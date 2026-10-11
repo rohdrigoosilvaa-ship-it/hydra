@@ -1,0 +1,862 @@
+<title>HYDRA — Entrega 1: Arquitetura e Especificação Técnica</title>
+<style>
+  :root{
+    --paper:#F4F6F5;
+    --paper-raised:#FFFFFF;
+    --ink:#12211D;
+    --ink-muted:#4B5C57;
+    --line:rgba(18,33,29,0.13);
+    --line-strong:rgba(18,33,29,0.22);
+    --teal:#0E6B5C;
+    --teal-deep:#0A4A40;
+    --teal-tint:#E3EFEC;
+    --amber:#C8660A;
+    --amber-tint:#FBEBD9;
+    --danger:#B5392E;
+    --shadow: 0 1px 2px rgba(18,33,29,0.06), 0 8px 24px -12px rgba(18,33,29,0.18);
+  }
+  @media (prefers-color-scheme: dark){
+    :root{
+      --paper:#0A1512;
+      --paper-raised:#101E1A;
+      --ink:#E7EFEC;
+      --ink-muted:#9AACA6;
+      --line:rgba(231,239,236,0.14);
+      --line-strong:rgba(231,239,236,0.24);
+      --teal:#35B79A;
+      --teal-deep:#1F8A72;
+      --teal-tint:#123128;
+      --amber:#E4933D;
+      --amber-tint:#2E210F;
+      --danger:#E2695D;
+      --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 12px 28px -14px rgba(0,0,0,0.6);
+    }
+  }
+  :root[data-theme="dark"]{
+    --paper:#0A1512; --paper-raised:#101E1A; --ink:#E7EFEC; --ink-muted:#9AACA6;
+    --line:rgba(231,239,236,0.14); --line-strong:rgba(231,239,236,0.24);
+    --teal:#35B79A; --teal-deep:#1F8A72; --teal-tint:#123128;
+    --amber:#E4933D; --amber-tint:#2E210F; --danger:#E2695D;
+    --shadow: 0 1px 2px rgba(0,0,0,0.3), 0 12px 28px -14px rgba(0,0,0,0.6);
+  }
+  :root[data-theme="light"]{
+    --paper:#F4F6F5; --paper-raised:#FFFFFF; --ink:#12211D; --ink-muted:#4B5C57;
+    --line:rgba(18,33,29,0.13); --line-strong:rgba(18,33,29,0.22);
+    --teal:#0E6B5C; --teal-deep:#0A4A40; --teal-tint:#E3EFEC;
+    --amber:#C8660A; --amber-tint:#FBEBD9; --danger:#B5392E;
+    --shadow: 0 1px 2px rgba(18,33,29,0.06), 0 8px 24px -12px rgba(18,33,29,0.18);
+  }
+
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family: "Segoe UI", -apple-system, "Helvetica Neue", Arial, sans-serif;
+    font-size:16px;
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  ::selection{ background: var(--teal); color:var(--paper-raised); }
+
+  h1,h2,h3,h4{
+    font-family: Cambria, Georgia, "Times New Roman", serif;
+    font-weight:600;
+    text-wrap:balance;
+    margin:0;
+    color:var(--ink);
+  }
+  code, .mono, .kv dt, table.spec th, .sheet-no, .tag{
+    font-family: Consolas, "SF Mono", "Cascadia Code", Menlo, monospace;
+  }
+  .mono-block{
+    font-family: Consolas, "SF Mono", "Cascadia Code", Menlo, monospace;
+    font-size:13px;
+    line-height:1.65;
+    white-space:pre;
+    overflow-x:auto;
+    background:var(--paper-raised);
+    border:1px solid var(--line);
+    border-radius:6px;
+    padding:16px 18px;
+    color:var(--ink);
+  }
+  a{ color:var(--teal-deep); }
+  :root[data-theme="dark"] a, @media (prefers-color-scheme:dark){ a{ color:var(--teal); } }
+
+  .layout{
+    display:grid;
+    grid-template-columns: 268px minmax(0,1fr);
+    max-width:1320px;
+    margin:0 auto;
+    align-items:start;
+  }
+  @media (max-width: 920px){
+    .layout{ grid-template-columns: 1fr; }
+    .side{ position:static !important; border-right:none !important; border-bottom:1px solid var(--line); }
+  }
+
+  .side{
+    position:sticky; top:0;
+    height:100vh;
+    overflow-y:auto;
+    border-right:1px solid var(--line);
+    padding:28px 20px 40px;
+  }
+  .brand{
+    display:flex; align-items:baseline; gap:8px; margin-bottom:4px;
+  }
+  .brand .mark{
+    width:10px;height:10px;border-radius:2px;background:var(--teal);
+    display:inline-block; transform: rotate(45deg);
+    flex:none;
+  }
+  .brand-name{
+    font-family:Cambria, Georgia, serif; font-weight:700; font-size:20px; letter-spacing:0.02em;
+  }
+  .brand-sub{
+    font-size:11.5px; color:var(--ink-muted); text-transform:uppercase; letter-spacing:0.08em;
+    margin:2px 0 26px 18px;
+  }
+  nav.toc{ display:flex; flex-direction:column; gap:1px; }
+  nav.toc a{
+    display:flex; gap:10px; align-items:baseline;
+    text-decoration:none; color:var(--ink-muted);
+    padding:6px 8px; border-radius:5px; font-size:13.5px;
+    border-left:2px solid transparent;
+  }
+  nav.toc a:hover{ background:var(--teal-tint); color:var(--ink); }
+  nav.toc a .n{ font-family:Consolas, monospace; font-size:11px; color:var(--teal-deep); flex:none; width:16px; }
+  :root[data-theme="dark"] nav.toc a .n, @media (prefers-color-scheme:dark){ nav.toc a .n{ color:var(--teal); } }
+  .toc-status{
+    margin-top:28px; padding:12px 12px; border:1px dashed var(--line-strong); border-radius:8px;
+    font-size:12px; color:var(--ink-muted); line-height:1.5;
+  }
+  .toc-status b{ color:var(--ink); }
+
+  main{ padding: 48px clamp(20px,4vw,64px) 100px; min-width:0; }
+
+  header.hero{ max-width:760px; margin-bottom:56px; }
+  .eyebrow{
+    font-family:Consolas,monospace; font-size:11.5px; letter-spacing:0.09em; text-transform:uppercase;
+    color:var(--teal-deep); margin-bottom:14px; display:flex; gap:10px; align-items:center;
+  }
+  :root[data-theme="dark"] .eyebrow, @media (prefers-color-scheme:dark){ .eyebrow{ color:var(--teal);} }
+  .eyebrow::before{ content:""; width:22px; height:1px; background:var(--teal); display:inline-block; }
+  h1.title{ font-size:clamp(30px,4vw,42px); line-height:1.12; margin-bottom:14px; }
+  p.lede{ font-size:17px; color:var(--ink-muted); max-width:62ch; }
+  .meta-row{ display:flex; gap:22px; flex-wrap:wrap; margin-top:22px; font-size:12.5px; color:var(--ink-muted); }
+  .meta-row .mono{ color:var(--ink); }
+
+  section.sheet{
+    max-width:900px;
+    padding-top:52px; margin-top:0;
+    border-top:1px solid var(--line);
+    scroll-margin-top:24px;
+  }
+  section.sheet:first-of-type{ border-top:none; padding-top:0; }
+  .sheet-head{ display:flex; gap:16px; align-items:flex-start; margin-bottom:22px; }
+  .sheet-no{
+    font-size:12px; color:var(--teal-deep); background:var(--teal-tint);
+    border-radius:5px; padding:3px 7px; flex:none; margin-top:6px;
+  }
+  :root[data-theme="dark"] .sheet-no, @media (prefers-color-scheme:dark){ .sheet-no{ color:var(--teal); } }
+  h2.sheet-title{ font-size:25px; margin-bottom:6px; }
+  p.sheet-abstract{ color:var(--ink-muted); font-size:14.5px; max-width:58ch; }
+
+  p{ margin:0 0 14px; max-width:68ch; }
+  ul,ol{ margin:0 0 14px; padding-left:22px; max-width:66ch; }
+  li{ margin-bottom:5px; }
+  strong{ color:var(--ink); }
+
+  .grid-2{ display:grid; grid-template-columns:1fr 1fr; gap:14px; margin:18px 0; }
+  @media (max-width:700px){ .grid-2{ grid-template-columns:1fr; } }
+  .card{
+    background:var(--paper-raised); border:1px solid var(--line); border-radius:8px;
+    padding:16px 18px; box-shadow:var(--shadow);
+  }
+  .card h4{ font-size:13.5px; margin-bottom:8px; color:var(--teal-deep); }
+  :root[data-theme="dark"] .card h4, @media (prefers-color-scheme:dark){ .card h4{ color:var(--teal); } }
+  .card p, .card ul{ font-size:13.5px; margin-bottom:0; }
+  .card ul{ padding-left:18px; }
+
+  table.spec{ width:100%; border-collapse:collapse; margin:18px 0; font-size:13.5px; }
+  table.spec th{
+    text-align:left; font-size:11px; text-transform:uppercase; letter-spacing:0.05em;
+    color:var(--ink-muted); border-bottom:1px solid var(--line-strong); padding:8px 10px;
+    font-weight:600;
+  }
+  table.spec td{ border-bottom:1px solid var(--line); padding:9px 10px; vertical-align:top; }
+  table.spec tr:last-child td{ border-bottom:none; }
+  .tblwrap{ overflow-x:auto; border:1px solid var(--line); border-radius:8px; }
+  .tblwrap table.spec{ margin:0; }
+  .tblwrap table.spec th:first-child, .tblwrap table.spec td:first-child{ padding-left:14px; }
+
+  .tag{
+    display:inline-block; font-size:10.5px; padding:2px 6px; border-radius:4px;
+    background:var(--teal-tint); color:var(--teal-deep); white-space:nowrap;
+  }
+  :root[data-theme="dark"] .tag, @media (prefers-color-scheme:dark){ .tag{ color:var(--teal);} }
+  .tag.amber{ background:var(--amber-tint); color:var(--amber); }
+
+  figure.diagram{ margin:22px 0 26px; padding:0; }
+  figure.diagram svg{ width:100%; height:auto; display:block; background:var(--paper-raised); border:1px solid var(--line); border-radius:8px; }
+  figcaption{ font-size:12.5px; color:var(--ink-muted); margin-top:8px; }
+  figure.diagram svg text{ font-family: Consolas, monospace; }
+
+  .phase{ display:flex; gap:16px; padding:16px 0; border-bottom:1px solid var(--line); }
+  .phase:last-child{ border-bottom:none; }
+  .phase .pn{
+    font-family:Cambria,Georgia,serif; font-weight:700; font-size:22px; color:var(--teal-deep);
+    flex:none; width:56px; font-variant-numeric: tabular-nums;
+  }
+  :root[data-theme="dark"] .phase .pn, @media (prefers-color-scheme:dark){ .phase .pn{ color:var(--teal);} }
+  .phase h4{ font-size:14.5px; margin-bottom:4px; }
+  .phase p{ font-size:13.5px; margin-bottom:6px; }
+  .phase .chips{ display:flex; gap:6px; flex-wrap:wrap; }
+
+  .rbac-list{ columns:2; gap:24px; }
+  @media (max-width:600px){ .rbac-list{ columns:1; } }
+  .rbac-list li{ break-inside:avoid; font-size:13.5px; }
+
+  .callout{
+    border-left:3px solid var(--amber); background:var(--amber-tint); border-radius:0 8px 8px 0;
+    padding:12px 16px; font-size:13.5px; color:var(--ink); margin:18px 0;
+  }
+  .callout b{ color:var(--amber); }
+
+  footer.closing{
+    max-width:760px; margin-top:64px; padding-top:32px; border-top:1px solid var(--line-strong);
+  }
+  footer.closing p{ color:var(--ink-muted); font-size:14px; }
+
+  .kv{ display:grid; grid-template-columns:max-content 1fr; gap:6px 16px; font-size:13.5px; margin:14px 0; }
+  .kv dt{ color:var(--teal-deep); }
+  :root[data-theme="dark"] .kv dt, @media (prefers-color-scheme:dark){ .kv dt{ color:var(--teal);} }
+  .kv dd{ margin:0; color:var(--ink-muted); }
+</style>
+
+<div class="layout">
+  <aside class="side">
+    <div class="brand"><span class="mark"></span><span class="brand-name">HYDRA</span></div>
+    <div class="brand-sub">Entrega 1 — Arquitetura</div>
+    <nav class="toc">
+      <a href="#s01"><span class="n">01</span>Arquitetura geral</a>
+      <a href="#s02"><span class="n">02</span>Pastas &amp; monorepo</a>
+      <a href="#s03"><span class="n">03</span>Stack tecnológica</a>
+      <a href="#s04"><span class="n">04</span>Modelo de dados</a>
+      <a href="#s05"><span class="n">05</span>Diagrama de entidades</a>
+      <a href="#s06"><span class="n">06</span>Multi-tenant</a>
+      <a href="#s07"><span class="n">07</span>Autenticação</a>
+      <a href="#s08"><span class="n">08</span>Permissões (RBAC)</a>
+      <a href="#s09"><span class="n">09</span>Design system</a>
+      <a href="#s10"><span class="n">10</span>Mapa de telas</a>
+      <a href="#s11"><span class="n">11</span>Roadmap do MVP</a>
+      <a href="#s12"><span class="n">12</span>Fluxo de navegação</a>
+      <a href="#s13"><span class="n">13</span>APIs</a>
+      <a href="#s14"><span class="n">14</span>Segurança</a>
+      <a href="#s15"><span class="n">15</span>LGPD</a>
+      <a href="#s16"><span class="n">16</span>Escalabilidade</a>
+    </nav>
+    <div class="toc-status">
+      <b>Status:</b> documento de arquitetura, pré-implementação (item 59). Nenhum código do produto Hydra foi escrito ainda — aguardando validação para iniciar a Fase 1.
+    </div>
+  </aside>
+
+  <main>
+    <header class="hero">
+      <div class="eyebrow">Plataforma Hydra · Projeto novo, independente do Portal SSMA atual</div>
+      <h1 class="title">Arquitetura e especificação técnica</h1>
+      <p class="lede">Dezesseis decisões estruturais — do banco de dados ao roadmap — para revisão antes de escrever a primeira linha de código de produto. Cada seção é uma folha independente; a ordem segue a sequência pedida.</p>
+      <div class="meta-row">
+        <span>Preparado para <span class="mono">Rodrigo</span></span>
+        <span class="mono">2026-08-08</span>
+        <span>Hidrovias do Brasil S.A. — prototipagem</span>
+      </div>
+    </header>
+
+    <!-- 01 ARQUITETURA GERAL -->
+    <section class="sheet" id="s01">
+      <div class="sheet-head">
+        <span class="sheet-no">01</span>
+        <div>
+          <h2 class="sheet-title">Arquitetura geral do sistema</h2>
+          <p class="sheet-abstract">Uma API central, stateless, servindo um SPA e processos assíncronos — sem lógica de negócio no cliente.</p>
+        </div>
+      </div>
+
+      <p>O Hydra é uma aplicação <strong>web-first</strong>: um SPA React consome uma API REST única (NestJS), que é a única porta de entrada para o banco de dados, o armazenamento de arquivos e as integrações externas. Nenhuma regra de negócio roda no cliente além de validação de formulário — isso mantém o isolamento multi-tenant e as permissões garantidos num único ponto.</p>
+
+      <figure class="diagram">
+        <svg viewBox="0 0 860 380" role="img" aria-label="Requisição do navegador vai por HTTPS até a API NestJS, que fala com Postgres, Redis e armazenamento S3; um worker separado consome filas do Redis para tarefas assíncronas; a API também fala com integrações externas como eSocial, Entra ID e e-mail/SMS.">
+          <defs>
+            <marker id="arw1" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+            </marker>
+          </defs>
+          <g fill="none" stroke="currentColor" stroke-width="1.2">
+            <rect x="24" y="150" width="130" height="60" rx="6"/>
+            <rect x="240" y="150" width="150" height="60" rx="6" stroke-width="1.8"/>
+            <rect x="490" y="40" width="140" height="52" rx="6"/>
+            <rect x="490" y="112" width="140" height="52" rx="6"/>
+            <rect x="490" y="184" width="140" height="52" rx="6"/>
+            <rect x="240" y="270" width="150" height="52" rx="6"/>
+            <rect x="686" y="112" width="150" height="52" rx="6" stroke-dasharray="3,3"/>
+            <rect x="686" y="270" width="150" height="90" rx="6" stroke-dasharray="3,3"/>
+          </g>
+          <g font-size="12.5" fill="currentColor">
+            <text x="89" y="176" text-anchor="middle">Cliente Web</text>
+            <text x="89" y="192" text-anchor="middle" opacity="0.65">React SPA</text>
+            <text x="315" y="176" text-anchor="middle">API</text>
+            <text x="315" y="192" text-anchor="middle" opacity="0.65">NestJS · REST</text>
+            <text x="560" y="62" text-anchor="middle">PostgreSQL</text>
+            <text x="560" y="77" text-anchor="middle" opacity="0.6">dados</text>
+            <text x="560" y="134" text-anchor="middle">Redis</text>
+            <text x="560" y="149" text-anchor="middle" opacity="0.6">cache · filas</text>
+            <text x="560" y="206" text-anchor="middle">Storage S3</text>
+            <text x="560" y="221" text-anchor="middle" opacity="0.6">documentos · fotos</text>
+            <text x="315" y="292" text-anchor="middle">Worker</text>
+            <text x="315" y="307" text-anchor="middle" opacity="0.6">BullMQ · jobs</text>
+            <text x="761" y="134" text-anchor="middle">eSocial / Entra ID</text>
+            <text x="761" y="292" text-anchor="middle">E-mail · SMS</text>
+            <text x="761" y="308" text-anchor="middle">integrações externas</text>
+          </g>
+          <g stroke="currentColor" stroke-width="1.2" fill="none">
+            <line x1="154" y1="180" x2="238" y2="180" marker-end="url(#arw1)"/>
+            <line x1="390" y1="170" x2="488" y2="66" marker-end="url(#arw1)"/>
+            <line x1="390" y1="180" x2="488" y2="138" marker-end="url(#arw1)"/>
+            <line x1="390" y1="192" x2="488" y2="210" marker-end="url(#arw1)"/>
+            <line x1="315" y1="210" x2="315" y2="268" marker-end="url(#arw1)"/>
+            <line x1="390" y1="288" x2="558" y2="200" stroke-dasharray="2,3" marker-end="url(#arw1)"/>
+            <line x1="630" y1="138" x2="684" y2="138" marker-end="url(#arw1)"/>
+            <line x1="390" y1="296" x2="684" y2="312" stroke-dasharray="2,3" marker-end="url(#arw1)"/>
+          </g>
+          <text x="196" y="172" font-size="10.5" fill="currentColor" opacity="0.55" text-anchor="middle">HTTPS/JSON</text>
+          <text x="325" y="245" font-size="10.5" fill="currentColor" opacity="0.55" text-anchor="middle">consome fila</text>
+        </svg>
+        <figcaption>Fig. 1 — A API é o único ponto que fala com dados, arquivos e integrações; o worker roda tarefas de fundo (envio eSocial, geração de relatório, notificações) fora do ciclo de requisição.</figcaption>
+      </figure>
+
+      <p>Três características guiam essa topologia:</p>
+      <ul>
+        <li><strong>Stateless na API</strong> — nenhuma sessão em memória local; qualquer instância pode responder qualquer requisição, o que permite escalar horizontalmente sem sticky sessions.</li>
+        <li><strong>Assíncrono onde o usuário não deveria esperar</strong> — envio de evento eSocial, geração de PDF de laudo, disparo de notificação em massa: tudo vai para fila, não bloqueia a resposta HTTP.</li>
+        <li><strong>Um adaptador para cada dependência externa</strong> — storage, e-mail, SSO e eSocial ficam atrás de interfaces internas, para trocar provedor sem reescrever módulos de negócio.</li>
+      </ul>
+    </section>
+
+    <!-- 02 PASTAS -->
+    <section class="sheet" id="s02">
+      <div class="sheet-head">
+        <span class="sheet-no">02</span>
+        <div>
+          <h2 class="sheet-title">Arquitetura de pastas</h2>
+          <p class="sheet-abstract">Monorepo com pnpm + Turborepo: um pacote de tipos e um de UI compartilhados entre web, API e worker.</p>
+        </div>
+      </div>
+      <p>Diferente do Portal SSMA atual (dois projetos soltos, <span class="mono">client/</span> e <span class="mono">server/</span>), o Hydra nasce como monorepo — necessário porque worker, API e web vão compartilhar tipos (DTOs) e componentes de UI desde o primeiro módulo.</p>
+      <div class="mono-block">hydra/
+├── apps/
+│   ├── web/              React + Vite — SPA principal (colaborador, gestor, admin)
+│   ├── api/               NestJS — API REST, guards de tenant/RBAC, módulos de domínio
+│   └── worker/             BullMQ — jobs assíncronos (eSocial, relatórios, notificações)
+├── packages/
+│   ├── ui/                 Hydra UI — design system (componentes, tokens, ícones)
+│   ├── types/               DTOs e enums compartilhados (gerados a partir do schema)
+│   ├── db/                  schema.prisma, migrations, seed, client Prisma
+│   └── config/               eslint, tsconfig, tailwind preset, prettier — base única
+├── docs/                    ADRs e este documento de arquitetura
+├── turbo.json
+├── pnpm-workspace.yaml
+└── .env.example</div>
+      <p>Dentro de <span class="mono">apps/api</span>, cada módulo de negócio (PGR, EPI, Treinamentos...) é uma pasta autocontida — controller, service, DTOs e testes — registrada no módulo raiz. Isso segue diretamente a regra do item 57 do escopo: <em>"cada módulo deve ser independente, mas integrado ao núcleo"</em>.</p>
+      <div class="mono-block">apps/api/src/
+├── core/                    tenant middleware, auth guards, audit interceptor
+├── modules/
+│   ├── org/                 tenants, companies, branches, units, employees
+│   ├── pgr/
+│   ├── epi/
+│   ├── trainings/
+│   ├── checklists/
+│   ├── actions/
+│   └── ...                  um por módulo do mapa de telas (seção 10)
+└── main.ts</div>
+    </section>
+
+    <!-- 03 STACK -->
+    <section class="sheet" id="s03">
+      <div class="sheet-head">
+        <span class="sheet-no">03</span>
+        <div>
+          <h2 class="sheet-title">Stack tecnológica</h2>
+          <p class="sheet-abstract">TypeScript ponta a ponta. Escolhas otimizadas para um time pequeno mantendo um produto com muitos módulos.</p>
+        </div>
+      </div>
+      <div class="grid-2">
+        <div class="card">
+          <h4>Front-end</h4>
+          <ul>
+            <li>React 18 + TypeScript, Vite</li>
+            <li>Tailwind CSS + componentes próprios (Hydra UI, base Radix)</li>
+            <li>TanStack Query (dados do servidor) + Zustand (estado local leve)</li>
+            <li>React Hook Form + Zod (formulários e validação)</li>
+            <li>Recharts (gráficos), Lucide (ícones), Framer Motion (transições)</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>Back-end</h4>
+          <ul>
+            <li>Node.js + TypeScript, NestJS (módulos, DI, guards)</li>
+            <li>PostgreSQL 16 + Prisma ORM</li>
+            <li>Redis (cache, filas, rate limit) + BullMQ (jobs)</li>
+            <li>Zod/class-validator na borda da API</li>
+            <li>OpenAPI gerado automaticamente a partir dos DTOs</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>Autenticação &amp; identidade</h4>
+          <ul>
+            <li>JWT de acesso (15 min) + refresh token rotativo (cookie httpOnly)</li>
+            <li>Argon2 para hash de senha</li>
+            <li>TOTP para MFA · OIDC para SSO (Microsoft Entra ID)</li>
+          </ul>
+        </div>
+        <div class="card">
+          <h4>Infraestrutura</h4>
+          <ul>
+            <li>Storage S3-compatível (Cloudflare R2 por custo; AWS S3/Azure Blob via adaptador)</li>
+            <li>PgBouncer (pool de conexões)</li>
+            <li>Observabilidade: logs estruturados + tracing (OpenTelemetry)</li>
+          </ul>
+        </div>
+      </div>
+      <p><strong>Por que NestJS em vez de Express puro:</strong> o número de módulos de negócio previsto (mais de 30) exige uma convenção forte de organização, injeção de dependência e guards reaproveitáveis — é exatamente o que o Express simples do Portal SSMA atual começou a sentir falta ao crescer. NestJS resolve isso sem sair de Node/TypeScript.</p>
+    </section>
+
+    <!-- 04 MODELO DE DADOS -->
+    <section class="sheet" id="s04">
+      <div class="sheet-head">
+        <span class="sheet-no">04</span>
+        <div>
+          <h2 class="sheet-title">Modelo de banco de dados</h2>
+          <p class="sheet-abstract">Um schema Prisma único, organizado por domínio; toda tabela de negócio carrega <span class="mono">tenantId</span>.</p>
+        </div>
+      </div>
+      <p>Três convenções valem para <strong>toda</strong> tabela do domínio, sem exceção — elas são o que torna o multi-tenant (seção 06) e a auditoria (seção 14) possíveis sem gambiarra depois:</p>
+      <div class="kv">
+        <dt>tenantId</dt><dd>chave estrangeira obrigatória para <span class="mono">companies</span> — nunca nula, sempre indexada.</dd>
+        <dt>createdAt / updatedAt / deletedAt</dt><dd>soft delete por padrão; exclusão definitiva é ação administrativa separada, auditada.</dd>
+        <dt>createdById / updatedById</dt><dd>rastreabilidade de quem alterou, exigida pelo item 39 (auditoria).</dd>
+      </div>
+      <div class="tblwrap">
+        <table class="spec">
+          <tr><th>Domínio</th><th>Tabelas principais</th><th>Observação</th></tr>
+          <tr><td>Organização</td><td class="mono">tenants, companies, branches, units, departments, positions, employees, users, roles, permissions</td><td>núcleo — todos os outros domínios referenciam <span class="mono">employees</span> ou <span class="mono">units</span></td></tr>
+          <tr><td>Riscos &amp; PGR</td><td class="mono">risk_groups, risks, hazards, pgrs, pgr_risks, pgr_actions, ghe</td><td><span class="mono">ghe</span> conecta função + ambiente + agente</td></tr>
+          <tr><td>Laudos &amp; LTCAT</td><td class="mono">ltcats, technical_reports, ergonomic_assessments</td><td>versionados, com validade e responsável técnico (ART)</td></tr>
+          <tr><td>Ocorrências</td><td class="mono">accidents, incidents, investigations, corrective_actions</td><td><span class="mono">corrective_actions</span> é compartilhada com Hydra Actions</td></tr>
+          <tr><td>Inspeções</td><td class="mono">checklists, checklist_questions, checklist_executions, checklist_answers</td><td>perguntas versionadas — editar um checklist não altera execuções passadas</td></tr>
+          <tr><td>EPI</td><td class="mono">ppe, ppe_stock, ppe_deliveries</td><td>entrega com assinatura digital do colaborador</td></tr>
+          <tr><td>Treinamentos</td><td class="mono">trainings, training_classes, training_participants, certificates</td><td>vencimento calculado a partir da NR + data de realização</td></tr>
+          <tr><td>Saúde ocupacional</td><td class="mono">medical_exams, medical_records, asos, pcmso, appointments</td><td>acesso restrito — ver seção 15 (LGPD)</td></tr>
+          <tr><td>Previdenciário</td><td class="mono">absences, benefits, fap_records, ppps</td><td>alimenta indicadores de absenteísmo</td></tr>
+          <tr><td>eSocial</td><td class="mono">esocial_events, esocial_receipts</td><td>guarda XML enviado, recibo e status por evento</td></tr>
+          <tr><td>Documentos</td><td class="mono">documents, document_versions, document_signatures</td><td>versionamento nativo; assinatura registra hash do arquivo</td></tr>
+          <tr><td>Rede &amp; comercial</td><td class="mono">providers, provider_contracts, provider_services, invoices, payments, crm_leads, crm_opportunities, crm_tasks</td><td>fora do MVP — fases 3 e 4</td></tr>
+          <tr><td>Transversal</td><td class="mono">notifications, audit_logs, ai_conversations, ai_messages</td><td>não pertencem a um módulo — servem todos</td></tr>
+        </table>
+      </div>
+    </section>
+
+    <!-- 05 DIAGRAMA ENTIDADES -->
+    <section class="sheet" id="s05">
+      <div class="sheet-head">
+        <span class="sheet-no">05</span>
+        <div>
+          <h2 class="sheet-title">Diagrama das principais entidades</h2>
+          <p class="sheet-abstract">Visão por clusters — a lista completa de colunas fica no <span class="mono">schema.prisma</span>, não neste documento.</p>
+        </div>
+      </div>
+      <figure class="diagram">
+        <svg viewBox="0 0 900 460" role="img" aria-label="Quatro grupos de entidades: Organização no centro conectando a Riscos e Conformidade, Pessoas e Saúde, e Documentos e Ações; Riscos gera pendências em Documentos e Ações; Pessoas é exposta a Riscos; tudo é registrado em Auditoria.">
+          <defs>
+            <marker id="arw2" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+              <path d="M0,0 L10,5 L0,10 z" fill="currentColor"/>
+            </marker>
+          </defs>
+          <g stroke="currentColor" fill="none" stroke-width="1.2">
+            <rect x="345" y="196" width="210" height="70" rx="7" stroke-width="2"/>
+            <rect x="60" y="40" width="220" height="96" rx="7"/>
+            <rect x="620" y="40" width="220" height="96" rx="7"/>
+            <rect x="60" y="330" width="220" height="96" rx="7"/>
+            <rect x="620" y="330" width="220" height="96" rx="7"/>
+          </g>
+          <g font-size="12.5" fill="currentColor">
+            <text x="450" y="226" text-anchor="middle">Organização</text>
+            <text x="450" y="242" text-anchor="middle" opacity="0.6" font-size="11">tenants · companies · units</text>
+            <text x="450" y="256" text-anchor="middle" opacity="0.6" font-size="11">employees · users · roles</text>
+
+            <text x="170" y="74" text-anchor="middle">Riscos &amp; Conformidade</text>
+            <text x="170" y="92" text-anchor="middle" opacity="0.6" font-size="11">pgrs · risks · ltcats</text>
+            <text x="170" y="107" text-anchor="middle" opacity="0.6" font-size="11">ghe · investigations</text>
+
+            <text x="730" y="74" text-anchor="middle">Pessoas &amp; Saúde</text>
+            <text x="730" y="92" text-anchor="middle" opacity="0.6" font-size="11">medical_exams · asos</text>
+            <text x="730" y="107" text-anchor="middle" opacity="0.6" font-size="11">trainings · ppe</text>
+
+            <text x="170" y="366" text-anchor="middle">Documentos &amp; Ações</text>
+            <text x="170" y="384" text-anchor="middle" opacity="0.6" font-size="11">documents · checklists</text>
+            <text x="170" y="399" text-anchor="middle" opacity="0.6" font-size="11">corrective_actions</text>
+
+            <text x="730" y="366" text-anchor="middle">Auditoria &amp; Notificações</text>
+            <text x="730" y="384" text-anchor="middle" opacity="0.6" font-size="11">audit_logs</text>
+            <text x="730" y="399" text-anchor="middle" opacity="0.6" font-size="11">notifications</text>
+          </g>
+          <g stroke="currentColor" stroke-width="1.2" fill="none">
+            <line x1="280" y1="100" x2="345" y2="210" marker-end="url(#arw2)"/>
+            <line x1="620" y1="100" x2="555" y2="210" marker-end="url(#arw2)"/>
+            <line x1="345" y1="252" x2="280" y2="365" marker-end="url(#arw2)"/>
+            <line x1="555" y1="252" x2="620" y2="365" marker-end="url(#arw2)"/>
+            <line x1="280" y1="80" x2="620" y2="360" stroke-dasharray="3,3" opacity="0.55" marker-end="url(#arw2)"/>
+          </g>
+          <text x="300" y="150" font-size="10.5" opacity="0.6" text-anchor="middle">expõe colaborador a</text>
+          <text x="605" y="150" font-size="10.5" opacity="0.6" text-anchor="middle">exige exame/treino</text>
+          <text x="235" y="310" font-size="10.5" opacity="0.6" text-anchor="middle">gera pendência</text>
+          <text x="660" y="310" font-size="10.5" opacity="0.6" text-anchor="middle">exige evidência</text>
+          <text x="460" y="465" font-size="10.5" opacity="0.55" text-anchor="middle">toda escrita nos quatro clusters é replicada em audit_logs (seção 14)</text>
+        </svg>
+        <figcaption>Fig. 2 — Organização é o eixo: os outros três clusters sempre referenciam <span class="mono">employee</span> ou <span class="mono">unit</span>, nunca se conectam diretamente entre si sem passar por ele.</figcaption>
+      </figure>
+    </section>
+
+    <!-- 06 MULTI-TENANT -->
+    <section class="sheet" id="s06">
+      <div class="sheet-head">
+        <span class="sheet-no">06</span>
+        <div>
+          <h2 class="sheet-title">Estratégia multi-tenant</h2>
+          <p class="sheet-abstract">Banco compartilhado com isolamento por linha, reforçado no próprio PostgreSQL — não só na aplicação.</p>
+        </div>
+      </div>
+      <p>Para o MVP e a maioria dos clientes, o Hydra usa <strong>um único banco PostgreSQL, schema compartilhado</strong>, com toda tabela de negócio carregando <span class="mono">tenantId</span>. É o modelo mais barato de operar (uma migração, um backup, um monitoramento) — mas ele só é seguro se o isolamento não depender exclusivamente de "lembrar de filtrar" no código.</p>
+      <p>Por isso, o isolamento tem <strong>duas camadas independentes</strong>:</p>
+      <ol>
+        <li><strong>Aplicação</strong> — um middleware de tenant lê o <span class="mono">tenantId</span> do JWT e injeta automaticamente o filtro em toda query do Prisma (via extension), sem depender de cada desenvolvedor lembrar de escrever <span class="mono">WHERE tenantId = ...</span>.</li>
+        <li><strong>Banco de dados</strong> — Row-Level Security (RLS) nativo do PostgreSQL, com uma policy por tabela que só libera linhas cujo <span class="mono">tenant_id</span> bate com a variável de sessão definida na conexão. Mesmo uma query com bug na camada 1 não vaza dado de outro tenant.</li>
+      </ol>
+      <figure class="diagram">
+        <svg viewBox="0 0 860 300" role="img" aria-label="A aplicação envia tenant_id junto com a query; a policy de row level security filtra as linhas do banco compartilhado para liberar só as do tenant correto; ao lado, um cliente enterprise opcional usa um schema dedicado dentro do mesmo cluster.">
+          <g stroke="currentColor" fill="none" stroke-width="1.2">
+            <rect x="20" y="110" width="140" height="60" rx="6"/>
+            <rect x="240" y="40" width="90" height="220" rx="4" stroke-width="1.8"/>
+            <rect x="400" y="70" width="230" height="150" rx="6"/>
+            <rect x="700" y="70" width="140" height="150" rx="6" stroke-dasharray="3,3"/>
+          </g>
+          <g font-size="11.5" fill="currentColor">
+            <text x="90" y="136" text-anchor="middle">Aplicação</text>
+            <text x="90" y="152" text-anchor="middle" opacity="0.6">API + Prisma</text>
+            <text x="285" y="30" text-anchor="middle" font-size="11">RLS policy</text>
+          </g>
+          <g fill="currentColor" opacity="0.85" font-size="10.5">
+            <rect x="415" y="88" width="200" height="20" rx="3" fill="none" stroke="currentColor" stroke-width="0.8"/>
+            <text x="425" y="102">tenant A · linha</text>
+            <rect x="415" y="114" width="200" height="20" rx="3" fill="none" stroke="currentColor" stroke-width="0.8"/>
+            <text x="425" y="128">tenant B · linha</text>
+            <rect x="415" y="140" width="200" height="20" rx="3" fill="none" stroke="currentColor" stroke-width="0.8"/>
+            <text x="425" y="154">tenant C · linha</text>
+            <text x="515" y="185" text-anchor="middle" opacity="0.6">PostgreSQL — schema único</text>
+          </g>
+          <g font-size="11" fill="currentColor">
+            <text x="770" y="140" text-anchor="middle">Tenant</text>
+            <text x="770" y="155" text-anchor="middle">enterprise</text>
+            <text x="770" y="172" text-anchor="middle" opacity="0.6" font-size="10">schema dedicado</text>
+            <text x="770" y="186" text-anchor="middle" opacity="0.6" font-size="10">(fase 4+, opcional)</text>
+          </g>
+          <g stroke="currentColor" stroke-width="1.2" fill="none">
+            <line x1="160" y1="140" x2="238" y2="140" marker-end="url(#arw1)"/>
+            <line x1="330" y1="140" x2="398" y2="140" marker-end="url(#arw1)"/>
+            <line x1="630" y1="145" x2="698" y2="145" stroke-dasharray="2,3" marker-end="url(#arw1)"/>
+          </g>
+          <text x="200" y="130" font-size="9.5" opacity="0.55" text-anchor="middle">tenant_id via JWT</text>
+          <text x="365" y="130" font-size="9.5" opacity="0.55" text-anchor="middle">só linhas do tenant</text>
+        </svg>
+        <figcaption>Fig. 3 — O caminho padrão passa pela policy de RLS. Um schema dedicado por tenant fica disponível como opção para clientes com exigência contratual de isolamento físico, sem mudar o modelo de dados.</figcaption>
+      </figure>
+      <p>Usuários que atendem mais de uma empresa — caso típico de consultorias de SST e prestadores — têm múltiplos vínculos de <span class="mono">tenantId</span> associados ao mesmo login, com um seletor de empresa ativa na interface; trocar de empresa reemite o JWT com o novo <span class="mono">tenantId</span>.</p>
+    </section>
+
+    <!-- 07 AUTENTICAÇÃO -->
+    <section class="sheet" id="s07">
+      <div class="sheet-head">
+        <span class="sheet-no">07</span>
+        <div>
+          <h2 class="sheet-title">Estratégia de autenticação</h2>
+          <p class="sheet-abstract">JWT curto + refresh rotativo como padrão; MFA e SSO corporativo previstos desde o modelo de dados.</p>
+        </div>
+      </div>
+      <div class="kv">
+        <dt>Senha</dt><dd>hash Argon2id, nunca reversível, nunca logada.</dd>
+        <dt>Access token</dt><dd>JWT de 15 minutos, carrega <span class="mono">userId</span>, <span class="mono">tenantId</span> ativo e papéis — enviado em header <span class="mono">Authorization</span>.</dd>
+        <dt>Refresh token</dt><dd>opaco, 30 dias, rotacionado a cada uso, guardado com hash no banco (revogável individualmente), entregue em cookie <span class="mono">httpOnly + secure + sameSite=strict</span>.</dd>
+        <dt>MFA</dt><dd>TOTP (RFC 6238) por usuário, com opção de tornar obrigatório por tenant — tabela <span class="mono">mfa_secrets</span> e códigos de recuperação de uso único.</dd>
+        <dt>SSO / OAuth</dt><dd>camada OIDC genérica; primeiro provedor suportado é Microsoft Entra ID, por já ser o ecossistema corporativo do usuário-tipo do Hydra.</dd>
+      </div>
+      <div class="callout"><b>Nota:</b> nenhuma dessas peças precisa estar pronta no MVP — mas o modelo de dados (tabela <span class="mono">users</span> com <span class="mono">authProvider</span>, tabela separada de <span class="mono">mfa_secrets</span>) já nasce preparado, para não exigir migração destrutiva quando forem ligadas na Fase 3.</div>
+    </section>
+
+    <!-- 08 PERMISSÕES -->
+    <section class="sheet" id="s08">
+      <div class="sheet-head">
+        <span class="sheet-no">08</span>
+        <div>
+          <h2 class="sheet-title">Estratégia de permissões</h2>
+          <p class="sheet-abstract">RBAC com escopo: o mesmo papel se comporta diferente conforme a abrangência do vínculo.</p>
+        </div>
+      </div>
+      <p>Um papel sozinho não basta — "Gestor SST" da filial Santarém não pode enxergar dados da filial Vila do Conde. Por isso cada vínculo de permissão é a combinação de <strong>papel + escopo</strong>: <span class="mono">(userId, tenantId, role, scopeType, scopeId)</span>, onde <span class="mono">scopeType</span> é <span class="mono">company</span>, <span class="mono">branch</span> ou <span class="mono">unit</span>.</p>
+      <ul class="rbac-list">
+        <li><span class="tag">SUPER_ADMIN</span> plataforma Hydra</li>
+        <li><span class="tag">ADMIN_EMPRESA</span> todas as filiais</li>
+        <li><span class="tag">GESTOR_SST</span> escopo configurável</li>
+        <li><span class="tag">ENGENHEIRO</span> escopo configurável</li>
+        <li><span class="tag">TECNICO_SST</span> escopo configurável</li>
+        <li><span class="tag">MEDICO</span> dados de saúde, escopo próprio</li>
+        <li><span class="tag">ENFERMEIRO</span> dados de saúde, escopo próprio</li>
+        <li><span class="tag">RH</span> escopo configurável</li>
+        <li><span class="tag">GESTOR</span> unidade/setor</li>
+        <li><span class="tag">COLABORADOR</span> somente os próprios dados</li>
+        <li><span class="tag">PRESTADOR</span> só serviços/clientes vinculados</li>
+        <li><span class="tag">CLINICA</span> só atendimentos próprios</li>
+        <li><span class="tag">FINANCEIRO</span> módulo financeiro</li>
+        <li><span class="tag">COMERCIAL</span> módulo CRM</li>
+      </ul>
+      <figure class="diagram">
+        <svg viewBox="0 0 860 190" role="img" aria-label="Uma requisição chega com o JWT do usuário; um guard resolve o papel e o escopo do vínculo; verifica se a permissão do módulo é concedida naquele escopo; se sim, executa a ação, se não, responde 403 e grava no log de auditoria.">
+          <g stroke="currentColor" fill="none" stroke-width="1.2">
+            <rect x="14" y="65" width="150" height="60" rx="6"/>
+            <rect x="214" y="65" width="150" height="60" rx="6"/>
+            <rect x="414" y="65" width="170" height="60" rx="6" stroke-width="1.8"/>
+            <rect x="640" y="10" width="200" height="52" rx="6"/>
+            <rect x="640" y="120" width="200" height="60" rx="6"/>
+          </g>
+          <g font-size="12" fill="currentColor" text-anchor="middle">
+            <text x="89" y="92">Requisição</text>
+            <text x="89" y="108" opacity="0.6" font-size="10.5">JWT: user, tenant</text>
+            <text x="289" y="92">Resolve papel</text>
+            <text x="289" y="108" opacity="0.6" font-size="10.5">+ escopo do vínculo</text>
+            <text x="499" y="92">Permissão do</text>
+            <text x="499" y="106">módulo concedida?</text>
+            <text x="740" y="32">Sim → executa ação</text>
+            <text x="740" y="146">Não → 403</text>
+            <text x="740" y="162" opacity="0.6" font-size="10.5">+ grava audit_log</text>
+          </g>
+          <g stroke="currentColor" stroke-width="1.2" fill="none">
+            <line x1="164" y1="95" x2="212" y2="95" marker-end="url(#arw2)"/>
+            <line x1="364" y1="95" x2="412" y2="95" marker-end="url(#arw2)"/>
+            <line x1="584" y1="85" x2="638" y2="45" marker-end="url(#arw2)"/>
+            <line x1="584" y1="105" x2="638" y2="145" marker-end="url(#arw2)"/>
+          </g>
+        </svg>
+        <figcaption>Fig. 4 — Implementado como um <span class="mono">PolicyGuard</span> do NestJS, reaproveitado em todo endpoint via decorator (<span class="mono">@RequirePermission('pgr:approve')</span>), nunca reimplementado módulo a módulo.</figcaption>
+      </figure>
+    </section>
+
+    <!-- 09 DESIGN SYSTEM -->
+    <section class="sheet" id="s09">
+      <div class="sheet-head">
+        <span class="sheet-no">09</span>
+        <div>
+          <h2 class="sheet-title">Design system — Hydra UI</h2>
+          <p class="sheet-abstract">Tokens antes de componentes: cor, espaço e tipografia definidos uma vez, consumidos por Tailwind e pelos componentes React.</p>
+        </div>
+      </div>
+      <p>Identidade própria, não copiada de nenhum produto de referência: paleta em <strong>petróleo/teal</strong> (tecnologia, saúde, controle) com <strong>âmbar</strong> reservado exclusivamente para estados de atenção e criticidade — nunca decorativo. Tipografia serifada para títulos (peso editorial, autoridade de laudo técnico) e sem serifa para corpo de texto e dados tabulares.</p>
+      <div class="grid-2">
+        <div class="card">
+          <h4>Componentes base</h4>
+          <p>Button, Input, Select, Modal, Drawer, Card, DataTable, Badge, Tabs, Dropdown, Tooltip, Toast, Alert, Calendar, DatePicker, FileUpload, Signature, Timeline, KPI Card, Chart.</p>
+        </div>
+        <div class="card">
+          <h4>Estados obrigatórios</h4>
+          <p>Todo componente de dado precisa de: loading (skeleton), vazio (empty state com ação), erro (com retry) — não apenas o estado "feliz". Sem isso, um módulo não é considerado pronto para revisão.</p>
+        </div>
+      </div>
+      <p>O pacote <span class="mono">packages/ui</span> é publicado internamente e consumido tanto pelo <span class="mono">apps/web</span> quanto por eventuais superfícies futuras (portal do colaborador, app mobile) — garantindo que "parecer Hydra" seja automático, não uma checklist manual por tela.</p>
+    </section>
+
+    <!-- 10 MAPA DE TELAS -->
+    <section class="sheet" id="s10">
+      <div class="sheet-head">
+        <span class="sheet-no">10</span>
+        <div>
+          <h2 class="sheet-title">Mapa de telas</h2>
+          <p class="sheet-abstract">Estrutura de navegação principal e as telas centrais de cada área — não cada variação de formulário.</p>
+        </div>
+      </div>
+      <div class="tblwrap">
+        <table class="spec">
+          <tr><th>Área</th><th>Telas principais</th></tr>
+          <tr><td><strong>Dashboard</strong></td><td>Hydra Control Center · Centro de Comando (pendências por criticidade)</td></tr>
+          <tr><td><strong>Minha Empresa</strong></td><td>Filiais · Setores · Cargos · Colaboradores</td></tr>
+          <tr><td><strong>Segurança</strong></td><td>PGR (inventário, GHE, plano de ação) · LTCAT · Laudos · AEP · CIPA · CAT · Incidentes/Investigação · Inspeções &amp; Checklists · EPI (estoque e ficha) · Treinamentos (catálogo, turmas, certificados)</td></tr>
+          <tr><td><strong>Saúde</strong></td><td>PCMSO · ASO · Exames · Ambulatório · Absenteísmo</td></tr>
+          <tr><td><strong>Previdenciário</strong></td><td>Afastamentos · Benefícios · FAP/NTEP</td></tr>
+          <tr><td><strong>eSocial</strong></td><td>Cockpit (pendentes, enviados, rejeitados) · Eventos S-2210/2220/2221/2230/2240</td></tr>
+          <tr><td><strong>Documentos</strong></td><td>Repositório com versionamento, assinatura e QR Code</td></tr>
+          <tr><td><strong>Plano de Ações</strong></td><td>Lista unificada, origem cruzada (PGR, inspeção, incidente, auditoria)</td></tr>
+          <tr><td><strong>HydraNET</strong></td><td>Busca de prestadores · Contratos · Avaliações</td></tr>
+          <tr><td><strong>Hydra BI</strong></td><td>Indicadores configuráveis, metas, L12M</td></tr>
+          <tr><td><strong>Hydra AI</strong></td><td>Hydra Copilot (chat)</td></tr>
+          <tr><td><strong>Financeiro / CRM</strong></td><td>Faturamento · Pipeline comercial</td></tr>
+          <tr><td><strong>Portal do Colaborador</strong></td><td>Meus documentos · ASO · Treinamentos · EPI · Riscos da função</td></tr>
+          <tr><td><strong>Administração</strong></td><td>Empresas · Usuários · Papéis · Logs · Integrações · Templates</td></tr>
+        </table>
+      </div>
+      <p>Navegação global: busca (<span class="mono">Ctrl+K</span>), sino de notificações e seletor de empresa/filial ficam fixos na barra superior em toda tela autenticada.</p>
+    </section>
+
+    <!-- 11 ROADMAP -->
+    <section class="sheet" id="s11">
+      <div class="sheet-head">
+        <span class="sheet-no">11</span>
+        <div>
+          <h2 class="sheet-title">Roadmap do MVP</h2>
+          <p class="sheet-abstract">Cinco fases. A Fase 1 é o que efetivamente entra em código depois desta entrega ser validada.</p>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="pn">01</div>
+        <div>
+          <h4>Fundação + PGR</h4>
+          <p>Login, multi-tenant, colaboradores, dashboard, PGR/riscos, documentos, plano de ações, checklists, treinamentos, EPI.</p>
+          <div class="chips"><span class="tag">núcleo</span><span class="tag">sem o núcleo, nada mais funciona</span></div>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="pn">02</div>
+        <div>
+          <h4>Saúde &amp; ocorrências</h4>
+          <p>PCMSO, ASO, exames, CAT, incidentes/investigação, CIPA, LTCAT, laudos.</p>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="pn">03</div>
+        <div>
+          <h4>Conformidade legal &amp; rede</h4>
+          <p>eSocial, PPP, previdenciário, prestadores, HydraNET.</p>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="pn">04</div>
+        <div>
+          <h4>Comercial</h4>
+          <p>Financeiro, CRM, contas médicas.</p>
+        </div>
+      </div>
+      <div class="phase">
+        <div class="pn">05</div>
+        <div>
+          <h4>Inteligência</h4>
+          <p>Hydra BI, Hydra AI/Copilot, app mobile, automações.</p>
+        </div>
+      </div>
+      <p>Dentro da própria Fase 1, a ordem de construção segue o item 57: arquitetura → banco → autenticação → multiempresa → permissões → layout → dashboard → primeiro módulo completo (PGR) antes de abrir o segundo.</p>
+    </section>
+
+    <!-- 12 NAVEGAÇÃO -->
+    <section class="sheet" id="s12">
+      <div class="sheet-head">
+        <span class="sheet-no">12</span>
+        <div>
+          <h2 class="sheet-title">Fluxo de navegação</h2>
+          <p class="sheet-abstract">Do login ao dado — o caminho mais curto sempre visível, o resto a um clique.</p>
+        </div>
+      </div>
+      <div class="mono-block">Login
+ └─ (múltiplos tenants?) → Seletor de empresa
+     └─ Dashboard (Control Center)
+         ├─ Card de pendência → lista filtrada do módulo → registro → ação
+         ├─ Sidebar → módulo → sub-área → registro
+         └─ Busca global (Ctrl+K) → qualquer entidade → registro direto</div>
+      <p>Regra de UX: todo card do dashboard e todo alerta é clicável e leva direto à lista já filtrada — nunca a uma tela genérica que o usuário precisa refiltrar manualmente.</p>
+    </section>
+
+    <!-- 13 APIS -->
+    <section class="sheet" id="s13">
+      <div class="sheet-head">
+        <span class="sheet-no">13</span>
+        <div>
+          <h2 class="sheet-title">APIs necessárias</h2>
+          <p class="sheet-abstract">Um namespace REST por módulo de negócio, todos atrás do mesmo guard de tenant + permissão.</p>
+        </div>
+      </div>
+      <div class="mono-block">/api/auth            /api/pgr              /api/checklists       /api/documents
+/api/companies        /api/ltcat             /api/ppe               /api/providers
+/api/branches         /api/laudos            /api/trainings         /api/hydranet
+/api/employees        /api/aep               /api/health            /api/finance
+/api/sst              /api/ghe               /api/pcmso             /api/crm
+/api/incidents        /api/accidents         /api/aso                /api/bi
+/api/actions          /api/absenteeism       /api/previdenciario     /api/notifications
+/api/esocial          /api/ppp               /api/admin              /api/ai</div>
+      <p>Cada namespace expõe operações REST convencionais (<span class="mono">GET/POST/PATCH/DELETE</span>) mais verbos de domínio quando fizer sentido — por exemplo <span class="mono">POST /api/pgr/:id/approve</span> ou <span class="mono">POST /api/esocial/events/:id/retransmit</span>. A especificação OpenAPI é gerada a partir dos DTOs do NestJS, não escrita à mão.</p>
+    </section>
+
+    <!-- 14 SEGURANÇA -->
+    <section class="sheet" id="s14">
+      <div class="sheet-head">
+        <span class="sheet-no">14</span>
+        <div>
+          <h2 class="sheet-title">Estratégia de segurança</h2>
+          <p class="sheet-abstract">Auditoria imutável, menor privilégio por padrão, segredos fora do repositório.</p>
+        </div>
+      </div>
+      <ul>
+        <li><strong>Audit log</strong> — toda escrita relevante (criação, alteração, exclusão, download, exportação, login) grava em <span class="mono">audit_logs</span> com usuário, IP, timestamp e diff; a tabela é apenas-inserção, sem update/delete pela aplicação.</li>
+        <li><strong>Exclusão</strong> — soft delete por padrão (item 39); exclusão física é ação restrita a <span class="mono">SUPER_ADMIN</span>, exigindo confirmação e motivo registrado.</li>
+        <li><strong>Segredos</strong> — nunca em <span class="mono">.env</span> versionado; gerenciador de segredos (Doppler ou equivalente do provedor de hospedagem) por ambiente.</li>
+        <li><strong>Transporte e repouso</strong> — TLS obrigatório ponta a ponta; criptografia de disco no provedor; campos de saúde especialmente sensíveis (CID, diagnóstico) com criptografia de coluna adicional.</li>
+        <li><strong>Limites</strong> — rate limiting por tenant e por IP no gateway da API; validação de payload (Zod/class-validator) rejeitando por padrão o que não é explicitamente esperado.</li>
+      </ul>
+    </section>
+
+    <!-- 15 LGPD -->
+    <section class="sheet" id="s15">
+      <div class="sheet-head">
+        <span class="sheet-no">15</span>
+        <div>
+          <h2 class="sheet-title">Estratégia LGPD</h2>
+          <p class="sheet-abstract">Classificação de dados desde a modelagem, não como camada adicionada depois.</p>
+        </div>
+      </div>
+      <div class="kv">
+        <dt>Classificação</dt><dd>toda tabela é marcada como <span class="mono">pública</span>, <span class="mono">interna</span>, <span class="mono">pessoal</span> ou <span class="mono">pessoal sensível</span> (dado de saúde) já no schema — não é decisão de código, é metadado consultável.</dd>
+        <dt>Acesso a dados sensíveis</dt><dd>tabelas de saúde (<span class="mono">medical_records</span>, <span class="mono">asos</span>, <span class="mono">pcmso</span>) exigem papel específico (Médico/Enfermeiro) mesmo dentro do próprio tenant — Gestor de SST não vê diagnóstico, só validade de exame.</dd>
+        <dt>Retenção</dt><dd>política de retenção por tipo de entidade, com job agendado de anonimização quando o prazo legal expira.</dd>
+        <dt>Direitos do titular</dt><dd>fluxo de solicitação (acesso, correção, exportação, anonimização) com trilha própria, não um e-mail manual para o suporte.</dd>
+        <dt>Consentimento</dt><dd>tabela de registros de consentimento vinculada ao colaborador, quando aplicável (ex.: uso de imagem em treinamento).</dd>
+      </div>
+    </section>
+
+    <!-- 16 ESCALABILIDADE -->
+    <section class="sheet" id="s16">
+      <div class="sheet-head">
+        <span class="sheet-no">16</span>
+        <div>
+          <h2 class="sheet-title">Estratégia de escalabilidade</h2>
+          <p class="sheet-abstract">Escalar por réplica antes de escalar por reescrita — o monólito modular aguenta muito mais do que parece.</p>
+        </div>
+      </div>
+      <ul>
+        <li><strong>API stateless</strong> — múltiplas instâncias atrás de um load balancer, sem sessão em memória; escala horizontal trivial.</li>
+        <li><strong>Worker separado</strong> — jobs pesados (geração de relatório, envio em massa, eSocial) escalam independente da API que atende usuários.</li>
+        <li><strong>Réplica de leitura</strong> — consultas de BI/relatório apontam para uma réplica do Postgres, isolando carga analítica da transacional.</li>
+        <li><strong>Cache</strong> — Redis para dados de leitura frequente e baixa mutação (estrutura organizacional, permissões resolvidas).</li>
+        <li><strong>Caminho de saída para clientes grandes</strong> — se um tenant crescer a ponto de justificar isolamento físico, a migração para schema dedicado (seção 06) é um script de dados, não uma reescrita de aplicação, porque o modelo já carrega <span class="mono">tenantId</span> em toda tabela desde o dia um.</li>
+      </ul>
+    </section>
+
+    <footer class="closing">
+      <p><strong>Próximo passo:</strong> com esta arquitetura validada, a implementação começa pela Fase 1 (seção 11) — repositório, schema Prisma do núcleo organizacional, autenticação e o primeiro módulo (PGR) — sem tocar no Portal SSMA existente, que continua rodando em paralelo.</p>
+    </footer>
+  </main>
+</div>

@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "hydra-api",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@hydra/api", "dev"],
+      "port": 3333
+    },
+    {
+      "name": "hydra-web",
+      "runtimeExecutable": "pnpm",
+      "runtimeArgs": ["--filter", "@hydra/web", "dev"],
+      "port": 5174
+    }
+  ]
+}

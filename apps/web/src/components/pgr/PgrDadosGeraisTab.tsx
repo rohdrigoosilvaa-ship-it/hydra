@@ -1,0 +1,222 @@
+import { FormEvent, useEffect, useState } from "react";
+import { Link } from "react-router-dom";
+import { Image as ImageIcon, Pencil } from "lucide-react";
+import { api } from "../../lib/api";
+import type { Company, PgrDetail } from "../../lib/types";
+import { Field } from "./pgr-shared";
+
+export function PgrDadosGeraisTab({ pgr, onChanged }: { pgr: PgrDetail; onChanged: () => void }) {
+  const [showDocForm, setShowDocForm] = useState(false);
+  const [company, setCompany] = useState<Company | null>(null);
+
+  useEffect(() => {
+    api.get<Company>(`/companies/${pgr.companyId}`).then(setCompany);
+  }, [pgr.companyId]);
+
+  return (
+    <div>
+      <div className="mb-4 flex items-center gap-3">
+        {company?.logoUrl ? (
+          <img src={company.logoUrl} alt="" className="h-12 w-12 rounded border border-line object-contain" />
+        ) : (
+          <span className="flex h-12 w-12 items-center justify-center rounded border border-line bg-paper-raised text-ink-muted">
+            <ImageIcon size={18} />
+          </span>
+        )}
+        <div className="text-sm">
+          <p className="text-ink-muted">Logo da empresa</p>
+          <Link to="/minha-empresa" className="text-teal-deep hover:underline">
+            {company?.logoUrl ? "Trocar logo" : "Enviar logo"} em Minha Empresa
+          </Link>
+        </div>
+      </div>
+
+      <div className="flex items-center justify-between">
+        <h2 className="font-display text-lg font-semibold text-ink">Dados do documento</h2>
+        <button
+          className="btn-secondary flex items-center gap-1.5 text-xs"
+          onClick={() => setShowDocForm((v) => !v)}
+        >
+          <Pencil size={13} /> {showDocForm ? "Fechar" : "Editar"}
+        </button>
+      </div>
+
+      {!showDocForm && (
+        <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 rounded-lg border border-line bg-paper-raised p-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
+          <Field label="Código" value={pgr.code} />
+          <Field label="Emitido em" value={pgr.issuedAt ? new Date(pgr.issuedAt).toLocaleDateString("pt-BR") : null} />
+          <Field label="Vigência" value={
+            pgr.validFrom || pgr.validUntil
+              ? `${pgr.validFrom ? new Date(pgr.validFrom).toLocaleDateString("pt-BR") : "—"} a ${pgr.validUntil ? new Date(pgr.validUntil).toLocaleDateString("pt-BR") : "—"}`
+              : null
+          } />
+          <Field label="Elaborado por" value={pgr.preparedBy} />
+          <Field label="Revisado por" value={pgr.reviewedBy} />
+          <Field label="Aprovado por" value={pgr.approvedBy} />
+          <Field label="Responsável pela empresa" value={pgr.companyResponsibleName} />
+          <Field label="Cargo do responsável" value={pgr.companyResponsibleRole} />
+          <Field label="Responsável técnico" value={pgr.technicalResponsibleName} />
+          <Field label="Especialidade" value={pgr.technicalResponsibleSpecialty} />
+          <Field label="Registro profissional" value={pgr.technicalResponsibleRegistry} />
+          <Field label="Conselho / UF" value={
+            pgr.technicalResponsibleCouncil || pgr.technicalResponsibleUf
+              ? `${pgr.technicalResponsibleCouncil ?? "—"} / ${pgr.technicalResponsibleUf ?? "—"}`
+              : null
+          } />
+        </div>
+      )}
+
+      {showDocForm && (
+        <DocumentForm
+          pgr={pgr}
+          onClose={() => setShowDocForm(false)}
+          onSaved={() => {
+            setShowDocForm(false);
+            onChanged();
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function DocumentForm({
+  pgr,
+  onClose,
+  onSaved,
+}: {
+  pgr: PgrDetail;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [code, setCode] = useState(pgr.code ?? "");
+  const [issuedAt, setIssuedAt] = useState(pgr.issuedAt ? pgr.issuedAt.slice(0, 10) : "");
+  const [validFrom, setValidFrom] = useState(pgr.validFrom ? pgr.validFrom.slice(0, 10) : "");
+  const [validUntil, setValidUntil] = useState(pgr.validUntil ? pgr.validUntil.slice(0, 10) : "");
+  const [preparedBy, setPreparedBy] = useState(pgr.preparedBy ?? "");
+  const [reviewedBy, setReviewedBy] = useState(pgr.reviewedBy ?? "");
+  const [approvedBy, setApprovedBy] = useState(pgr.approvedBy ?? "");
+  const [companyResponsibleName, setCompanyResponsibleName] = useState(pgr.companyResponsibleName ?? "");
+  const [companyResponsibleRole, setCompanyResponsibleRole] = useState(pgr.companyResponsibleRole ?? "");
+  const [technicalResponsibleName, setTechnicalResponsibleName] = useState(pgr.technicalResponsibleName ?? "");
+  const [technicalResponsibleSpecialty, setTechnicalResponsibleSpecialty] = useState(pgr.technicalResponsibleSpecialty ?? "");
+  const [technicalResponsibleRegistry, setTechnicalResponsibleRegistry] = useState(pgr.technicalResponsibleRegistry ?? "");
+  const [technicalResponsibleCouncil, setTechnicalResponsibleCouncil] = useState(pgr.technicalResponsibleCouncil ?? "");
+  const [technicalResponsibleUf, setTechnicalResponsibleUf] = useState(pgr.technicalResponsibleUf ?? "");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    try {
+      await api.patch(`/pgr/${pgr.id}`, {
+        code: code || undefined,
+        issuedAt: issuedAt || undefined,
+        validFrom: validFrom || undefined,
+        validUntil: validUntil || undefined,
+        preparedBy: preparedBy || undefined,
+        reviewedBy: reviewedBy || undefined,
+        approvedBy: approvedBy || undefined,
+        companyResponsibleName: companyResponsibleName || undefined,
+        companyResponsibleRole: companyResponsibleRole || undefined,
+        technicalResponsibleName: technicalResponsibleName || undefined,
+        technicalResponsibleSpecialty: technicalResponsibleSpecialty || undefined,
+        technicalResponsibleRegistry: technicalResponsibleRegistry || undefined,
+        technicalResponsibleCouncil: technicalResponsibleCouncil || undefined,
+        technicalResponsibleUf: technicalResponsibleUf || undefined,
+      });
+      onSaved();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao salvar.");
+    } finally {
+      setSaving(false);
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="card mt-3 flex flex-col gap-4">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="text-ink-muted">Código do documento</span>
+          <input className="input" value={code} onChange={(e) => setCode(e.target.value)} />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="text-ink-muted">Data de emissão</span>
+          <input type="date" className="input" value={issuedAt} onChange={(e) => setIssuedAt(e.target.value)} />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="text-ink-muted">Vigência de</span>
+          <input type="date" className="input" value={validFrom} onChange={(e) => setValidFrom(e.target.value)} />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="text-ink-muted">Vigência até</span>
+          <input type="date" className="input" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="text-ink-muted">Elaborado por</span>
+          <input className="input" value={preparedBy} onChange={(e) => setPreparedBy(e.target.value)} />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="text-ink-muted">Revisado por</span>
+          <input className="input" value={reviewedBy} onChange={(e) => setReviewedBy(e.target.value)} />
+        </label>
+        <label className="flex flex-col gap-1 text-sm">
+          <span className="text-ink-muted">Aprovado por</span>
+          <input className="input" value={approvedBy} onChange={(e) => setApprovedBy(e.target.value)} />
+        </label>
+      </div>
+
+      <div className="border-t border-line pt-4">
+        <p className="mb-3 font-mono text-[10px] uppercase tracking-wide text-ink-muted">Responsável pela empresa</p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-ink-muted">Nome</span>
+            <input className="input" value={companyResponsibleName} onChange={(e) => setCompanyResponsibleName(e.target.value)} />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-ink-muted">Cargo</span>
+            <input className="input" value={companyResponsibleRole} onChange={(e) => setCompanyResponsibleRole(e.target.value)} />
+          </label>
+        </div>
+      </div>
+
+      <div className="border-t border-line pt-4">
+        <p className="mb-3 font-mono text-[10px] uppercase tracking-wide text-ink-muted">Responsável técnico</p>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-ink-muted">Nome</span>
+            <input className="input" value={technicalResponsibleName} onChange={(e) => setTechnicalResponsibleName(e.target.value)} />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-ink-muted">Especialidade</span>
+            <input className="input" value={technicalResponsibleSpecialty} onChange={(e) => setTechnicalResponsibleSpecialty(e.target.value)} />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-ink-muted">Registro profissional</span>
+            <input className="input" value={technicalResponsibleRegistry} onChange={(e) => setTechnicalResponsibleRegistry(e.target.value)} />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-ink-muted">Conselho</span>
+            <input className="input" value={technicalResponsibleCouncil} onChange={(e) => setTechnicalResponsibleCouncil(e.target.value)} placeholder="ex.: CREA" />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-ink-muted">UF</span>
+            <input className="input" value={technicalResponsibleUf} onChange={(e) => setTechnicalResponsibleUf(e.target.value)} maxLength={2} />
+          </label>
+        </div>
+      </div>
+
+      <div className="flex items-center gap-3 border-t border-line pt-4">
+        <button type="submit" disabled={saving} className="btn-primary">
+          {saving ? "Salvando…" : "Salvar"}
+        </button>
+        <button type="button" onClick={onClose} className="btn-secondary">
+          Cancelar
+        </button>
+        {error && <p className="text-sm text-amber">{error}</p>}
+      </div>
+    </form>
+  );
+}

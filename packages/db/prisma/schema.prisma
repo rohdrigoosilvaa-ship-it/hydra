@@ -1,0 +1,2337 @@
+// HYDRA — núcleo organizacional (Fase 1)
+// Convenções (ver docs/hydra-arquitetura.html, seção 04):
+//   - toda tabela de negócio carrega tenantId
+//   - soft delete via deletedAt
+//   - createdById / updatedById para rastreabilidade (auditoria)
+
+generator client {
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "rhel-openssl-3.0.x"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---------------------------------------------------------------------------
+// Organização
+// ---------------------------------------------------------------------------
+
+/// Conta contratante do Hydra — fronteira de isolamento multi-tenant (RLS).
+model Tenant {
+  id        String       @id @default(cuid())
+  name      String
+  slug      String       @unique
+  status    TenantStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  deletedAt DateTime?
+
+  companies       Company[]
+  users           User[]
+  roleAssignments RoleAssignment[]
+  auditLogs       AuditLog[]
+
+  @@map("tenants")
+}
+
+enum TenantStatus {
+  ACTIVE
+  SUSPENDED
+  CANCELED
+}
+
+/// Entidade legal (CNPJ) dentro de um tenant — um grupo econômico pode ter várias.
+model Company {
+  id        String       @id @default(cuid())
+  tenantId  String
+  name      String
+  legalName String?
+  cnpj      String?
+  status    RecordStatus @default(ACTIVE)
+
+  // Identificação (documentos e registros — nem toda empresa tem todos)
+  unidadeContratante Boolean @default(false) @map("unidade_contratante") // assina contratos diretamente, não só opera
+  cpf                String? // pessoa física / MEI, quando não há CNPJ
+  cei                String? // Cadastro Específico do INSS (legado)
+  caepf              String? // Cadastro de Atividade Econômica de Pessoa Física
+  cno                String? // Cadastro Nacional de Obras
+  inscricaoEstadual  String? @map("inscricao_estadual")
+  inscricaoMunicipal String? @map("inscricao_municipal")
+  telefone           String?
+  codigoRH           String? @map("codigo_rh") // referência no sistema de RH/folha, quando houver
+
+  logoUrl String? @map("logo_url") // logo da empresa, reaproveitado nos documentos gerados (PGR, LTCAT, Ordem de Serviço)
+
+  // CNAE e caracterização de risco (NR-1/NR-4)
+  cnae                    String?
+  cnaeSecundario          String? @map("cnae_secundario")
+  grauRisco               Int?    @map("grau_risco") // 1-4, NR-4
+  caracterizacaoProcessos String? @map("caracterizacao_processos") @db.Text
+  descricaoLocal          String? @map("descricao_local") @db.Text
+  desconsiderarEsocial    Boolean @default(false) @map("desconsiderar_esocial")
+
+  // Endereço
+  cep         String?
+  endereco    String?
+  numero      String?
+  complemento String?
+  bairro      String?
+  cidade      String?
+  estado      String?
+
+  // Endereço de cobrança (quando diferente do endereço acima)
+  cepCobranca         String? @map("cep_cobranca")
+  enderecoCobranca    String? @map("endereco_cobranca")
+  numeroCobranca      String? @map("numero_cobranca")
+  complementoCobranca String? @map("complemento_cobranca")
+  bairroCobranca      String? @map("bairro_cobranca")
+  cidadeCobranca      String? @map("cidade_cobranca")
+  estadoCobranca      String? @map("estado_cobranca")
+
+  // Contrato / PPP / ASO / Brigada de incêndio
+  dataContrato      DateTime?
+  observacaoPPP     String?   @map("observacao_ppp") @db.Text
+  observacaoASO     String?   @map("observacao_aso") @db.Text
+  percentualBrigada Float?    @map("percentual_brigada") // % de colaboradores considerados no cálculo da brigada
+
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  deletedAt   DateTime?
+  createdById String?
+  updatedById String?
+
+  tenant      Tenant       @relation(fields: [tenantId], references: [id])
+  branches    Branch[]
+  positions   Position[]
+  departments Department[]
+  employees   Employee[]
+
+  @@index([tenantId])
+  @@map("companies")
+}
+
+/// Filial ("Unidade" na navegação Cadastros → Estrutura → Unidade).
+model Branch {
+  id          String       @id @default(cuid())
+  tenantId    String
+  companyId   String
+  code        String?
+  name        String
+  cnpj        String?
+  cep         String?
+  address     String?
+  numero      String?
+  complemento String?
+  bairro      String?
+  city        String?
+  state       String?
+  status      RecordStatus @default(ACTIVE)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  deletedAt   DateTime?
+  createdById String?
+  updatedById String?
+
+  company     Company      @relation(fields: [companyId], references: [id])
+  units       Unit[]
+  employees   Employee[]
+  departments Department[]
+
+  @@index([tenantId])
+  @@index([companyId])
+  @@map("branches")
+}
+
+/// Unidade operacional / site dentro de uma filial (ex.: terminal, porto, base).
+model Unit {
+  id          String       @id @default(cuid())
+  tenantId    String
+  branchId    String
+  name        String
+  status      RecordStatus @default(ACTIVE)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  deletedAt   DateTime?
+  createdById String?
+  updatedById String?
+
+  branch    Branch     @relation(fields: [branchId], references: [id])
+  employees Employee[]
+
+  @@index([tenantId])
+  @@index([branchId])
+  @@map("units")
+}
+
+/// Setor — relacionado a uma Unidade (Branch); `branchId` opcional para não
+/// quebrar setores já cadastrados antes da tela de Unidade existir.
+model Department {
+  id        String       @id @default(cuid())
+  tenantId  String
+  companyId String
+  branchId  String?
+  code      String?
+  name      String
+  status    RecordStatus @default(ACTIVE)
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  deletedAt DateTime?
+
+  company      Company       @relation(fields: [companyId], references: [id])
+  branch       Branch?       @relation(fields: [branchId], references: [id])
+  employees    Employee[]
+  gheFunctions GheFunction[]
+
+  @@index([tenantId])
+  @@index([companyId])
+  @@index([branchId])
+  @@map("departments")
+}
+
+/// Cargo/função — nível de empresa (reaproveitável entre filiais).
+model Position {
+  id          String       @id @default(cuid())
+  tenantId    String
+  companyId   String
+  code        String?
+  name        String
+  cbo         String?
+  /// Atividades / descrição do cargo (conforme CBO) — reaproveitada por todo
+  /// colaborador com esse cargo, exibida (somente leitura) na ficha dele.
+  description String?      @db.Text
+  status      RecordStatus @default(ACTIVE)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+  deletedAt   DateTime?
+
+  company      Company               @relation(fields: [companyId], references: [id])
+  employees    Employee[]
+  gheFunctions GheFunction[]
+  requiredEpis PositionRequiredEpi[]
+
+  @@index([tenantId])
+  @@index([companyId])
+  @@map("positions")
+}
+
+/// EPIs que um Cargo exige — cadastrado manualmente uma vez por cargo, usado
+/// pela Ordem de Serviço pra puxar automaticamente os EPIs da função do
+/// colaborador (sem isso, não existe nenhum vínculo entre Cargo e EPI).
+model PositionRequiredEpi {
+  id                String   @id @default(cuid())
+  tenantId          String
+  positionId        String
+  epiCatalogItemId  String?
+  epiName           String // snapshot do nome — mesmo padrão "outro (digitar)" do EpiDeliveryItem
+  ca                String?
+  periodicityMonths Int?
+  notes             String?  @db.Text
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+
+  position    Position        @relation(fields: [positionId], references: [id])
+  catalogItem EpiCatalogItem? @relation(fields: [epiCatalogItemId], references: [id])
+
+  @@index([tenantId])
+  @@index([positionId])
+  @@map("position_required_epis")
+}
+
+/// Pessoa física — colaborador. Pode ou não ter um User (login) associado.
+model Employee {
+  id           String  @id @default(cuid())
+  tenantId     String
+  companyId    String
+  branchId     String?
+  unitId       String?
+  departmentId String?
+  positionId   String?
+
+  // Dados cadastrais
+  name          String
+  leaveReason   String?   @map("leave_reason") // Motivo Licença
+  birthDate     DateTime? @map("birth_date")
+  cpf           String?
+  registration  String? // matrícula
+  admittedAt    DateTime?
+  inactivatedAt DateTime? @map("inactivated_at")
+  sex           String? // "M" | "F" | "OUTRO" — livre para não travar dado real incompleto
+  rg            String?
+  rgIssueDate   DateTime? @map("rg_issue_date")
+  rgIssuer      String?   @map("rg_issuer")
+  rgExpiryDate  DateTime? @map("rg_expiry_date")
+  nit           String? // NIT / PIS/PASEP
+  ctps          String?
+  ctpsSeries    String?   @map("ctps_series")
+  ctpsIssueDate DateTime? @map("ctps_issue_date")
+  ctpsState     String?   @map("ctps_state") // UF CTPS
+
+  // Endereço
+  cep           String?
+  address       String?
+  addressNumber String? @map("address_number")
+  complement    String?
+  neighborhood  String?
+  city          String?
+  state         String?
+  homePhone     String? @map("home_phone")
+  mobilePhone   String? @map("mobile_phone")
+  smsOptIn      Boolean @default(false) @map("sms_opt_in")
+
+  // Deficiência
+  rehabilitated  Boolean @default(false)
+  disabled       Boolean @default(false)
+  disabilityType String? @map("disability_type")
+
+  status      EmployeeStatus @default(ACTIVE)
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @updatedAt
+  deletedAt   DateTime?
+  createdById String?
+  updatedById String?
+
+  company       Company            @relation(fields: [companyId], references: [id])
+  branch        Branch?            @relation(fields: [branchId], references: [id])
+  unit          Unit?              @relation(fields: [unitId], references: [id])
+  department    Department?        @relation(fields: [departmentId], references: [id])
+  position      Position?          @relation(fields: [positionId], references: [id])
+  user          User?
+  medicalExams  MedicalExam[]
+  absences      Absence[]
+  documents     EmployeeDocument[]
+  epiDeliveries EpiDelivery[]
+  workOrders    WorkOrder[]
+
+  @@index([tenantId])
+  @@index([companyId])
+  @@index([branchId])
+  @@index([unitId])
+  @@index([cpf])
+  @@map("employees")
+}
+
+/// Histórico de importações de colaboradores via planilha (item 12 do pedido).
+model EmployeeImportLog {
+  id        String   @id @default(cuid())
+  tenantId  String
+  companyId String?
+  userId    String
+  fileName  String?
+  totalRows Int
+  created   Int
+  updated   Int
+  errors    Int
+  createdAt DateTime @default(now())
+
+  @@index([tenantId])
+  @@map("employee_import_logs")
+}
+
+enum EmployeeDocumentType {
+  RG
+  ASO
+  PPP
+  TREINAMENTO
+  OUTRO
+}
+
+/// Documento com validade rastreado por colaborador (Controle de Vencimentos).
+/// `name` é o rótulo livre para TREINAMENTO/OUTRO (ex.: "NR-35"); os demais
+/// tipos já têm identidade própria (RG, ASO, PPP) e podem deixar `name` vazio.
+model EmployeeDocument {
+  id          String               @id @default(cuid())
+  tenantId    String
+  companyId   String
+  employeeId  String
+  type        EmployeeDocumentType
+  name        String?
+  issueDate   DateTime?
+  expiryDate  DateTime?
+  notes       String?              @db.Text
+  createdAt   DateTime             @default(now())
+  updatedAt   DateTime             @updatedAt
+  createdById String?
+  updatedById String?
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@index([tenantId])
+  @@index([companyId])
+  @@index([employeeId])
+  @@index([expiryDate])
+  @@map("employee_documents")
+}
+
+/// Catálogo de ocupações CBO (Classificação Brasileira de Ocupações) — dado de
+/// referência público, compartilhado entre todos os tenants (não carrega
+/// tenantId). Seed a partir da lista canônica oficial (ver prisma/cbo-seed.csv).
+model CboOccupation {
+  id          String  @id @default(cuid())
+  code        String  @unique
+  title       String
+  description String? @db.Text
+
+  @@index([title])
+  @@map("cbo_occupations")
+}
+
+enum EmployeeStatus {
+  ACTIVE
+  ON_LEAVE
+  TERMINATED
+}
+
+// ---------------------------------------------------------------------------
+// Identidade & acesso
+// ---------------------------------------------------------------------------
+
+/// Login. Um usuário pertence a um tenant "principal" mas pode ter vínculos
+/// adicionais em outros tenants via RoleAssignment (caso de prestadores/consultores).
+model User {
+  id           String       @id @default(cuid())
+  tenantId     String
+  employeeId   String?      @unique
+  email        String
+  passwordHash String
+  name         String
+  status       UserStatus   @default(ACTIVE)
+  authProvider AuthProvider @default(LOCAL)
+  mfaEnabled   Boolean      @default(false)
+  mfaSecret    String?
+  lastLoginAt  DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+  deletedAt    DateTime?
+
+  tenant              Tenant               @relation(fields: [tenantId], references: [id])
+  employee            Employee?            @relation(fields: [employeeId], references: [id])
+  roleAssignments     RoleAssignment[]
+  refreshTokens       RefreshToken[]
+  passwordResetTokens PasswordResetToken[]
+
+  @@unique([tenantId, email])
+  @@index([tenantId])
+  @@map("users")
+}
+
+enum UserStatus {
+  ACTIVE
+  INVITED
+  SUSPENDED
+}
+
+enum AuthProvider {
+  LOCAL
+  MICROSOFT_ENTRA
+  GOOGLE
+}
+
+/// Vínculo de papel + escopo — a unidade real de permissão (ver seção 08).
+model RoleAssignment {
+  id        String    @id @default(cuid())
+  tenantId  String
+  userId    String
+  role      HydraRole
+  scopeType ScopeType
+  scopeId   String? // null quando scopeType = TENANT
+  createdAt DateTime  @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+  user   User   @relation(fields: [userId], references: [id])
+
+  @@unique([userId, tenantId, role, scopeType, scopeId])
+  @@index([tenantId])
+  @@index([userId])
+  @@map("role_assignments")
+}
+
+enum HydraRole {
+  SUPER_ADMIN
+  ADMIN_EMPRESA
+  GESTOR_SST
+  ENGENHEIRO
+  TECNICO_SST
+  MEDICO
+  ENFERMEIRO
+  RH
+  GESTOR
+  COLABORADOR
+  PRESTADOR
+  CLINICA
+  FINANCEIRO
+  COMERCIAL
+}
+
+enum ScopeType {
+  TENANT
+  COMPANY
+  BRANCH
+  UNIT
+}
+
+/// Token de redefinição de senha — opaco, hash armazenado, uso único, expira em 1h.
+model PasswordResetToken {
+  id        String    @id @default(cuid())
+  userId    String
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("password_reset_tokens")
+}
+
+/// Refresh token opaco, rotacionado a cada uso (ver seção 07).
+model RefreshToken {
+  id          String    @id @default(cuid())
+  userId      String
+  tokenHash   String    @unique
+  expiresAt   DateTime
+  revokedAt   DateTime?
+  replacedBy  String?
+  createdAt   DateTime  @default(now())
+  createdByIp String?
+
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@map("refresh_tokens")
+}
+
+// ---------------------------------------------------------------------------
+// Transversal
+// ---------------------------------------------------------------------------
+
+/// Log de auditoria — apenas inserção (ver seção 14).
+model AuditLog {
+  id         String   @id @default(cuid())
+  tenantId   String
+  userId     String?
+  action     String // ex.: "employee.create", "auth.login"
+  entityType String?
+  entityId   String?
+  ip         String?
+  metadata   Json?
+  createdAt  DateTime @default(now())
+
+  tenant Tenant @relation(fields: [tenantId], references: [id])
+
+  @@index([tenantId, createdAt])
+  @@index([entityType, entityId])
+  @@map("audit_logs")
+}
+
+enum RecordStatus {
+  ACTIVE
+  INACTIVE
+}
+
+// ---------------------------------------------------------------------------
+// PGR — Programa de Gerenciamento de Riscos (Fase 1, ver seção 06 do escopo)
+// ---------------------------------------------------------------------------
+
+enum RiskCategory {
+  FISICO
+  QUIMICO
+  BIOLOGICO
+  ERGONOMICO
+  ACIDENTE
+}
+
+/// Catálogo de perigos/agentes reutilizável entre PGRs do mesmo tenant.
+model Hazard {
+  id              String       @id @default(cuid())
+  tenantId        String
+  category        RiskCategory
+  name            String
+  description     String?
+  damagePotential String?
+  /// Código eSocial do agente/perigo (ex.: 09.01.001), quando aplicável — igual ao usado no S-2240.
+  esocialCode     String?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  deletedAt       DateTime?
+
+  pgrRisks PgrRisk[]
+
+  @@index([tenantId])
+  @@map("hazards")
+}
+
+/// Status compartilhado por todo documento técnico versionado (PGR, PCMSO, LTCAT, laudos).
+enum DocumentStatus {
+  DRAFT
+  IN_REVIEW
+  APPROVED
+  ARCHIVED
+}
+
+/// Documento PGR — um por empresa/filial, versionado.
+model Pgr {
+  id            String         @id @default(cuid())
+  tenantId      String
+  companyId     String
+  branchId      String?
+  title         String
+  /// Código do documento (ex.: PGR-2026-001), livre — não gerado automaticamente.
+  code          String?
+  version       Int            @default(1)
+  status        DocumentStatus @default(DRAFT)
+  /// Data de emissão (capa) — distinta de createdAt, que é quando o registro foi salvo no sistema.
+  issuedAt      DateTime?
+  validFrom     DateTime?
+  validUntil    DateTime?
+  responsibleId String?
+
+  // Elaborado / revisado / aprovado por (seção 5 — nomes livres, sem vínculo a User)
+  preparedBy String?
+  reviewedBy String?
+  approvedBy String?
+
+  // Bloco de assinatura — Responsável pela Empresa (seção 28)
+  companyResponsibleName String?
+  companyResponsibleRole String?
+
+  // Bloco de assinatura — Responsável Técnico (seção 29)
+  technicalResponsibleName      String?
+  technicalResponsibleSpecialty String?
+  technicalResponsibleRegistry  String?
+  technicalResponsibleCouncil   String?
+  technicalResponsibleUf        String?
+
+  // Snapshot da Empresa no momento da criação (CNAE / grau de risco / colaboradores) —
+  // o documento não muda sozinho se o cadastro da empresa for editado depois.
+  cnae          String?
+  grauRisco     Int?
+  employeeCount Int?
+
+  // Aba "Plano de ações e recomendações" e "Finalização"
+  procedimentoTrabalho    String? @db.Text
+  treinamentosNecessarios String? @db.Text
+  episRecomendados        String? @db.Text
+  metasPrioridades        String? @db.Text
+  consideracoesFinais     String? @db.Text
+
+  approvedAt   DateTime?
+  approvedById String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+  createdById  String?
+  updatedById  String?
+
+  ghes       Ghe[]
+  risks      PgrRisk[]
+  actions    PgrAction[]
+  cronograma PgrCronogramaItem[]
+
+  @@index([tenantId])
+  @@index([companyId])
+  @@map("pgrs")
+}
+
+/// Linha do Cronograma ("PLANO DE AÇÃO - PGR") — ação livre + responsável em texto
+/// livre; os meses marcados ficam em PgrCronogramaMark.
+model PgrCronogramaItem {
+  id          String   @id @default(cuid())
+  tenantId    String
+  pgrId       String
+  description String
+  responsible String?
+  order       Int      @default(0)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  pgr   Pgr                 @relation(fields: [pgrId], references: [id], onDelete: Cascade)
+  marks PgrCronogramaMark[]
+
+  @@index([tenantId])
+  @@index([pgrId])
+  @@map("pgr_cronograma_items")
+}
+
+model PgrCronogramaMark {
+  id     String @id @default(cuid())
+  itemId String
+  year   Int
+  month  Int // 1-12
+
+  item PgrCronogramaItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@unique([itemId, year, month])
+  @@map("pgr_cronograma_marks")
+}
+
+/// Grupo Homogêneo de Exposição dentro de um PGR — pode reunir mais de um
+/// Setor/Cargo (ver GheFunction), conforme o padrão do PGR de referência.
+/// `pgrId`/`ltcatId`: um GHE pertence a exatamente um dos dois (nunca ambos, nunca
+/// nenhum) — validado na aplicação, já que o Postgres não tem XOR nativo. Isso
+/// permite o LTCAT reaproveitar a mesma estrutura de GHE do PGR (Fase 6) sem
+/// misturar o ciclo de vida dos dois: cada GHE continua pertencendo a um único
+/// documento, só que agora esse documento pode ser um Pgr OU um Ltcat.
+model Ghe {
+  id                  String   @id @default(cuid())
+  tenantId            String
+  pgrId               String?
+  ltcatId             String?
+  name                String
+  code                String?
+  /// Descrição do local (ex.: "Alvenaria, piso em cerâmica...").
+  localDescription    String?  @db.Text
+  /// Descrição da atividade do GHE como um todo (distinta da atividade por cargo, ver GheFunction).
+  activityDescription String?  @db.Text
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  pgr         Pgr?          @relation(fields: [pgrId], references: [id])
+  ltcat       Ltcat?        @relation(fields: [ltcatId], references: [id])
+  risks       PgrRisk[]
+  functions   GheFunction[]
+  ltcatAgents LtcatAgent[]
+
+  @@index([tenantId])
+  @@index([pgrId])
+  @@index([ltcatId])
+  @@map("ghe")
+}
+
+/// Vínculo Setor+Cargo de um GHE — um GHE pode reunir vários cargos de vários
+/// setores, cada um com sua própria descrição de atividade (ver PGR de referência,
+/// onde um único GHE lista "Cargo X ... Cargo Y ..." de setores diferentes).
+model GheFunction {
+  id                  String   @id @default(cuid())
+  tenantId            String
+  gheId               String
+  departmentId        String?
+  positionId          String?
+  activityDescription String?  @db.Text
+  createdAt           DateTime @default(now())
+  updatedAt           DateTime @updatedAt
+
+  ghe        Ghe         @relation(fields: [gheId], references: [id])
+  department Department? @relation(fields: [departmentId], references: [id])
+  position   Position?   @relation(fields: [positionId], references: [id])
+
+  @@index([tenantId])
+  @@index([gheId])
+  @@map("ghe_functions")
+}
+
+enum RiskLevel {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+/// Tipo de exposição ao perigo (seção 17 do PGR de referência).
+enum ExposureType {
+  EVENTUAL
+  INTERMITENTE
+  PERMANENTE
+}
+
+/// Critério de avaliação do risco.
+enum EvaluationCriteria {
+  QUALITATIVO
+  QUANTITATIVO
+}
+
+/// Uma linha do inventário de riscos: um perigo avaliado dentro de um GHE.
+/// Estrutura de campos espelha exatamente "Identificação / Avaliação / Prevenção
+/// e controle" do PGR de referência (HBSA 2025) — ver seções 16-20 do escopo.
+model PgrRisk {
+  id       String @id @default(cuid())
+  tenantId String
+  pgrId    String
+  gheId    String
+  hazardId String
+
+  // Identificação
+  /// Possíveis lesões ou agravos à saúde.
+  typicalInjuries     String? @db.Text
+  /// Fontes ou circunstâncias geradoras do perigo.
+  sourceCircumstances String? @db.Text
+  /// Meio de propagação (ex.: "Pelo ar", "Contato"), quando aplicável.
+  propagationMeans    String?
+
+  // Avaliação
+  exposureType       ExposureType?
+  evaluationCriteria EvaluationCriteria?
+  /// Perfil de exposição em texto livre (ex.: "Habitual e permanente").
+  exposureProfile    String?
+  probability        Int // 1-5
+  severity           Int // 1-5
+  riskLevel          RiskLevel
+  /// Classificação conforme a metodologia do PGR de referência (ex.: "Aceitável",
+  /// "Tolerável") — texto livre porque a escala completa não está confirmada
+  /// (matriz visual do documento de referência, não extraída como texto).
+  classification     String?
+  /// Conclusão específica deste risco (narrativa), quando aplicável.
+  conclusion         String?             @db.Text
+
+  // Prevenção e controle (hierarquia de controles — seção 21)
+  adminControls       String? @db.Text
+  engineeringControls String? @db.Text
+  epcMeasures         String? @db.Text
+  epiMeasures         String? @db.Text
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+  updatedById String?
+
+  pgr     Pgr         @relation(fields: [pgrId], references: [id])
+  ghe     Ghe         @relation(fields: [gheId], references: [id])
+  hazard  Hazard      @relation(fields: [hazardId], references: [id])
+  actions PgrAction[]
+
+  @@index([tenantId])
+  @@index([pgrId])
+  @@index([gheId])
+  @@map("pgr_risks")
+}
+
+enum ActionStatus {
+  OPEN
+  IN_PROGRESS
+  LATE
+  VALIDATING
+  DONE
+  CANCELED
+}
+
+/// Item do plano de ações — pode nascer de um risco do PGR ou ser avulso
+/// (inspeção, incidente, auditoria — módulos futuros reaproveitam esta tabela).
+model PgrAction {
+  id              String       @id @default(cuid())
+  tenantId        String
+  companyId       String? // denormalizado para permitir contagem por empresa (dashboard)
+  pgrId           String?
+  pgrRiskId       String?
+  nonConformityId String?
+  description     String
+  responsibleId   String?
+  dueDate         DateTime?
+  priority        Int          @default(2) // 1 alta, 2 média, 3 baixa
+  status          ActionStatus @default(OPEN)
+  evidenceUrl     String?
+  completedAt     DateTime?
+  createdAt       DateTime     @default(now())
+  updatedAt       DateTime     @updatedAt
+  createdById     String?
+  updatedById     String?
+
+  pgr           Pgr?           @relation(fields: [pgrId], references: [id])
+  pgrRisk       PgrRisk?       @relation(fields: [pgrRiskId], references: [id])
+  nonConformity NonConformity? @relation(fields: [nonConformityId], references: [id])
+
+  @@index([tenantId])
+  @@index([pgrId])
+  @@index([status])
+  @@index([companyId])
+  @@map("pgr_actions")
+}
+
+// ---------------------------------------------------------------------------
+// Saúde ocupacional (Fase 2)
+// ---------------------------------------------------------------------------
+
+/// Documento PCMSO — mesmo padrão de versionamento do PGR.
+model Pcmso {
+  id            String         @id @default(cuid())
+  tenantId      String
+  companyId     String
+  branchId      String?
+  title         String
+  version       Int            @default(1)
+  status        DocumentStatus @default(DRAFT)
+  validFrom     DateTime?
+  validUntil    DateTime?
+  responsibleId String?
+  approvedAt    DateTime?
+  approvedById  String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  deletedAt     DateTime?
+  createdById   String?
+  updatedById   String?
+
+  exams MedicalExam[]
+
+  @@index([tenantId])
+  @@index([companyId])
+  @@map("pcmso")
+}
+
+enum ExamType {
+  ADMISSIONAL
+  PERIODICO
+  DEMISSIONAL
+  RETORNO_TRABALHO
+  MUDANCA_RISCO
+}
+
+enum ExamResult {
+  APTO
+  INAPTO
+  PENDENTE
+}
+
+model MedicalExam {
+  id          String     @id @default(cuid())
+  tenantId    String
+  employeeId  String
+  pcmsoId     String?
+  type        ExamType
+  scheduledAt DateTime?
+  performedAt DateTime?
+  result      ExamResult @default(PENDENTE)
+  nextDueAt   DateTime?
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  createdById String?
+
+  pcmso    Pcmso?   @relation(fields: [pcmsoId], references: [id])
+  aso      Aso?
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@index([tenantId])
+  @@index([employeeId])
+  @@map("medical_exams")
+}
+
+/// Atestado de Saúde Ocupacional emitido a partir de um exame.
+model Aso {
+  id          String     @id @default(cuid())
+  tenantId    String
+  examId      String     @unique
+  result      ExamResult
+  issuedAt    DateTime   @default(now())
+  physicianId String?
+  fileUrl     String?
+  createdAt   DateTime   @default(now())
+
+  exam MedicalExam @relation(fields: [examId], references: [id])
+
+  @@index([tenantId])
+  @@map("asos")
+}
+
+// ---------------------------------------------------------------------------
+// Ocorrências — incidentes, acidentes, investigação e CAT (Fase 2)
+// ---------------------------------------------------------------------------
+
+enum OccurrenceType {
+  INCIDENT
+  NEAR_MISS
+  ACCIDENT_TYPICAL
+  ACCIDENT_COMMUTE
+  OCCUPATIONAL_DISEASE
+}
+
+enum OccurrenceStatus {
+  OPEN
+  INVESTIGATING
+  CLOSED
+}
+
+model Occurrence {
+  id               String           @id @default(cuid())
+  tenantId         String
+  companyId        String
+  branchId         String?
+  unitId           String?
+  employeeId       String?
+  type             OccurrenceType
+  highPotential    Boolean          @default(false)
+  description      String
+  location         String?
+  immediateActions String?          @db.Text
+  occurredAt       DateTime
+  status           OccurrenceStatus @default(OPEN)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+  deletedAt        DateTime?
+  createdById      String?
+  updatedById      String?
+
+  investigation  Investigation?
+  cat            Cat?
+  involvedPeople OccurrenceInvolvedPerson[]
+
+  @@index([tenantId])
+  @@index([companyId])
+  @@index([type])
+  @@map("occurrences")
+}
+
+enum InvestigationMethod {
+  FIVE_WHYS
+  ISHIKAWA
+}
+
+/// Investigação de causa raiz de uma ocorrência (item 15 do escopo).
+model Investigation {
+  id             String              @id @default(cuid())
+  tenantId       String
+  occurrenceId   String              @unique
+  method         InvestigationMethod
+  immediateCause String?
+  rootCause      String?
+  findings       String?
+  createdAt      DateTime            @default(now())
+  updatedAt      DateTime            @updatedAt
+  createdById    String?
+
+  occurrence Occurrence @relation(fields: [occurrenceId], references: [id])
+
+  @@index([tenantId])
+  @@map("investigations")
+}
+
+enum CatType {
+  TYPICAL
+  COMMUTE
+  DISEASE
+}
+
+enum CatStatus {
+  DRAFT
+  SENT
+  ACKNOWLEDGED
+  REJECTED
+}
+
+/// Comunicação de Acidente de Trabalho, vinculada 1:1 a uma ocorrência.
+model Cat {
+  id           String    @id @default(cuid())
+  tenantId     String
+  occurrenceId String    @unique
+  type         CatType
+  leaveDays    Int?
+  status       CatStatus @default(DRAFT)
+  sentAt       DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  createdById  String?
+
+  occurrence Occurrence @relation(fields: [occurrenceId], references: [id])
+
+  @@index([tenantId])
+  @@map("cats")
+}
+
+enum OccurrenceInvolvedPersonRole {
+  VITIMA
+  TESTEMUNHA
+  ENVOLVIDO
+}
+
+/// Pessoa envolvida numa ocorrência (vítima, testemunha etc.) — uma ocorrência
+/// pode ter várias, ao contrário do único `employeeId` opcional do registro.
+model OccurrenceInvolvedPerson {
+  id           String                       @id @default(cuid())
+  tenantId     String
+  occurrenceId String
+  employeeId   String?
+  name         String?
+  role         OccurrenceInvolvedPersonRole
+  createdAt    DateTime                     @default(now())
+
+  occurrence Occurrence @relation(fields: [occurrenceId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([occurrenceId])
+  @@map("occurrence_involved_people")
+}
+
+enum BehaviorObservationCategory {
+  ATO_SEGURO
+  ATO_INSEGURO
+  CONDICAO_SEGURA
+  CONDICAO_INSEGURA
+}
+
+/// Observação comportamental de segurança (BBS) — registro de campo,
+/// independente de inspeção ou incidente.
+model BehaviorObservation {
+  id                 String                      @id @default(cuid())
+  tenantId           String
+  companyId          String
+  branchId           String?
+  observerId         String?
+  observedEmployeeId String?
+  category           BehaviorObservationCategory
+  description        String                      @db.Text
+  actionTaken        String?                     @db.Text
+  createdAt          DateTime                    @default(now())
+  createdById        String?
+
+  @@index([tenantId])
+  @@index([companyId])
+  @@map("behavior_observations")
+}
+
+// ---------------------------------------------------------------------------
+// Operação de campo — Inspeções, Não Conformidades e Evidências (Fase 2)
+// ---------------------------------------------------------------------------
+
+/// Roteiro/modelo reutilizável de inspeção de campo.
+model InspectionTemplate {
+  id          String   @id @default(cuid())
+  tenantId    String
+  companyId   String?
+  name        String
+  description String?  @db.Text
+  category    String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+
+  items       InspectionTemplateItem[]
+  inspections Inspection[]
+
+  @@index([tenantId])
+  @@index([companyId])
+  @@map("inspection_templates")
+}
+
+enum InspectionItemType {
+  CONFORME_NAO_CONFORME
+  SIM_NAO
+  NOTA
+  TEXTO_LIVRE
+  SELECAO_MULTIPLA
+}
+
+/// Item do roteiro de inspeção (pergunta/verificação).
+model InspectionTemplateItem {
+  id           String             @id @default(cuid())
+  tenantId     String
+  templateId   String
+  order        Int
+  text         String
+  responseType InspectionItemType @default(CONFORME_NAO_CONFORME)
+  category     String?
+  options      String[]           @default([]) // opções de escolha quando responseType = SELECAO_MULTIPLA
+  blockLabel   String?            // nome do InspectionBlock de origem, congelado no momento em que foi inserido no roteiro
+  allowPhoto   Boolean            @default(true) // se falso, não mostra a opção de anexar foto/evidência pra este item
+
+  template  InspectionTemplate       @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  responses InspectionItemResponse[]
+
+  @@index([tenantId])
+  @@index([templateId])
+  @@map("inspection_template_items")
+}
+
+/// Bloco reutilizável de itens de checklist — biblioteca pra montar roteiros sem
+/// redigitar; ao ser inserido num InspectionTemplate, seus itens são copiados
+/// (snapshot) e passam a ser independentes — editar o bloco depois não afeta
+/// roteiros que já o usaram.
+model InspectionBlock {
+  id          String   @id @default(cuid())
+  tenantId    String
+  companyId   String?
+  name        String
+  description String?  @db.Text
+  active      Boolean  @default(true)
+  createdById String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  items InspectionBlockItem[]
+
+  @@index([tenantId])
+  @@map("inspection_blocks")
+}
+
+model InspectionBlockItem {
+  id           String             @id @default(cuid())
+  tenantId     String
+  blockId      String
+  order        Int
+  text         String
+  responseType InspectionItemType @default(CONFORME_NAO_CONFORME)
+  category     String?
+  options      String[]           @default([])
+  allowPhoto   Boolean            @default(true)
+
+  block InspectionBlock @relation(fields: [blockId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([blockId])
+  @@map("inspection_block_items")
+}
+
+enum InspectionStatus {
+  EM_ANDAMENTO
+  CONCLUIDA
+  CANCELADA
+}
+
+/// Uma inspeção de campo realizada a partir de um roteiro.
+model Inspection {
+  id           String           @id @default(cuid())
+  tenantId     String
+  companyId    String
+  branchId     String?
+  departmentId String?
+  templateId   String
+  inspectorId  String?
+  status       InspectionStatus @default(EM_ANDAMENTO)
+  scheduledAt  DateTime?
+  startedAt    DateTime         @default(now())
+  completedAt  DateTime?
+  notes        String?          @db.Text
+  createdAt    DateTime         @default(now())
+  updatedAt    DateTime         @updatedAt
+  createdById  String?
+
+  template        InspectionTemplate       @relation(fields: [templateId], references: [id])
+  responses       InspectionItemResponse[]
+  nonConformities NonConformity[]
+
+  @@index([tenantId])
+  @@index([companyId])
+  @@index([templateId])
+  @@map("inspections")
+}
+
+enum InspectionResponseValue {
+  CONFORME
+  NAO_CONFORME
+  NAO_APLICAVEL
+}
+
+/// Resposta a um item do roteiro dentro de uma inspeção específica.
+model InspectionItemResponse {
+  id             String                   @id @default(cuid())
+  tenantId       String
+  inspectionId   String
+  templateItemId String
+  value          InspectionResponseValue?
+  textValue      String?                  @db.Text
+  comment        String?                  @db.Text
+  order          Int
+  createdAt      DateTime                 @default(now())
+
+  inspection      Inspection             @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
+  templateItem    InspectionTemplateItem @relation(fields: [templateItemId], references: [id])
+  nonConformities NonConformity[]
+
+  @@index([tenantId])
+  @@index([inspectionId])
+  @@map("inspection_item_responses")
+}
+
+enum NonConformitySeverity {
+  BAIXA
+  MEDIA
+  ALTA
+  CRITICA
+}
+
+enum NonConformityStatus {
+  ABERTA
+  EM_TRATATIVA
+  RESOLVIDA
+}
+
+/// Não conformidade identificada em campo — pode nascer de uma inspeção ou
+/// de um item específico dela; alimenta o plano de ações via PgrAction.
+model NonConformity {
+  id                       String                @id @default(cuid())
+  tenantId                 String
+  companyId                String
+  inspectionId             String?
+  inspectionItemResponseId String?
+  description              String                @db.Text
+  severity                 NonConformitySeverity @default(MEDIA)
+  status                   NonConformityStatus   @default(ABERTA)
+  dueDate                  DateTime?
+  createdAt                DateTime              @default(now())
+  updatedAt                DateTime              @updatedAt
+  createdById              String?
+
+  inspection             Inspection?             @relation(fields: [inspectionId], references: [id])
+  inspectionItemResponse InspectionItemResponse? @relation(fields: [inspectionItemResponseId], references: [id])
+  actions                PgrAction[]
+
+  @@index([tenantId])
+  @@index([companyId])
+  @@index([inspectionId])
+  @@map("non_conformities")
+}
+
+/// De onde uma evidência (foto/anexo) vem — transversal a vários módulos.
+enum EvidenceSourceType {
+  INSPECTION
+  INSPECTION_ITEM_RESPONSE
+  NON_CONFORMITY
+  BEHAVIOR_OBSERVATION
+  OCCURRENCE
+  ACTION
+  AUDIT
+  PGR
+}
+
+/// Evidência (foto/anexo) transversal — identifica a origem por
+/// sourceType+sourceId em vez de uma FK por módulo (são 8 origens possíveis;
+/// uma FK por origem, como em PgrAction, ficaria inviável aqui).
+model Evidence {
+  id           String             @id @default(cuid())
+  tenantId     String
+  companyId    String?
+  sourceType   EvidenceSourceType
+  sourceId     String
+  fileUrl      String
+  fileName     String
+  mimeType     String?
+  caption      String?
+  /// Agrupa anexos dentro de uma mesma origem (ex.: anexos do PGR).
+  category     String?
+  uploadedById String?
+  createdAt    DateTime           @default(now())
+
+  @@index([tenantId])
+  @@index([sourceType, sourceId])
+  @@map("evidences")
+}
+
+// ---------------------------------------------------------------------------
+// CIPA (Fase 2)
+// ---------------------------------------------------------------------------
+
+enum CipaTermStatus {
+  PLANNED
+  ACTIVE
+  CLOSED
+}
+
+/// Mandato/gestão da CIPA.
+model CipaTerm {
+  id        String         @id @default(cuid())
+  tenantId  String
+  companyId String
+  branchId  String?
+  startDate DateTime
+  endDate   DateTime
+  status    CipaTermStatus @default(PLANNED)
+  createdAt DateTime       @default(now())
+  updatedAt DateTime       @updatedAt
+
+  members CipaMember[]
+
+  @@index([tenantId])
+  @@index([companyId])
+  @@map("cipa_terms")
+}
+
+enum CipaMemberRole {
+  TITULAR
+  SUPLENTE
+}
+
+enum CipaRepresentation {
+  EMPREGADOR
+  EMPREGADOS
+}
+
+model CipaMember {
+  id             String             @id @default(cuid())
+  tenantId       String
+  termId         String
+  employeeId     String
+  role           CipaMemberRole
+  representation CipaRepresentation
+  createdAt      DateTime           @default(now())
+
+  term CipaTerm @relation(fields: [termId], references: [id])
+
+  @@index([tenantId])
+  @@index([termId])
+  @@map("cipa_members")
+}
+
+enum CipaElectionType {
+  PRIMEIRA
+  RENOVACAO
+}
+
+enum CipaScheduleOrigin {
+  LEGAL
+  PROGRAMADA
+}
+
+/// Processo eleitoral da CIPA (dimensionamento + cronograma de prazos legais).
+model CipaElection {
+  id                      String           @id @default(cuid())
+  tenantId                String
+  companyId               String
+  branchId                String?
+  type                    CipaElectionType
+  grauRisco               Int
+  gestaoLabel             String
+  posseDate               DateTime
+  dataTerminoMandatoAtual DateTime?
+  previousTermId          String?
+  createdAt               DateTime         @default(now())
+  updatedAt               DateTime         @updatedAt
+  createdById             String?
+
+  steps CipaElectionScheduleStep[]
+
+  @@index([tenantId])
+  @@index([companyId])
+  @@map("cipa_elections")
+}
+
+/// Etapa do cronograma legal/programado de uma eleição da CIPA.
+model CipaElectionScheduleStep {
+  id            String             @id @default(cuid())
+  tenantId      String
+  electionId    String
+  etapa         String
+  regra         String
+  origem        CipaScheduleOrigin
+  baseLegal     String?
+  diasRelativos Int
+  data          DateTime
+  concluido     Boolean            @default(false)
+  order         Int
+
+  election CipaElection @relation(fields: [electionId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([electionId])
+  @@map("cipa_election_schedule_steps")
+}
+
+// ---------------------------------------------------------------------------
+// LTCAT e Laudos (Fase 2)
+// ---------------------------------------------------------------------------
+
+/// Documento LTCAT — mesmo padrão de versionamento do PGR/PCMSO. Reaproveita
+/// os GHEs já cadastrados no PGR da empresa (ver Ghe.ltcatId) em vez de exigir
+/// recadastro — só os campos de metadados abaixo têm paridade com o Pgr.
+model Ltcat {
+  id            String         @id @default(cuid())
+  tenantId      String
+  companyId     String
+  branchId      String?
+  title         String
+  version       Int            @default(1)
+  status        DocumentStatus @default(DRAFT)
+  artNumber     String?
+  validFrom     DateTime?
+  validUntil    DateTime?
+  responsibleId String?
+
+  code                          String?
+  issuedAt                      DateTime?
+  preparedBy                    String?
+  reviewedBy                    String?
+  approvedBy                    String?
+  companyResponsibleName        String?
+  companyResponsibleRole        String?
+  technicalResponsibleName      String?
+  technicalResponsibleSpecialty String?
+  technicalResponsibleRegistry  String?
+  technicalResponsibleCouncil   String?
+  technicalResponsibleUf        String?
+
+  approvedAt   DateTime?
+  approvedById String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+  deletedAt    DateTime?
+  createdById  String?
+  updatedById  String?
+
+  ghes   Ghe[]
+  agents LtcatAgent[]
+
+  @@index([tenantId])
+  @@index([companyId])
+  @@map("ltcats")
+}
+
+/// Agente ambiental (físico/químico/biológico) identificado num GHE, conforme
+/// avaliação do LTCAT (NR-09) — estrutura própria, distinta de PgrRisk (que é
+/// sobre risco/probabilidade/severidade, não sobre medição de agente).
+model LtcatAgent {
+  id                     String       @id @default(cuid())
+  tenantId               String
+  ltcatId                String
+  gheId                  String?
+  agentCategory          RiskCategory
+  agentName              String
+  intensityConcentration String?
+  toleranceLimit         String?
+  measurementMethod      String?
+  exposureTechnique      String?
+  effectiveEpi           String?      @db.Text
+  conclusion             String?      @db.Text
+  createdById            String?
+  updatedById            String?
+  createdAt              DateTime     @default(now())
+  updatedAt              DateTime     @updatedAt
+
+  ltcat Ltcat @relation(fields: [ltcatId], references: [id])
+  ghe   Ghe?  @relation(fields: [gheId], references: [id])
+
+  @@index([tenantId])
+  @@index([ltcatId])
+  @@map("ltcat_agents")
+}
+
+enum TechnicalReportType {
+  INSALUBRIDADE
+  PERICULOSIDADE
+  COMPLEMENTAR
+  PARECER
+  ERGONOMICO
+}
+
+/// Laudo técnico (Hydra Laudos).
+model TechnicalReport {
+  id            String              @id @default(cuid())
+  tenantId      String
+  companyId     String
+  branchId      String?
+  type          TechnicalReportType
+  title         String
+  status        DocumentStatus      @default(DRAFT)
+  issuedAt      DateTime?
+  validUntil    DateTime?
+  responsibleId String?
+  createdAt     DateTime            @default(now())
+  updatedAt     DateTime            @updatedAt
+  deletedAt     DateTime?
+  createdById   String?
+  updatedById   String?
+
+  @@index([tenantId])
+  @@index([companyId])
+  @@map("technical_reports")
+}
+
+// ---------------------------------------------------------------------------
+// Previdenciário, PPP e eSocial (Fase 3)
+// ---------------------------------------------------------------------------
+
+enum AbsenceType {
+  DOENCA
+  MATERNIDADE
+  ACIDENTE
+  OUTROS
+}
+
+/// Afastamento — base do módulo previdenciário e do indicador de absenteísmo.
+/// O campo `cid` é dado de saúde sensível (ver seção 15 do documento de arquitetura);
+/// em produção deve receber controle de acesso por coluna além do RBAC por módulo.
+model Absence {
+  id          String      @id @default(cuid())
+  tenantId    String
+  employeeId  String
+  type        AbsenceType
+  startDate   DateTime
+  endDate     DateTime?
+  cid         String?
+  inssBenefit String?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+  createdById String?
+
+  employee Employee @relation(fields: [employeeId], references: [id])
+
+  @@index([tenantId])
+  @@index([employeeId])
+  @@map("absences")
+}
+
+/// Índice FAP/NTEP anual por empresa.
+model FapRecord {
+  id        String   @id @default(cuid())
+  tenantId  String
+  companyId String
+  year      Int
+  fapIndex  Float
+  ntepCount Int      @default(0)
+  createdAt DateTime @default(now())
+
+  @@unique([companyId, year])
+  @@index([tenantId])
+  @@map("fap_records")
+}
+
+/// Perfil Profissiográfico Previdenciário — um documento por colaborador/período.
+model Ppp {
+  id            String         @id @default(cuid())
+  tenantId      String
+  employeeId    String
+  companyId     String
+  periodStart   DateTime
+  periodEnd     DateTime?
+  status        DocumentStatus @default(DRAFT)
+  issuedAt      DateTime?
+  responsibleId String?
+  fileUrl       String?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  createdById   String?
+
+  @@index([tenantId])
+  @@index([employeeId])
+  @@map("ppps")
+}
+
+enum EsocialEventType {
+  S2210
+  S2220
+  S2221
+  S2230
+  S2240
+}
+
+enum EsocialEventStatus {
+  PENDING
+  SENT
+  PROCESSED
+  REJECTED
+}
+
+/// Evento do Cockpit eSocial. `payload` guarda os dados que formam o XML;
+/// a transmissão real ao governo é um adaptador externo, fora do escopo do MVP.
+model EsocialEvent {
+  id            String             @id @default(cuid())
+  tenantId      String
+  companyId     String
+  employeeId    String?
+  eventType     EsocialEventType
+  status        EsocialEventStatus @default(PENDING)
+  payload       Json?
+  receiptNumber String?
+  errorMessage  String?
+  sentAt        DateTime?
+  createdAt     DateTime           @default(now())
+  updatedAt     DateTime           @updatedAt
+  createdById   String?
+
+  @@index([tenantId])
+  @@index([companyId])
+  @@index([status])
+  @@map("esocial_events")
+}
+
+// ---------------------------------------------------------------------------
+// Prestadores e HydraNET (Fase 3)
+// ---------------------------------------------------------------------------
+
+enum ProviderType {
+  CLINICA
+  ENGENHEIRO
+  TECNICO
+  CONSULTORIA
+  LABORATORIO
+  OUTRO
+}
+
+/// Catálogo de prestadores do tenant — hoje por empresa; uma rede compartilhada
+/// entre tenants (HydraNET "de verdade") exige um modelo de dados público
+/// separado do isolamento por tenant e fica para uma fase futura.
+model Provider {
+  id        String       @id @default(cuid())
+  tenantId  String
+  name      String
+  type      ProviderType
+  document  String?
+  email     String?
+  phone     String?
+  rating    Float?
+  createdAt DateTime     @default(now())
+  updatedAt DateTime     @updatedAt
+  deletedAt DateTime?
+
+  contracts    ProviderContract[]
+  medicalBills MedicalBill[]
+
+  @@index([tenantId])
+  @@map("providers")
+}
+
+enum ProviderContractStatus {
+  DRAFT
+  ACTIVE
+  EXPIRED
+  CANCELED
+}
+
+model ProviderContract {
+  id          String                 @id @default(cuid())
+  tenantId    String
+  providerId  String
+  companyId   String
+  startDate   DateTime
+  endDate     DateTime?
+  slaDays     Int?
+  status      ProviderContractStatus @default(DRAFT)
+  notes       String?
+  createdAt   DateTime               @default(now())
+  updatedAt   DateTime               @updatedAt
+  createdById String?
+
+  provider Provider @relation(fields: [providerId], references: [id])
+
+  @@index([tenantId])
+  @@index([providerId])
+  @@map("provider_contracts")
+}
+
+// ---------------------------------------------------------------------------
+// Financeiro, CRM e Contas Médicas (Fase 4)
+// ---------------------------------------------------------------------------
+
+enum InvoiceStatus {
+  PENDING
+  PAID
+  OVERDUE
+  CANCELED
+}
+
+model Invoice {
+  id          String        @id @default(cuid())
+  tenantId    String
+  companyId   String
+  providerId  String?
+  description String
+  amount      Float
+  dueDate     DateTime
+  status      InvoiceStatus @default(PENDING)
+  issuedAt    DateTime      @default(now())
+  paidAt      DateTime?
+  createdAt   DateTime      @default(now())
+  updatedAt   DateTime      @updatedAt
+  createdById String?
+
+  @@index([tenantId])
+  @@index([companyId])
+  @@map("invoices")
+}
+
+// ---------------------------------------------------------------------------
+// Gerador de Contratos — Administrativo (Fase 2)
+// ---------------------------------------------------------------------------
+
+/// Dados fixos da CONTRATADA (a própria ProtecSeg) usados em todo contrato
+/// gerado — 1 registro por tenant, editável sem precisar de deploy.
+model ContractIssuer {
+  id               String   @id @default(cuid())
+  tenantId         String   @unique
+  name             String
+  cnpj             String?
+  cep              String?
+  endereco         String?
+  numero           String?
+  complemento      String?
+  bairro           String?
+  cidade           String?
+  estado           String?
+  repNome          String?
+  repNacionalidade String?
+  repEstadoCivil   String?
+  repProfissao     String?
+  repRg            String?
+  repCpf           String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@map("contract_issuers")
+}
+
+/// Modelo de contrato reutilizável (ex.: "Consultoria e Assessoria em SST").
+/// Arquitetura pensada para caber outros tipos de contrato no futuro — cada
+/// um é só um novo ContractTemplate com suas próprias cláusulas.
+model ContractTemplate {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  description String?
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  clauses      ContractTemplateClause[]
+  serviceItems ContractServiceItem[]
+  contracts    Contract[]
+
+  @@index([tenantId])
+  @@map("contract_templates")
+}
+
+/// Uma cláusula fixa do modelo — texto com marcadores {{TOKEN}} resolvidos
+/// na geração do PDF.
+model ContractTemplateClause {
+  id         String @id @default(cuid())
+  tenantId   String
+  templateId String
+  order      Int
+  title      String
+  body       String @db.Text
+
+  template ContractTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([templateId])
+  @@map("contract_template_clauses")
+}
+
+/// Item do catálogo de serviços do modelo (ex.: a lista a-s da Cláusula 2ª) —
+/// cada contrato escolhe quais entram, relistados em ordem na geração.
+model ContractServiceItem {
+  id         String @id @default(cuid())
+  tenantId   String
+  templateId String
+  order      Int
+  text       String @db.Text
+
+  template  ContractTemplate          @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  contracts ContractSelectedService[]
+
+  @@index([tenantId])
+  @@index([templateId])
+  @@map("contract_service_items")
+}
+
+enum ContractStatus {
+  ATIVO
+  CANCELADO
+}
+
+/// Um contrato gerado para um CONTRATANTE específico. Guarda sua PRÓPRIA
+/// cópia dos dados da parte (não referencia Company ao vivo) — um contrato
+/// assinado é um documento jurídico, não pode mudar sozinho se alguém editar
+/// o cadastro da empresa depois. `companyId` é só referência opcional.
+model Contract {
+  id         String  @id @default(cuid())
+  tenantId   String
+  companyId  String?
+  templateId String
+
+  // Snapshot do CONTRATANTE
+  razaoSocial  String
+  nomeFantasia String?
+  cnpj         String
+  cep          String?
+  endereco     String?
+  numero       String?
+  complemento  String?
+  bairro       String?
+  cidade       String?
+  estado       String?
+
+  // Representante legal do CONTRATANTE
+  repNome          String
+  repNacionalidade String?
+  repEstadoCivil   String?
+  repProfissao     String?
+  repRg            String?
+  repCpf           String?
+
+  // Termos
+  quantidadeVidas               Int?
+  dataInicio                    DateTime
+  prazoMeses                    Int       @default(12)
+  dataVencimento                DateTime
+  valorMensalidade              Float
+  valorPrimeiraParcela          Float?
+  dataVencimentoPrimeiraParcela DateTime?
+  diaVencimentoMensal           Int?
+  formaPagamento                String?
+  qtdVisitas                    Int?
+  frequenciaVisitas             String?
+  observacoes                   String?   @db.Text
+
+  status         ContractStatus @default(ATIVO)
+  pdfUrl         String?
+  pdfGeneratedAt DateTime?
+  pdfSha256      String?
+
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+
+  template   ContractTemplate          @relation(fields: [templateId], references: [id])
+  services   ContractSelectedService[]
+  signatures ContractSignature[]
+
+  @@index([tenantId])
+  @@index([companyId])
+  @@index([templateId])
+  @@map("contracts")
+}
+
+/// Serviços selecionados para um contrato específico (join simples).
+model ContractSelectedService {
+  id            String @id @default(cuid())
+  tenantId      String
+  contractId    String
+  serviceItemId String
+
+  contract    Contract            @relation(fields: [contractId], references: [id], onDelete: Cascade)
+  serviceItem ContractServiceItem @relation(fields: [serviceItemId], references: [id])
+
+  @@index([tenantId])
+  @@index([contractId])
+  @@map("contract_selected_services")
+}
+
+enum ContractSignatureRole {
+  CONTRATANTE
+  CONTRATADA
+}
+
+enum ContractSignatureMethod {
+  DRAWN
+  TYPED
+}
+
+/// Assinatura eletrônica simples (MP 2.200-2/2001) de uma das partes de um
+/// Contract — uma linha por papel, criada via upsert quando o link é
+/// solicitado (CONTRATANTE) ou no momento da assinatura (CONTRATADA).
+/// Snapshot próprio (signerName/signerCpf): quem assinou não muda se o
+/// cadastro mudar depois.
+model ContractSignature {
+  id         String                @id @default(cuid())
+  tenantId   String
+  contractId String
+  role       ContractSignatureRole
+
+  signerName String
+  signerCpf  String?
+
+  /// Só CONTRATADA — usuário autenticado que executou "Assinar como CONTRATADA".
+  signedByUserId String?
+
+  /// Só CONTRATANTE — hash do token enviado por link; o token bruto nunca é persistido.
+  tokenHash String?   @unique
+  expiresAt DateTime?
+
+  signedAt        DateTime?
+  signatureImage  Bytes?
+  signatureMethod ContractSignatureMethod?
+
+  /// SHA-256 do texto das cláusulas resolvidas no momento da assinatura —
+  /// prova do que exatamente foi assinado.
+  contentHash String?
+
+  ip        String?
+  userAgent String? @db.Text
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  contract Contract @relation(fields: [contractId], references: [id], onDelete: Cascade)
+
+  @@unique([contractId, role])
+  @@index([tenantId])
+  @@index([contractId])
+  @@map("contract_signatures")
+}
+
+enum CrmStage {
+  LEAD
+  CONTATO
+  QUALIFICACAO
+  PROPOSTA
+  NEGOCIACAO
+  CONTRATO
+  CLIENTE
+}
+
+model CrmLead {
+  id          String   @id @default(cuid())
+  tenantId    String
+  name        String
+  contactName String?
+  email       String?
+  phone       String?
+  stage       CrmStage @default(LEAD)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  createdById String?
+
+  tasks CrmTask[]
+
+  @@index([tenantId])
+  @@map("crm_leads")
+}
+
+model CrmTask {
+  id          String    @id @default(cuid())
+  tenantId    String
+  leadId      String
+  description String
+  dueDate     DateTime?
+  done        Boolean   @default(false)
+  createdAt   DateTime  @default(now())
+
+  lead CrmLead @relation(fields: [leadId], references: [id])
+
+  @@index([tenantId])
+  @@index([leadId])
+  @@map("crm_tasks")
+}
+
+enum MedicalBillStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  GLOSSED
+  PAID
+}
+
+/// Conferência de contas médicas — lote de serviços prestados por um provedor
+/// de saúde ocupacional (clínica/laboratório), sujeito a glosa antes do pagamento.
+model MedicalBill {
+  id             String            @id @default(cuid())
+  tenantId       String
+  providerId     String
+  companyId      String
+  referenceMonth String // "2026-08"
+  totalAmount    Float
+  glossAmount    Float?
+  glossReason    String?
+  status         MedicalBillStatus @default(SUBMITTED)
+  submittedAt    DateTime          @default(now())
+  approvedAt     DateTime?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  createdById    String?
+
+  provider Provider @relation(fields: [providerId], references: [id])
+
+  @@index([tenantId])
+  @@index([providerId])
+  @@map("medical_bills")
+}
+
+enum PsychosocialSurveyStatus {
+  DRAFT
+  ACTIVE
+  CLOSED
+}
+
+/// Módulo NR-01 — campanha de pesquisa de riscos psicossociais (ex.: aplicação
+/// periódica do instrumento HSE-IT). Fase 1: cadastro da campanha + envio de
+/// convites e monitoramento de participação — sem relatório de riscos nem
+/// plano de ação ainda (fases futuras). As perguntas seguem um conjunto
+/// fictício/de exemplo até o questionário oficial ser fornecido pelo cliente
+/// — ver PSYCHOSOCIAL_SAMPLE_QUESTIONS em psychosocial.service.ts.
+model PsychosocialSurvey {
+  id          String                   @id @default(cuid())
+  tenantId    String
+  companyId   String
+  branchId    String?
+  title       String
+  description String?                  @db.Text
+  status      PsychosocialSurveyStatus @default(DRAFT)
+  startDate   DateTime?
+  endDate     DateTime?
+  createdAt   DateTime                 @default(now())
+  updatedAt   DateTime                 @updatedAt
+  deletedAt   DateTime?
+  createdById String?
+
+  questions PsychosocialQuestion[]
+  invites   PsychosocialInvite[]
+  responses PsychosocialResponse[]
+
+  @@index([tenantId])
+  @@index([companyId])
+  @@map("psychosocial_surveys")
+}
+
+/// Pergunta da pesquisa, agrupada por dimensão (categoria do instrumento —
+/// ex.: HSE-IT usa Demandas, Controle, Apoio da Chefia, Apoio dos Colegas,
+/// Relacionamentos, Papel, Mudança).
+model PsychosocialQuestion {
+  id        String @id @default(cuid())
+  tenantId  String
+  surveyId  String
+  dimension String
+  text      String @db.Text
+  order     Int    @default(0)
+
+  survey  PsychosocialSurvey   @relation(fields: [surveyId], references: [id])
+  answers PsychosocialAnswer[]
+
+  @@index([tenantId])
+  @@index([surveyId])
+  @@map("psychosocial_questions")
+}
+
+/// Convite individual de um colaborador para responder a pesquisa — rastreia
+/// participação (quem já respondeu) sem vincular a resposta em si ao
+/// colaborador, preservando o anonimato exigido pela metodologia.
+model PsychosocialInvite {
+  id          String    @id @default(cuid())
+  tenantId    String
+  surveyId    String
+  employeeId  String
+  token       String    @unique @default(cuid())
+  sentAt      DateTime  @default(now())
+  respondedAt DateTime?
+
+  survey PsychosocialSurvey @relation(fields: [surveyId], references: [id])
+
+  @@unique([surveyId, employeeId])
+  @@index([tenantId])
+  @@index([surveyId])
+  @@index([employeeId])
+  @@map("psychosocial_invites")
+}
+
+/// Submissão anônima do questionário — deliberadamente sem employeeId; carrega
+/// apenas um setor autodeclarado (opcional) para permitir segmentação sem
+/// quebrar o anonimato da resposta.
+model PsychosocialResponse {
+  id           String   @id @default(cuid())
+  tenantId     String
+  surveyId     String
+  /// CPF mascarado (ex.: "123.***.***-00") — nunca o CPF completo, para
+  /// pseudonimização conforme LGPD. Autodeclarado na tela de identificação.
+  cpfMasked    String?
+  branchId     String?
+  departmentId String?
+  positionId   String?
+  gheId        String?
+  submittedAt  DateTime @default(now())
+
+  survey  PsychosocialSurvey   @relation(fields: [surveyId], references: [id])
+  answers PsychosocialAnswer[]
+
+  @@index([tenantId])
+  @@index([surveyId])
+  @@map("psychosocial_responses")
+}
+
+/// Resposta a uma pergunta específica — escala 1 (Nunca) a 5 (Sempre).
+model PsychosocialAnswer {
+  id         String @id @default(cuid())
+  tenantId   String
+  responseId String
+  questionId String
+  value      Int
+
+  response PsychosocialResponse @relation(fields: [responseId], references: [id])
+  question PsychosocialQuestion @relation(fields: [questionId], references: [id])
+
+  @@index([tenantId])
+  @@index([responseId])
+  @@map("psychosocial_answers")
+}
+
+/// Catálogo de EPIs disponíveis para cadastro nas fichas de entrega — carga
+/// inicial via seed (44 itens/9 categorias), editável depois pela tela.
+model EpiCatalogItem {
+  id             String   @id @default(cuid())
+  tenantId       String
+  name           String
+  category       String
+  mainProtection String?
+  active         Boolean  @default(true)
+  createdAt      DateTime @default(now())
+
+  deliveryItems        EpiDeliveryItem[]
+  positionRequirements PositionRequiredEpi[]
+
+  @@index([tenantId])
+  @@map("epi_catalog_items")
+}
+
+enum EpiDeliveryStatus {
+  ATIVA
+  CANCELADA
+}
+
+/// Ficha de entrega de EPI de um colaborador. Snapshot de setor/cargo/admissão
+/// no momento da criação — mesmo motivo do Contract: a ficha assinada não pode
+/// mudar sozinha se o cadastro do colaborador for editado depois.
+model EpiDelivery {
+  id             String            @id @default(cuid())
+  tenantId       String
+  companyId      String
+  employeeId     String
+  deliveryDate   DateTime
+  employeeName   String
+  departmentName String?
+  positionName   String?
+  admittedAt     DateTime?
+  status         EpiDeliveryStatus @default(ATIVA)
+  pdfUrl         String?
+  pdfGeneratedAt DateTime?
+  pdfSha256      String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  createdById    String?
+
+  employee  Employee              @relation(fields: [employeeId], references: [id])
+  items     EpiDeliveryItem[]
+  signature EpiDeliverySignature?
+
+  @@index([tenantId])
+  @@index([companyId])
+  @@index([employeeId])
+  @@map("epi_deliveries")
+}
+
+/// Um EPI entregue dentro de uma ficha. `epiName` é sempre gravado (snapshot,
+/// funciona tanto pra item do catálogo quanto pra "outro" digitado na hora).
+model EpiDeliveryItem {
+  id                String    @id @default(cuid())
+  tenantId          String
+  deliveryId        String
+  epiCatalogItemId  String?
+  epiName           String
+  ca                String?
+  quantity          String?
+  expiresAt         DateTime?
+  periodicityMonths Int?
+  observation       String?   @db.Text
+  createdAt         DateTime  @default(now())
+
+  delivery    EpiDelivery     @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+  catalogItem EpiCatalogItem? @relation(fields: [epiCatalogItemId], references: [id])
+
+  @@index([tenantId])
+  @@index([deliveryId])
+  @@map("epi_delivery_items")
+}
+
+/// Mesma forma de ContractSignature (assinatura eletrônica simples, MP 2.200-2/2001)
+/// — Prisma não tem relação polimórfica, então é um model próprio em vez de
+/// reaproveitar ContractSignature, mas compartilha o enum de método de assinatura.
+model EpiDeliverySignature {
+  id              String                   @id @default(cuid())
+  tenantId        String
+  deliveryId      String                   @unique
+  signerName      String
+  signerCpf       String?
+  tokenHash       String?                  @unique
+  expiresAt       DateTime?
+  signedAt        DateTime?
+  signatureImage  Bytes?
+  signatureMethod ContractSignatureMethod?
+  contentHash     String?
+  ip              String?
+  userAgent       String?                  @db.Text
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  delivery EpiDelivery @relation(fields: [deliveryId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("epi_delivery_signatures")
+}
+
+/// Ordem de Serviço (NR-01) — riscos e EPIs da função do colaborador, puxados
+/// automaticamente do PGR Aprovado mais recente da empresa e do cadastro de
+/// "EPIs exigidos por Cargo", e "congelados" (snapshot) na criação — é um
+/// documento assinado, não pode mudar sozinho se o PGR ou o cargo mudarem depois.
+model WorkOrder {
+  id             String    @id @default(cuid())
+  tenantId       String
+  companyId      String
+  employeeId     String
+  /// Qual PGR aprovado alimentou esta OS — só rastreabilidade, não é live-join.
+  referencePgrId String
+  issueDate      DateTime
+  employeeName   String // snapshot
+  departmentName String?
+  positionName   String?
+  admittedAt     DateTime?
+  pdfUrl         String?
+  pdfGeneratedAt DateTime?
+  pdfSha256      String?
+  createdById    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  employee  Employee            @relation(fields: [employeeId], references: [id])
+  riskItems WorkOrderRiskItem[]
+  epiItems  WorkOrderEpiItem[]
+  signature WorkOrderSignature?
+
+  @@index([tenantId])
+  @@index([companyId])
+  @@index([employeeId])
+  @@map("work_orders")
+}
+
+model WorkOrderRiskItem {
+  id              String       @id @default(cuid())
+  tenantId        String
+  workOrderId     String
+  hazardName      String // snapshot
+  hazardCategory  RiskCategory
+  gheName         String? // snapshot, só rastreabilidade
+  typicalInjuries String?      @db.Text
+  epiMeasures     String?      @db.Text
+  riskLevel       RiskLevel
+  createdAt       DateTime     @default(now())
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([workOrderId])
+  @@map("work_order_risk_items")
+}
+
+model WorkOrderEpiItem {
+  id                String   @id @default(cuid())
+  tenantId          String
+  workOrderId       String
+  epiName           String // snapshot
+  ca                String?
+  periodicityMonths Int?
+  createdAt         DateTime @default(now())
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([workOrderId])
+  @@map("work_order_epi_items")
+}
+
+model WorkOrderSignature {
+  id              String                   @id @default(cuid())
+  tenantId        String
+  workOrderId     String                   @unique
+  signerName      String
+  signerCpf       String?
+  tokenHash       String?                  @unique
+  expiresAt       DateTime?
+  signedAt        DateTime?
+  signatureImage  Bytes?
+  signatureMethod ContractSignatureMethod?
+  contentHash     String?
+  ip              String?
+  userAgent       String?                  @db.Text
+  createdAt       DateTime                 @default(now())
+  updatedAt       DateTime                 @updatedAt
+
+  workOrder WorkOrder @relation(fields: [workOrderId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@map("work_order_signatures")
+}

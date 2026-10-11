@@ -1,0 +1,321 @@
+import { Type } from "class-transformer";
+import {
+  IsArray,
+  IsBoolean,
+  IsDateString,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Min,
+  MinLength,
+  ValidateNested,
+} from "class-validator";
+import type {
+  BehaviorObservationCategory,
+  EvidenceSourceType,
+  InspectionItemType,
+  InspectionResponseValue,
+  InspectionStatus,
+  NonConformitySeverity,
+  NonConformityStatus,
+} from "@hydra/db";
+
+const ITEM_TYPES: InspectionItemType[] = ["CONFORME_NAO_CONFORME", "SIM_NAO", "NOTA", "TEXTO_LIVRE", "SELECAO_MULTIPLA"];
+const RESPONSE_VALUES: InspectionResponseValue[] = ["CONFORME", "NAO_CONFORME", "NAO_APLICAVEL"];
+const INSPECTION_STATUSES: InspectionStatus[] = ["EM_ANDAMENTO", "CONCLUIDA", "CANCELADA"];
+const NC_SEVERITIES: NonConformitySeverity[] = ["BAIXA", "MEDIA", "ALTA", "CRITICA"];
+const NC_STATUSES: NonConformityStatus[] = ["ABERTA", "EM_TRATATIVA", "RESOLVIDA"];
+const BEHAVIOR_CATEGORIES: BehaviorObservationCategory[] = [
+  "ATO_SEGURO",
+  "ATO_INSEGURO",
+  "CONDICAO_SEGURA",
+  "CONDICAO_INSEGURA",
+];
+const EVIDENCE_SOURCE_TYPES: EvidenceSourceType[] = [
+  "INSPECTION",
+  "INSPECTION_ITEM_RESPONSE",
+  "NON_CONFORMITY",
+  "BEHAVIOR_OBSERVATION",
+  "OCCURRENCE",
+  "ACTION",
+  "AUDIT",
+  "PGR",
+];
+
+export class CreateInspectionTemplateItemDto {
+  @IsInt()
+  order!: number;
+
+  @IsString()
+  @MinLength(2)
+  text!: string;
+
+  @IsOptional()
+  @IsIn(ITEM_TYPES)
+  responseType?: InspectionItemType;
+
+  @IsOptional()
+  @IsString()
+  category?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  options?: string[];
+
+  @IsOptional()
+  @IsString()
+  blockLabel?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  allowPhoto?: boolean;
+}
+
+export class CreateInspectionBlockItemDto {
+  @IsInt()
+  order!: number;
+
+  @IsString()
+  @MinLength(2)
+  text!: string;
+
+  @IsOptional()
+  @IsIn(ITEM_TYPES)
+  responseType?: InspectionItemType;
+
+  @IsOptional()
+  @IsString()
+  category?: string;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  options?: string[];
+
+  @IsOptional()
+  @IsBoolean()
+  allowPhoto?: boolean;
+}
+
+export class CreateInspectionBlockDto {
+  @IsOptional()
+  @IsString()
+  companyId?: string;
+
+  @IsString()
+  @MinLength(2)
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateInspectionBlockItemDto)
+  items!: CreateInspectionBlockItemDto[];
+}
+
+export class UpdateInspectionBlockDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateInspectionBlockItemDto)
+  items?: CreateInspectionBlockItemDto[];
+}
+
+export class CreateInspectionTemplateDto {
+  @IsOptional()
+  @IsString()
+  companyId?: string;
+
+  @IsString()
+  @MinLength(2)
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  category?: string;
+
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => CreateInspectionTemplateItemDto)
+  items!: CreateInspectionTemplateItemDto[];
+}
+
+export class UpdateInspectionTemplateItemDto {
+  @IsString()
+  @MinLength(1)
+  text!: string;
+
+  @IsOptional()
+  @IsString()
+  blockLabel?: string;
+
+  @IsOptional()
+  @IsString()
+  category?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  allowPhoto?: boolean;
+}
+
+export class UpdateInspectionTemplateDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  category?: string;
+}
+
+export class CreateInspectionDto {
+  @IsString()
+  companyId!: string;
+
+  @IsOptional()
+  @IsString()
+  branchId?: string;
+
+  @IsOptional()
+  @IsString()
+  departmentId?: string;
+
+  @IsString()
+  templateId!: string;
+
+  @IsOptional()
+  @IsString()
+  inspectorId?: string;
+
+  @IsOptional()
+  @IsDateString()
+  scheduledAt?: string;
+}
+
+export class UpdateInspectionDto {
+  @IsOptional()
+  @IsIn(INSPECTION_STATUSES)
+  status?: InspectionStatus;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
+export class UpsertInspectionResponseDto {
+  @IsString()
+  templateItemId!: string;
+
+  @IsOptional()
+  @IsIn(RESPONSE_VALUES)
+  value?: InspectionResponseValue;
+
+  @IsOptional()
+  @IsString()
+  textValue?: string;
+
+  @IsOptional()
+  @IsString()
+  comment?: string;
+}
+
+export class CreateNonConformityDto {
+  @IsString()
+  companyId!: string;
+
+  @IsOptional()
+  @IsString()
+  inspectionId?: string;
+
+  @IsOptional()
+  @IsString()
+  inspectionItemResponseId?: string;
+
+  @IsString()
+  @MinLength(2)
+  description!: string;
+
+  @IsOptional()
+  @IsIn(NC_SEVERITIES)
+  severity?: NonConformitySeverity;
+
+  @IsOptional()
+  @IsDateString()
+  dueDate?: string;
+}
+
+export class UpdateNonConformityStatusDto {
+  @IsIn(NC_STATUSES)
+  status!: NonConformityStatus;
+}
+
+export class CreateEvidenceDto {
+  @IsIn(EVIDENCE_SOURCE_TYPES)
+  sourceType!: EvidenceSourceType;
+
+  @IsString()
+  sourceId!: string;
+
+  @IsOptional()
+  @IsString()
+  companyId?: string;
+
+  @IsOptional()
+  @IsString()
+  caption?: string;
+
+  @IsOptional()
+  @IsString()
+  category?: string;
+}
+
+export class CreateBehaviorObservationDto {
+  @IsString()
+  companyId!: string;
+
+  @IsOptional()
+  @IsString()
+  branchId?: string;
+
+  @IsOptional()
+  @IsString()
+  observerId?: string;
+
+  @IsOptional()
+  @IsString()
+  observedEmployeeId?: string;
+
+  @IsIn(BEHAVIOR_CATEGORIES)
+  category!: BehaviorObservationCategory;
+
+  @IsString()
+  @MinLength(2)
+  description!: string;
+
+  @IsOptional()
+  @IsString()
+  actionTaken?: string;
+}
