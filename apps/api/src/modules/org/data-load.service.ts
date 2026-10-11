@@ -65,6 +65,14 @@ function parseEmployeeStatus(raw?: string): "ACTIVE" | "ON_LEAVE" | "TERMINATED"
   return undefined;
 }
 
+/** Referência a Unidade/Setor/Cargo: vale o Código; se não bater, aceita o Nome (desde que seja único). */
+function matchRef(list: CodedRec[], ref: string, companyId?: string): { rec?: CodedRec; ambiguous: boolean } {
+  const scope = companyId ? list.filter((r) => r.companyId === companyId) : list;
+  const byCode = scope.filter((r) => lower(r.code) === lower(ref));
+  const found = byCode.length ? byCode : scope.filter((r) => lower(r.name) === lower(ref));
+  return { rec: found.length === 1 ? found[0] : undefined, ambiguous: found.length > 1 };
+}
+
 type CompanyRec = { id: string; name: string; cnpj: string | null };
 type CodedRec = { id: string; companyId: string; code: string | null; name: string };
 
@@ -352,9 +360,14 @@ export class DataLoadService {
 
     let branchId: string | undefined;
     if (kind === "department" && company && row.branch) {
-      const branch = ctx.branches.find((b) => b.companyId === company.id && lower(b.code) === lower(row.branch));
-      if (!branch) errors.push(`Unidade com código "${row.branch}" não encontrada nesta empresa (cadastre na aba Carga Unidade).`);
-      else branchId = branch.id;
+      const branch = matchRef(ctx.branches, row.branch, company.id);
+      if (!branch.rec) {
+        errors.push(
+          branch.ambiguous
+            ? `Mais de uma unidade "${row.branch}" nesta empresa — use o código da unidade.`
+            : `Unidade "${row.branch}" não encontrada nesta empresa (cadastre na aba Carga Unidade e use o código dela).`,
+        );
+      } else branchId = branch.rec.id;
     }
     if (errors.length || !company) return this.fail(row, label, ...errors);
 
@@ -415,12 +428,6 @@ export class DataLoadService {
 
   // ------------------------------------------------------------ Funcionários
 
-  /** Código sem empresa: precisa ser inequívoco em toda a base. */
-  private findUnique(list: CodedRec[], code: string): { rec?: CodedRec; ambiguous: boolean } {
-    const matches = list.filter((r) => lower(r.code) === lower(code));
-    return { rec: matches.length === 1 ? matches[0] : undefined, ambiguous: matches.length > 1 };
-  }
-
   private async employeeRow(ctx: Ctx, row: RawRow, seen: Set<string>): Promise<DataLoadRowResult> {
     const label = row.name ?? `linha ${row.rowNumber}`;
     const errors = requiredErrors(row, {
@@ -435,6 +442,7 @@ export class DataLoadService {
     const status = parseEmployeeStatus(row.status);
     if (!status) errors.push(`Situação inválida: "${row.status}" (use Ativo, Inativo ou Afastado).`);
     if (row.admittedAt === "__invalid__") errors.push("Admissão em formato inválido (use dd/mm/aaaa).");
+    if (row.birthDate === "__invalid__") errors.push("Data Nascimento em formato inválido (use dd/mm/aaaa).");
 
     const cpf = normalizeCpf(row.cpf);
     if (row.cpf && (!cpf || !isValidCpf(cpf))) errors.push(`CPF inválido: "${row.cpf}".`);
@@ -442,22 +450,22 @@ export class DataLoadService {
     if (errors.length) return this.fail(row, label, ...errors);
     seen.add(cpf!);
 
-    const branch = this.findUnique(ctx.branches, row.branch!);
+    const branch = matchRef(ctx.branches, row.branch!);
     if (!branch.rec) {
       return this.fail(
         row,
         label,
         branch.ambiguous
-          ? `Código de unidade "${row.branch}" existe em mais de uma empresa — use códigos de unidade únicos.`
-          : `Unidade com código "${row.branch}" não encontrada (cadastre na aba Carga Unidade).`,
+          ? `Unidade "${row.branch}" existe em mais de uma empresa — use códigos de unidade únicos.`
+          : `Unidade "${row.branch}" não encontrada (cadastre na aba Carga Unidade e use o código dela).`,
       );
     }
     const companyId = branch.rec.companyId;
-    const department = ctx.departments.find((d) => d.companyId === companyId && lower(d.code) === lower(row.department));
-    const position = ctx.positions.find((p) => p.companyId === companyId && lower(p.code) === lower(row.position));
+    const department = matchRef(ctx.departments, row.department!, companyId).rec;
+    const position = matchRef(ctx.positions, row.position!, companyId).rec;
     const linkErrors: string[] = [];
-    if (!department) linkErrors.push(`Setor com código "${row.department}" não encontrado na empresa da unidade "${row.branch}".`);
-    if (!position) linkErrors.push(`Cargo com código "${row.position}" não encontrado na empresa da unidade "${row.branch}".`);
+    if (!department) linkErrors.push(`Setor "${row.department}" não encontrado na empresa da unidade "${row.branch}" (cadastre na aba Carga Setor).`);
+    if (!position) linkErrors.push(`Cargo "${row.position}" não encontrado na empresa da unidade "${row.branch}" (cadastre na aba Carga Cargo).`);
     if (linkErrors.length) return this.fail(row, label, ...linkErrors);
 
     if (!this.can(ctx, PERMISSIONS.ORG_EMPLOYEE_WRITE, companyId)) {
@@ -471,6 +479,7 @@ export class DataLoadService {
       departmentId: department!.id,
       positionId: position!.id,
       admittedAt: new Date(row.admittedAt!),
+      ...(row.birthDate ? { birthDate: new Date(row.birthDate) } : {}),
       status: status!,
     };
     const key = `${companyId}|${cpf}`;

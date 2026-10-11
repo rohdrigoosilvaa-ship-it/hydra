@@ -107,6 +107,7 @@ export const SHEETS: SheetSpec[] = [
     columns: [
       col("name", "Nome", true, [], 32),
       col("cpf", "CPF", true, [], 16),
+      col("birthDate", "Data Nascimento", false, ["nascimento", "data de nascimento"], 16),
       col("status", "Situação", false, [], 12),
       col("branch", "Unidade", true, ["codigo unidade", "codigo da unidade"], 16),
       col("department", "Setor", true, ["codigo setor", "codigo do setor"], 16),
@@ -134,6 +135,8 @@ export interface ParsedSheet {
   rows: RawRow[];
   missingColumns: string[];
 }
+
+const DATE_KEYS = new Set(["admittedAt", "birthDate"]);
 
 function cellToString(v: unknown, isDate: boolean): string | undefined {
   if (v === null || v === undefined || v === "") return undefined;
@@ -177,7 +180,7 @@ export function parseDataLoadWorkbook(buffer: Buffer): ParsedSheet[] {
       for (const c of spec.columns) {
         const idx = indexByKey.get(c.key);
         if (idx === undefined) continue;
-        const value = cellToString(line[idx], c.key === "admittedAt");
+        const value = cellToString(line[idx], DATE_KEYS.has(c.key));
         if (value !== undefined) hasValue = true;
         row[c.key] = value;
       }
