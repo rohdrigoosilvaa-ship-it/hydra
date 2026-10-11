@@ -1,4 +1,4 @@
-import { createBrowserRouter } from "react-router-dom";
+import { createBrowserRouter, Navigate } from "react-router-dom";
 import { AppShell } from "./components/AppShell";
 import { LoginPage } from "./pages/LoginPage";
 import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
@@ -125,7 +125,12 @@ export const router = createBrowserRouter([
       { path: "crm", element: <CrmPage /> },
       { path: "contas-medicas", element: <MedicalBillingPage /> },
       { path: "contratos", element: <ContractsHubPage /> },
-      { path: "inspecoes", element: <InspectionsHubPage /> },
+      { path: "checkhub/dashboard", element: <InspectionsHubPage view="dashboard" /> },
+      { path: "checkhub/criar-checklist", element: <InspectionsHubPage view="criar-checklist" /> },
+      { path: "checkhub/checklists-aplicados", element: <InspectionsHubPage view="checklists-aplicados" /> },
+      { path: "checkhub/planos-de-acao", element: <InspectionsHubPage view="planos-de-acao" /> },
+      // endereço antigo: mantém links e favoritos funcionando
+      { path: "inspecoes", element: <Navigate to="/checkhub/dashboard" replace /> },
       { path: "epi", element: <EpiControlPage /> },
       { path: "epi/:id", element: <EpiDeliveryDetailPage /> },
       { path: "ordens-servico", element: <WorkOrdersPage /> },
