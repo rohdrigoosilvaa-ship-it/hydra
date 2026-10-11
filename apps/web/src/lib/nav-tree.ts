@@ -170,7 +170,10 @@ export const navSections: NavSection[] = [
     id: "checkhub",
     label: "CheckHub",
     items: [
-      { kind: "link", to: "/inspecoes", label: "Inspeções", icon: ClipboardCheck, permission: PERMISSIONS.OCCURRENCE_READ },
+      { kind: "link", to: "/checkhub/dashboard", label: "Dashboard", icon: LayoutDashboard, permission: PERMISSIONS.OCCURRENCE_READ },
+      { kind: "link", to: "/checkhub/criar-checklist", label: "Criar Checklist", icon: ListChecks, permission: PERMISSIONS.OCCURRENCE_READ },
+      { kind: "link", to: "/checkhub/checklists-aplicados", label: "Checklists Aplicados", icon: ClipboardCheck, permission: PERMISSIONS.OCCURRENCE_READ },
+      { kind: "link", to: "/checkhub/planos-de-acao", label: "Planos de Ação", icon: ListTodo, permission: PERMISSIONS.OCCURRENCE_READ },
     ],
   },
   {
