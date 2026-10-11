@@ -148,7 +148,6 @@ export const navSections: NavSection[] = [
       { kind: "link", to: "/nr01/ghe", label: "GHE", icon: Boxes, permission: PERMISSIONS.PGR_READ },
       { kind: "link", to: "/nr01/inventario", label: "Inventário de Riscos", icon: TriangleAlert, permission: PERMISSIONS.PGR_READ },
       { kind: "link", to: "/nr01/gro", label: "GRO", icon: SearchCheck, permission: PERMISSIONS.PGR_READ },
-      { kind: "link", to: "/inspecoes", label: "Inspeções", icon: ClipboardList, permission: PERMISSIONS.OCCURRENCE_READ },
       { kind: "link", to: "/incidentes", label: "Incidentes", icon: Siren, permission: PERMISSIONS.OCCURRENCE_READ },
       {
         kind: "group",
@@ -165,6 +164,13 @@ export const navSections: NavSection[] = [
       { kind: "link", to: "/treinamentos", label: "Treinamentos", icon: GraduationCap, permission: PERMISSIONS.EMPLOYEE_DOCUMENT_READ },
       { kind: "link", to: "/ltcat", label: "LTCAT", icon: ClipboardList, permission: PERMISSIONS.LTCAT_READ },
       { kind: "link", to: "/laudos", label: "Laudos", icon: FileText, permission: PERMISSIONS.REPORT_READ },
+    ],
+  },
+  {
+    id: "checkhub",
+    label: "CheckHub",
+    items: [
+      { kind: "link", to: "/inspecoes", label: "Inspeções", icon: ClipboardCheck, permission: PERMISSIONS.OCCURRENCE_READ },
     ],
   },
   {
