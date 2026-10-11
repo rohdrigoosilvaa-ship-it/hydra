@@ -34,8 +34,8 @@ export default {
         },
       },
       fontFamily: {
-        display: ["Inter", "-apple-system", "Segoe UI", "Helvetica Neue", "Arial", "sans-serif"],
-        body: ["Inter", "-apple-system", "Segoe UI", "Helvetica Neue", "Arial", "sans-serif"],
+        display: ["Montserrat", "-apple-system", "Segoe UI", "Helvetica Neue", "Arial", "sans-serif"],
+        body: ["Lato", "Open Sans", "-apple-system", "Segoe UI", "Helvetica Neue", "Arial", "sans-serif"],
         mono: ["Consolas", "SF Mono", "Cascadia Code", "Menlo", "monospace"],
       },
     },
