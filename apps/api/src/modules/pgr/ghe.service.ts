@@ -65,9 +65,75 @@ export class GheService {
   async create(tenantId: string, dto: CreateGheDto, assignments: RoleAssignmentClaim[]) {
     if (!dto.pgrId && !dto.ltcatId) throw new BadRequestException("Informe pgrId ou ltcatId.");
     if (dto.pgrId && dto.ltcatId) throw new BadRequestException("Um GHE pertence a um PGR ou a um LTCAT, nunca aos dois.");
-    if (dto.pgrId) await this.assertPgrEditable(tenantId, dto.pgrId, assignments);
-    else await this.assertLtcatEditable(tenantId, dto.ltcatId!, assignments);
-    return this.prisma.ghe.create({ data: { ...dto, tenantId }, include: FUNCTIONS_INCLUDE });
+    const owner = dto.pgrId
+      ? await this.assertPgrEditable(tenantId, dto.pgrId, assignments)
+      : await this.assertLtcatEditable(tenantId, dto.ltcatId!, assignments);
+
+    const { departmentId, positionIds, ...gheData } = dto;
+    if (!departmentId) {
+      return this.prisma.ghe.create({ data: { ...gheData, tenantId }, include: FUNCTIONS_INCLUDE });
+    }
+
+    // GHE criado a partir de um Setor cadastrado: o setor (e os cargos escolhidos) já entram como vínculos.
+    const department = await this.prisma.department.findFirst({
+      where: { id: departmentId, tenantId, companyId: owner.companyId, deletedAt: null },
+    });
+    if (!department) throw new NotFoundException("Setor não encontrado nesta empresa.");
+    const uniquePositionIds = [...new Set(positionIds ?? [])];
+    if (uniquePositionIds.length) {
+      const found = await this.prisma.position.count({
+        where: { id: { in: uniquePositionIds }, tenantId, companyId: owner.companyId, deletedAt: null },
+      });
+      if (found !== uniquePositionIds.length) throw new NotFoundException("Cargo não encontrado nesta empresa.");
+    }
+    return this.prisma.$transaction(async (tx) => {
+      const ghe = await tx.ghe.create({ data: { ...gheData, tenantId } });
+      await tx.gheFunction.createMany({
+        data: (uniquePositionIds.length ? uniquePositionIds : [null]).map((positionId) => ({
+          tenantId,
+          gheId: ghe.id,
+          departmentId,
+          positionId,
+        })),
+      });
+      return tx.ghe.findUniqueOrThrow({ where: { id: ghe.id }, include: FUNCTIONS_INCLUDE });
+    });
+  }
+
+  /**
+   * Setores da empresa com a quantidade de colaboradores ativos (total e por cargo) —
+   * alimenta o seletor "Setor → GHE" e as contagens automáticas nos vínculos.
+   */
+  async departmentSummary(tenantId: string, assignments: RoleAssignmentClaim[], companyId: string) {
+    assertCompanyInScope(assignments, PERMISSIONS.PGR_READ, companyId);
+    const [departments, positions, groups] = await Promise.all([
+      this.prisma.department.findMany({
+        where: { tenantId, companyId, deletedAt: null, status: "ACTIVE" },
+        select: { id: true, name: true, code: true },
+        orderBy: { name: "asc" },
+      }),
+      this.prisma.position.findMany({
+        where: { tenantId, companyId, deletedAt: null },
+        select: { id: true, name: true },
+      }),
+      this.prisma.employee.groupBy({
+        by: ["departmentId", "positionId"],
+        where: { tenantId, companyId, deletedAt: null, status: { not: "TERMINATED" } },
+        _count: { _all: true },
+      }),
+    ]);
+    const positionName = new Map(positions.map((p) => [p.id, p.name]));
+    return departments.map((d) => {
+      const own = groups.filter((g) => g.departmentId === d.id);
+      return {
+        ...d,
+        employeeCount: own.reduce((n, g) => n + g._count._all, 0),
+        positions: own
+          .filter((g) => g.positionId && positionName.has(g.positionId))
+          .map((g) => ({ id: g.positionId!, name: positionName.get(g.positionId!)!, count: g._count._all }))
+          .sort((a, b) => a.name.localeCompare(b.name)),
+      };
+    });
   }
 
   async update(tenantId: string, id: string, dto: UpdateGheDto, assignments: RoleAssignmentClaim[]) {

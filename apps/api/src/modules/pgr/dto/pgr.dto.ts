@@ -1,4 +1,4 @@
-import { IsDateString, IsIn, IsInt, IsOptional, IsString, Max, Min, MinLength } from "class-validator";
+import { IsArray, IsDateString, IsIn, IsInt, IsOptional, IsString, Max, Min, MinLength } from "class-validator";
 import type { ActionStatus, EvaluationCriteria, ExposureType, RiskCategory } from "@hydra/db";
 
 const RISK_CATEGORIES: RiskCategory[] = ["FISICO", "QUIMICO", "BIOLOGICO", "ERGONOMICO", "ACIDENTE"];
@@ -215,6 +215,17 @@ export class CreateGheDto {
   @IsOptional()
   @IsString()
   activityDescription?: string;
+
+  /** Cria o GHE a partir de um Setor cadastrado (vira o vínculo Setor/Cargo do GHE). */
+  @IsOptional()
+  @IsString()
+  departmentId?: string;
+
+  /** Cargos (funções) do setor a vincular ao GHE; vazio = só o setor. */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  positionIds?: string[];
 }
 
 export class UpdateGheDto {
