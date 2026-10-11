@@ -113,6 +113,7 @@ export const SHEETS: SheetSpec[] = [
       col("department", "Setor", true, ["codigo setor", "codigo do setor"], 16),
       col("position", "Cargo", true, ["codigo cargo", "codigo do cargo"], 16),
       col("admittedAt", "Admissão", true, ["admissao", "data admissao", "data de admissao"], 14),
+      col("company", "Empresa", false, [], 30),
     ],
   },
 ];
@@ -209,7 +210,8 @@ export function buildDataLoadTemplate(): Buffer {
     ["Empresa: identificada pelo CNPJ. Nas demais abas, a coluna Empresa aceita o CNPJ ou o Nome da Empresa."],
     ["Unidade, Setor e Cargo: identificados pelo Código (único dentro de cada empresa)."],
     ["Setor: a coluna Unidade recebe o Código da Unidade (aba Carga Unidade) da mesma empresa."],
-    ["Funcionarios: Unidade, Setor e Cargo recebem os Códigos das respectivas abas; a empresa é a da Unidade."],
+    ["Funcionarios: Unidade, Setor e Cargo recebem os Códigos (ou nomes) das respectivas abas; a empresa é a da Unidade."],
+    ["Se a mesma Unidade/Setor/Cargo existir em mais de uma empresa, preencha a coluna opcional Empresa (CNPJ ou nome) na aba Funcionarios."],
     ["Funcionário é identificado pelo CPF."],
     [""],
     ["Regras"],
