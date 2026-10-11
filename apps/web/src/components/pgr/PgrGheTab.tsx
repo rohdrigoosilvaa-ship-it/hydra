@@ -3,6 +3,7 @@ import { ChevronDown, ChevronRight, Pencil, Plus, Trash2, Users } from "lucide-r
 import { api } from "../../lib/api";
 import type { Department, Ghe, GheFunction, Nr01GheListItem, PgrDetail, Position } from "../../lib/types";
 import { AiSuggestButton, Field } from "./pgr-shared";
+import { DepartmentPicker, allPositionIds, colabLabel, countFor, useDepartmentSummary, type DepartmentSummary } from "./ghe-department";
 
 export function PgrGheTab({
   pgr,
@@ -16,6 +17,7 @@ export function PgrGheTab({
   onChanged: () => void;
 }) {
   const [showGheForm, setShowGheForm] = useState(false);
+  const summary = useDepartmentSummary(pgr.companyId);
 
   return (
     <div>
@@ -31,6 +33,7 @@ export function PgrGheTab({
         <NewGheForm
           pgrId={pgr.id}
           companyId={pgr.companyId}
+          summary={summary}
           onClose={() => setShowGheForm(false)}
           onCreated={() => {
             setShowGheForm(false);
@@ -41,7 +44,7 @@ export function PgrGheTab({
       <div className="mt-3 flex flex-col gap-3">
         {pgr.ghes.length === 0 && <p className="text-sm text-ink-muted">Nenhum GHE cadastrado.</p>}
         {pgr.ghes.map((g) => (
-          <GheCard key={g.id} ghe={g} departments={departments} positions={positions} onChanged={onChanged} />
+          <GheCard key={g.id} ghe={g} departments={departments} positions={positions} summary={summary} onChanged={onChanged} />
         ))}
       </div>
     </div>
@@ -51,16 +54,20 @@ export function PgrGheTab({
 function NewGheForm({
   pgrId,
   companyId,
+  summary,
   onClose,
   onCreated,
 }: {
   pgrId: string;
   companyId: string;
+  summary: DepartmentSummary[];
   onClose: () => void;
   onCreated: () => void;
 }) {
   const [existingGhes, setExistingGhes] = useState<Nr01GheListItem[]>([]);
   const [copyFromId, setCopyFromId] = useState("");
+  const [departmentId, setDepartmentId] = useState("");
+  const [positionIds, setPositionIds] = useState<string[]>([]);
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [localDescription, setLocalDescription] = useState("");
@@ -82,6 +89,16 @@ function NewGheForm({
     setActivityDescription(source.activityDescription ?? "");
   }
 
+  function handleDepartment(id: string) {
+    setDepartmentId(id);
+    setPositionIds(allPositionIds(summary, id));
+    const dep = summary.find((d) => d.id === id);
+    if (dep) {
+      setName(dep.name);
+      setCode(dep.code ?? "");
+    }
+  }
+
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
@@ -89,6 +106,8 @@ function NewGheForm({
     try {
       await api.post("/pgr/ghe", {
         pgrId,
+        departmentId: departmentId || undefined,
+        positionIds: departmentId ? positionIds : undefined,
         name,
         code: code || undefined,
         localDescription: localDescription || undefined,
@@ -104,6 +123,15 @@ function NewGheForm({
 
   return (
     <form onSubmit={handleSubmit} className="card mt-3 flex flex-col gap-3">
+      {summary.length > 0 && (
+        <DepartmentPicker
+          summary={summary}
+          departmentId={departmentId}
+          positionIds={positionIds}
+          onDepartmentChange={handleDepartment}
+          onPositionsChange={setPositionIds}
+        />
+      )}
       {existingGhes.length > 0 && (
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-ink-muted">Copiar dados de um GHE existente (opcional)</span>
@@ -162,11 +190,13 @@ function GheCard({
   ghe,
   departments,
   positions,
+  summary,
   onChanged,
 }: {
   ghe: Ghe;
   departments: Department[];
   positions: Position[];
+  summary: DepartmentSummary[];
   onChanged: () => void;
 }) {
   const [open, setOpen] = useState(true);
@@ -225,6 +255,7 @@ function GheCard({
                 gheId={ghe.id}
                 departments={departments}
                 positions={positions}
+                summary={summary}
                 onClose={() => setShowFunctionForm(false)}
                 onSaved={() => { setShowFunctionForm(false); onChanged(); }}
               />
@@ -234,7 +265,7 @@ function GheCard({
                 <p className="text-sm text-ink-muted">Nenhuma função vinculada a este GHE.</p>
               )}
               {ghe.functions.map((f) => (
-                <GheFunctionRow key={f.id} entry={f} onChanged={onChanged} />
+                <GheFunctionRow key={f.id} entry={f} summary={summary} onChanged={onChanged} />
               ))}
             </div>
           </div>
@@ -315,12 +346,14 @@ function GheFunctionForm({
   gheId,
   departments,
   positions,
+  summary,
   onClose,
   onSaved,
 }: {
   gheId: string;
   departments: Department[];
   positions: Position[];
+  summary: DepartmentSummary[];
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -356,18 +389,24 @@ function GheFunctionForm({
           <span className="text-ink-muted">Setor</span>
           <select className="input" value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
             <option value="">Nenhum</option>
-            {departments.map((d) => (
-              <option key={d.id} value={d.id}>{d.name}</option>
-            ))}
+            {departments.map((d) => {
+              const n = countFor(summary, d.id);
+              return (
+                <option key={d.id} value={d.id}>{d.name}{n !== null ? ` — ${colabLabel(n)}` : ""}</option>
+              );
+            })}
           </select>
         </label>
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-ink-muted">Cargo</span>
           <select className="input" value={positionId} onChange={(e) => setPositionId(e.target.value)}>
             <option value="">Nenhum</option>
-            {positions.map((p) => (
-              <option key={p.id} value={p.id}>{p.name}</option>
-            ))}
+            {positions.map((p) => {
+              const n = departmentId ? countFor(summary, departmentId, p.id) : null;
+              return (
+                <option key={p.id} value={p.id}>{p.name}{n !== null ? ` — ${colabLabel(n)} no setor` : ""}</option>
+              );
+            })}
           </select>
         </label>
       </div>
@@ -388,7 +427,8 @@ function GheFunctionForm({
   );
 }
 
-function GheFunctionRow({ entry, onChanged }: { entry: GheFunction; onChanged: () => void }) {
+function GheFunctionRow({ entry, summary, onChanged }: { entry: GheFunction; summary: DepartmentSummary[]; onChanged: () => void }) {
+  const count = countFor(summary, entry.departmentId, entry.positionId);
   async function handleRemove() {
     if (!window.confirm("Remover este vínculo de setor/cargo do GHE?")) return;
     await api.del(`/pgr/ghe-functions/${entry.id}`);
@@ -402,6 +442,7 @@ function GheFunctionRow({ entry, onChanged }: { entry: GheFunction; onChanged: (
           <span className="font-medium">{entry.department?.name ?? "Setor não informado"}</span>
           {" — "}
           <span>{entry.position?.name ?? "Cargo não informado"}</span>
+          {count !== null && <span className="ml-2 text-xs text-ink-muted">· {colabLabel(count)}</span>}
         </p>
         <button onClick={handleRemove} className="flex shrink-0 items-center gap-1 text-xs text-amber hover:underline">
           <Trash2 size={12} /> Remover

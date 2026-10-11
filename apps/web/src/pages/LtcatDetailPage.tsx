@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { CheckCircle2, ChevronDown, ChevronRight, Download, Pencil, Plus, Trash2, Upload } from "lucide-react";
 import { api } from "../lib/api";
+import { DepartmentPicker, allPositionIds, colabLabel, countFor, useDepartmentSummary, type DepartmentSummary } from "../components/pgr/ghe-department";
 import type { Department, Ghe, LtcatAgent, LtcatDetail, Position, RiskCategory } from "../lib/types";
 
 const STATUS_LABEL: Record<string, string> = { DRAFT: "Rascunho", IN_REVIEW: "Em revisão", APPROVED: "Aprovado", ARCHIVED: "Arquivado" };
@@ -31,6 +32,7 @@ export function LtcatDetailPage() {
   const navigate = useNavigate();
   const [ltcat, setLtcat] = useState<LtcatDetail | null>(null);
   const [departments, setDepartments] = useState<Department[]>([]);
+  const summary = useDepartmentSummary(ltcat?.companyId);
   const [positions, setPositions] = useState<Position[]>([]);
   const [showDocForm, setShowDocForm] = useState(false);
   const [showNewGheForm, setShowNewGheForm] = useState(false);
@@ -234,11 +236,11 @@ export function LtcatDetailPage() {
         ) : (
           <>
             {showNewGheForm && (
-              <NewGheForm ltcatId={ltcat.id} onClose={() => setShowNewGheForm(false)} onCreated={() => { setShowNewGheForm(false); load(); }} />
+              <NewGheForm ltcatId={ltcat.id} companyId={ltcat.companyId} summary={summary} onClose={() => setShowNewGheForm(false)} onCreated={() => { setShowNewGheForm(false); load(); }} />
             )}
             <div className="mt-3 flex flex-col gap-3">
               {ltcat.ghes.map((ghe) => (
-                <GheCard key={ghe.id} ghe={ghe} departments={departments} positions={positions} onChanged={load} onRemoveFunction={handleRemoveFunction} />
+                <GheCard key={ghe.id} ghe={ghe} departments={departments} positions={positions} summary={summary} onChanged={load} onRemoveFunction={handleRemoveFunction} />
               ))}
             </div>
           </>
@@ -440,13 +442,36 @@ function LtcatDocumentForm({ ltcat, onClose, onSaved }: { ltcat: LtcatDetail; on
   );
 }
 
-function NewGheForm({ ltcatId, onClose, onCreated }: { ltcatId: string; onClose: () => void; onCreated: () => void }) {
+function NewGheForm({
+  ltcatId,
+  summary,
+  onClose,
+  onCreated,
+}: {
+  ltcatId: string;
+  companyId: string;
+  summary: DepartmentSummary[];
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const [departmentId, setDepartmentId] = useState("");
+  const [positionIds, setPositionIds] = useState<string[]>([]);
   const [name, setName] = useState("");
   const [code, setCode] = useState("");
   const [localDescription, setLocalDescription] = useState("");
   const [activityDescription, setActivityDescription] = useState("");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  function handleDepartment(id: string) {
+    setDepartmentId(id);
+    setPositionIds(allPositionIds(summary, id));
+    const dep = summary.find((d) => d.id === id);
+    if (dep) {
+      setName(dep.name);
+      setCode(dep.code ?? "");
+    }
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -455,6 +480,8 @@ function NewGheForm({ ltcatId, onClose, onCreated }: { ltcatId: string; onClose:
     try {
       await api.post("/pgr/ghe", {
         ltcatId,
+        departmentId: departmentId || undefined,
+        positionIds: departmentId ? positionIds : undefined,
         name,
         code: code || undefined,
         localDescription: localDescription || undefined,
@@ -470,6 +497,15 @@ function NewGheForm({ ltcatId, onClose, onCreated }: { ltcatId: string; onClose:
 
   return (
     <form onSubmit={handleSubmit} className="card mt-3 flex flex-col gap-3">
+      {summary.length > 0 && (
+        <DepartmentPicker
+          summary={summary}
+          departmentId={departmentId}
+          positionIds={positionIds}
+          onDepartmentChange={handleDepartment}
+          onPositionsChange={setPositionIds}
+        />
+      )}
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-ink-muted">Nome do GHE</span>
@@ -501,12 +537,14 @@ function GheCard({
   ghe,
   departments,
   positions,
+  summary,
   onChanged,
   onRemoveFunction,
 }: {
   ghe: Ghe;
   departments: Department[];
   positions: Position[];
+  summary: DepartmentSummary[];
   onChanged: () => void;
   onRemoveFunction: (functionId: string) => void;
 }) {
@@ -520,6 +558,11 @@ function GheCard({
           {open ? <ChevronDown size={15} /> : <ChevronRight size={15} />}
           <span className="font-medium text-ink">{ghe.name}</span>
           {ghe.code && <span className="font-mono text-xs text-ink-muted">{ghe.code}</span>}
+          {ghe.employeesCount !== undefined && (
+            <span className="rounded-full bg-teal-tint px-2 py-0.5 text-xs font-medium text-teal-deep" title="Colaboradores vinculados a este GHE (pelo setor/cargo)">
+              {colabLabel(ghe.employeesCount)}
+            </span>
+          )}
         </button>
       </div>
       {open && (
@@ -541,6 +584,7 @@ function GheCard({
                 gheId={ghe.id}
                 departments={departments}
                 positions={positions}
+                summary={summary}
                 onClose={() => setShowFunctionForm(false)}
                 onCreated={() => {
                   setShowFunctionForm(false);
@@ -554,6 +598,9 @@ function GheCard({
                 <li key={f.id} className="flex items-center justify-between rounded-md border border-line px-3 py-1.5 text-sm">
                   <span className="text-ink">
                     {f.department?.name ?? "—"} — {f.position?.name ?? "—"}
+                    {countFor(summary, f.departmentId, f.positionId) !== null && (
+                      <span className="ml-2 text-xs text-ink-muted">· {colabLabel(countFor(summary, f.departmentId, f.positionId)!)}</span>
+                    )}
                   </span>
                   <button onClick={() => onRemoveFunction(f.id)} className="text-xs text-amber hover:underline">
                     Remover
@@ -572,12 +619,14 @@ function NewFunctionForm({
   gheId,
   departments,
   positions,
+  summary,
   onClose,
   onCreated,
 }: {
   gheId: string;
   departments: Department[];
   positions: Position[];
+  summary: DepartmentSummary[];
   onClose: () => void;
   onCreated: () => void;
 }) {
@@ -609,14 +658,20 @@ function NewFunctionForm({
         <span className="text-ink-muted">Setor</span>
         <select className="input" value={departmentId} onChange={(e) => setDepartmentId(e.target.value)}>
           <option value="">Selecione</option>
-          {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+          {departments.map((d) => {
+            const n = countFor(summary, d.id);
+            return <option key={d.id} value={d.id}>{d.name}{n !== null ? ` — ${colabLabel(n)}` : ""}</option>;
+          })}
         </select>
       </label>
       <label className="flex flex-col gap-1 text-xs">
         <span className="text-ink-muted">Cargo</span>
         <select className="input" value={positionId} onChange={(e) => setPositionId(e.target.value)}>
           <option value="">Selecione</option>
-          {positions.map((p) => <option key={p.id} value={p.id}>{p.name}</option>)}
+          {positions.map((p) => {
+            const n = departmentId ? countFor(summary, departmentId, p.id) : null;
+            return <option key={p.id} value={p.id}>{p.name}{n !== null ? ` — ${colabLabel(n)} no setor` : ""}</option>;
+          })}
         </select>
       </label>
       <button type="button" onClick={handleSubmit} disabled={saving} className="btn-primary text-xs">

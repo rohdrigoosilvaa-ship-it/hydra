@@ -16,6 +16,12 @@ export class GheController {
     return this.ghe.list(user.tenantId, user.assignments, pgrId);
   }
 
+  @Get("department-summary")
+  @RequirePermission(PERMISSIONS.PGR_READ)
+  departmentSummary(@CurrentUser() user: HydraRequestUser, @Query("companyId") companyId: string) {
+    return this.ghe.departmentSummary(user.tenantId, user.assignments, companyId);
+  }
+
   @Post()
   @RequirePermission(PERMISSIONS.PGR_WRITE)
   create(@CurrentUser() user: HydraRequestUser, @Body() dto: CreateGheDto) {
