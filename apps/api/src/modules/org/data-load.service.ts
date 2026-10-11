@@ -4,7 +4,6 @@ import { PrismaService } from "../../core/prisma/prisma.service";
 import { PERMISSIONS, type Permission } from "../../core/permissions/permissions";
 import type { RoleAssignmentClaim } from "../../core/auth/jwt.types";
 import { normalizeCpf } from "./employees.service";
-import { isValidCpf } from "./employees-import.util";
 import { hasTenantWideAccess, isCompanyInScope } from "./scope.util";
 import { parseDataLoadWorkbook, type ParsedSheet, type RawRow, type SheetKey } from "./data-load.util";
 
@@ -444,29 +443,52 @@ export class DataLoadService {
     if (row.admittedAt === "__invalid__") errors.push("Admissão em formato inválido (use dd/mm/aaaa).");
     if (row.birthDate === "__invalid__") errors.push("Data Nascimento em formato inválido (use dd/mm/aaaa).");
 
+    // CPF: aceita qualquer número informado (só precisa ter dígitos) — sem conferir dígito verificador.
     const cpf = normalizeCpf(row.cpf);
-    if (row.cpf && (!cpf || !isValidCpf(cpf))) errors.push(`CPF inválido: "${row.cpf}".`);
+    if (row.cpf && !cpf) errors.push(`CPF inválido: "${row.cpf}" (precisa ter números).`);
     if (cpf && seen.has(cpf)) errors.push("CPF repetido nesta aba.");
     if (errors.length) return this.fail(row, label, ...errors);
     seen.add(cpf!);
 
-    const branch = matchRef(ctx.branches, row.branch!);
-    if (!branch.rec) {
+    // A aba não tem coluna de empresa: a unidade pode se repetir entre empresas (ex.: "SEDE").
+    // Escolhemos a empresa em que Unidade, Setor e Cargo existem juntos; se ainda sobrar mais de
+    // uma, a coluna opcional "Empresa" resolve.
+    let candidateIds: string[];
+    if (row.company) {
+      const { company, error } = this.resolveCompany(ctx, row.company);
+      if (error) return this.fail(row, label, error);
+      candidateIds = [company!.id];
+    } else {
+      candidateIds = [...new Set(ctx.branches.filter((b) => matchRef(ctx.branches, row.branch!, b.companyId).rec).map((b) => b.companyId))];
+    }
+    if (candidateIds.length === 0) {
+      return this.fail(row, label, `Unidade "${row.branch}" não encontrada (cadastre na aba Carga Unidade e use o código dela).`);
+    }
+    const viable = candidateIds
+      .map((companyId) => ({
+        companyId,
+        branch: matchRef(ctx.branches, row.branch!, companyId).rec,
+        department: matchRef(ctx.departments, row.department!, companyId).rec,
+        position: matchRef(ctx.positions, row.position!, companyId).rec,
+      }))
+      .filter((c) => c.branch && c.department && c.position);
+    if (viable.length > 1) {
       return this.fail(
         row,
         label,
-        branch.ambiguous
-          ? `Unidade "${row.branch}" existe em mais de uma empresa — use códigos de unidade únicos.`
-          : `Unidade "${row.branch}" não encontrada (cadastre na aba Carga Unidade e use o código dela).`,
+        `Unidade "${row.branch}", Setor "${row.department}" e Cargo "${row.position}" existem em mais de uma empresa — adicione a coluna Empresa (CNPJ ou nome) na aba Carga Funcionarios.`,
       );
     }
-    const companyId = branch.rec.companyId;
-    const department = matchRef(ctx.departments, row.department!, companyId).rec;
-    const position = matchRef(ctx.positions, row.position!, companyId).rec;
-    const linkErrors: string[] = [];
-    if (!department) linkErrors.push(`Setor "${row.department}" não encontrado na empresa da unidade "${row.branch}" (cadastre na aba Carga Setor).`);
-    if (!position) linkErrors.push(`Cargo "${row.position}" não encontrado na empresa da unidade "${row.branch}" (cadastre na aba Carga Cargo).`);
-    if (linkErrors.length) return this.fail(row, label, ...linkErrors);
+    if (viable.length === 0) {
+      const c = candidateIds[0]!;
+      const linkErrors: string[] = [];
+      if (!matchRef(ctx.branches, row.branch!, c).rec) linkErrors.push(`Unidade "${row.branch}" não encontrada na empresa informada (aba Carga Unidade).`);
+      if (!matchRef(ctx.departments, row.department!, c).rec) linkErrors.push(`Setor "${row.department}" não encontrado na empresa da unidade "${row.branch}" (cadastre na aba Carga Setor).`);
+      if (!matchRef(ctx.positions, row.position!, c).rec) linkErrors.push(`Cargo "${row.position}" não encontrado na empresa da unidade "${row.branch}" (cadastre na aba Carga Cargo).`);
+      return this.fail(row, label, ...(candidateIds.length > 1 ? [`Unidade "${row.branch}" existe em mais de uma empresa e Setor/Cargo não batem com nenhuma — confira os nomes ou adicione a coluna Empresa.`] : linkErrors));
+    }
+    const { companyId, branch: branchRec, department, position } = viable[0]!;
+    const branch = { rec: branchRec! };
 
     if (!this.can(ctx, PERMISSIONS.ORG_EMPLOYEE_WRITE, companyId)) {
       return this.fail(row, label, "Você não tem acesso a esta empresa.");
