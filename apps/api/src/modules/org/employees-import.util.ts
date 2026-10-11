@@ -46,7 +46,7 @@ function excelSerialToDate(serial: number): Date {
   return new Date(utcDays * 86400 * 1000);
 }
 
-function toIsoDate(value: unknown): string | undefined {
+export function toIsoDate(value: unknown): string | undefined {
   if (value === null || value === undefined || value === "") return undefined;
   if (value instanceof Date) {
     if (Number.isNaN(value.getTime())) return undefined;

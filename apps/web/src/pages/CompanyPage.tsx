@@ -1,15 +1,17 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { Image as ImageIcon, Pencil, Plus, Trash2, X } from "lucide-react";
+import { Image as ImageIcon, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
 import { api } from "../lib/api";
+import { DataLoadWizard } from "../components/DataLoadWizard";
 import { useCompanyFilterStore } from "../lib/company-filter-store";
 import type { Company } from "../lib/types";
 
 export function CompanyPage() {
   const [companies, setCompanies] = useState<Company[] | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [showLoad, setShowLoad] = useState(false);
   const [editing, setEditing] = useState<Company | null>(null);
   const [loadingEdit, setLoadingEdit] = useState(false);
-  const { selectedCompanyId, setSelectedCompanyId } = useCompanyFilterStore();
+  const { selectedCompanyId, setSelectedCompanyId, refreshCompanies } = useCompanyFilterStore();
 
   async function load() {
     setCompanies(await api.get<Company[]>("/companies"));
@@ -26,6 +28,7 @@ export function CompanyPage() {
     if (!confirmed) return;
     await api.del(`/companies/${company.id}`);
     if (selectedCompanyId === company.id) setSelectedCompanyId(null);
+    refreshCompanies();
     load();
   }
 
@@ -59,18 +62,25 @@ export function CompanyPage() {
               <X size={13} /> Ver todas as empresas
             </button>
           )}
+          <button className="btn-secondary flex items-center gap-1.5" onClick={() => setShowLoad(true)}>
+            <Upload size={15} /> Carga de dados
+          </button>
           <button className="btn-primary flex items-center gap-1.5" onClick={() => setShowForm(true)}>
             <Plus size={15} /> Nova empresa
           </button>
         </div>
       </div>
 
-      {showForm && <CompanyForm onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); load(); }} />}
+      {showLoad && (
+        <DataLoadWizard onClose={() => setShowLoad(false)} onImported={() => { refreshCompanies(); load(); }} />
+      )}
+
+      {showForm && <CompanyForm onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); refreshCompanies(); load(); }} />}
       {editing && (
         <CompanyForm
           company={editing}
           onClose={() => setEditing(null)}
-          onSaved={() => { setEditing(null); load(); }}
+          onSaved={() => { setEditing(null); refreshCompanies(); load(); }}
           onLogoChanged={(updated) => { setEditing(updated); load(); }}
         />
       )}
