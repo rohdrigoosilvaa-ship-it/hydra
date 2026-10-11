@@ -4,7 +4,7 @@ import { Plus, Upload } from "lucide-react";
 import { api } from "../lib/api";
 import { useCompanyFilterStore } from "../lib/company-filter-store";
 import { CreatableSelect } from "../components/CreatableSelect";
-import { ImportEmployeesWizard } from "../components/ImportEmployeesWizard";
+import { DataLoadWizard } from "../components/DataLoadWizard";
 import type { Company, Department, Employee, Position } from "../lib/types";
 
 export function EmployeesPage() {
@@ -13,7 +13,7 @@ export function EmployeesPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [showImport, setShowImport] = useState(false);
+  const [showLoad, setShowLoad] = useState(false);
   const selectedCompanyId = useCompanyFilterStore((s) => s.selectedCompanyId);
 
   async function load() {
@@ -51,8 +51,8 @@ export function EmployeesPage() {
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button className="btn-secondary flex items-center gap-1.5" onClick={() => setShowImport(true)}>
-            <Upload size={15} /> Importar Colaboradores
+          <button className="btn-secondary flex items-center gap-1.5" onClick={() => setShowLoad(true)}>
+            <Upload size={15} /> Carga de dados
           </button>
           <button className="btn-primary flex items-center gap-1.5" onClick={() => setShowForm(true)}>
             <Plus size={15} /> Novo colaborador
@@ -79,9 +79,7 @@ export function EmployeesPage() {
         />
       )}
 
-      {showImport && (
-        <ImportEmployeesWizard onClose={() => setShowImport(false)} onImported={load} />
-      )}
+      {showLoad && <DataLoadWizard onClose={() => setShowLoad(false)} onImported={load} />}
 
       <div className="mt-6 overflow-hidden rounded-lg border border-line bg-paper-raised">
         <table className="w-full text-left text-sm">

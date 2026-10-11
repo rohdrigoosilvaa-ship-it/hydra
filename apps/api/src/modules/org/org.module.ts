@@ -17,6 +17,8 @@ import { UsersController } from "./users.controller";
 import { UsersService } from "./users.service";
 import { EmployeesImportController } from "./employees-import.controller";
 import { EmployeesImportService } from "./employees-import.service";
+import { DataLoadController } from "./data-load.controller";
+import { DataLoadService } from "./data-load.service";
 import { EmployeeDocumentsController } from "./employee-documents.controller";
 import { EmployeeDocumentsService } from "./employee-documents.service";
 
@@ -32,6 +34,7 @@ import { EmployeeDocumentsService } from "./employee-documents.service";
     UsersController,
     EmployeesImportController,
     EmployeeDocumentsController,
+    DataLoadController,
   ],
   providers: [
     CompaniesService,
@@ -44,6 +47,7 @@ import { EmployeeDocumentsService } from "./employee-documents.service";
     UsersService,
     EmployeesImportService,
     EmployeeDocumentsService,
+    DataLoadService,
   ],
 })
 export class OrgModule {}

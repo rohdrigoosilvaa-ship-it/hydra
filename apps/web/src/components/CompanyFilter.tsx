@@ -10,7 +10,7 @@ import type { CompanySummary } from "../lib/types";
  */
 export function CompanyFilter() {
   const [companies, setCompanies] = useState<CompanySummary[] | null>(null);
-  const { selectedCompanyId, setSelectedCompanyId } = useCompanyFilterStore();
+  const { selectedCompanyId, setSelectedCompanyId, companiesVersion } = useCompanyFilterStore();
 
   useEffect(() => {
     api.get<CompanySummary[]>("/dashboard/companies").then((list) => {
@@ -21,7 +21,7 @@ export function CompanyFilter() {
       }
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [companiesVersion]);
 
   if (!companies) return <div className="h-9 w-64" />;
 

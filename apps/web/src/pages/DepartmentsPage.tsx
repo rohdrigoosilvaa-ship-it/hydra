@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Pencil, Plus, Trash2, X } from "lucide-react";
+import { Pencil, Plus, Trash2, Upload, X } from "lucide-react";
 import { api } from "../lib/api";
+import { DataLoadWizard } from "../components/DataLoadWizard";
 import { useCompanyFilterStore } from "../lib/company-filter-store";
 import type { Branch, Company, Department } from "../lib/types";
 
@@ -10,6 +11,7 @@ export function DepartmentsPage() {
   const [branches, setBranches] = useState<Branch[]>([]);
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [showLoad, setShowLoad] = useState(false);
   const [editing, setEditing] = useState<Department | null>(null);
   const [error, setError] = useState<string | null>(null);
   const selectedCompanyId = useCompanyFilterStore((s) => s.selectedCompanyId);
@@ -67,9 +69,14 @@ export function DepartmentsPage() {
               : "Setores vinculados a uma unidade da empresa."}
           </p>
         </div>
-        <button className="btn-primary flex items-center gap-1.5" onClick={() => setShowForm(true)}>
-          <Plus size={15} /> Novo setor
-        </button>
+        <div className="flex items-center gap-2">
+          <button className="btn-secondary flex items-center gap-1.5" onClick={() => setShowLoad(true)}>
+            <Upload size={15} /> Carga de dados
+          </button>
+          <button className="btn-primary flex items-center gap-1.5" onClick={() => setShowForm(true)}>
+            <Plus size={15} /> Novo setor
+          </button>
+        </div>
       </div>
 
       <input
@@ -80,6 +87,8 @@ export function DepartmentsPage() {
       />
 
       {error && <p className="mt-4 rounded-md border-l-2 border-amber bg-amber-tint px-3 py-2 text-sm">{error}</p>}
+
+      {showLoad && <DataLoadWizard onClose={() => setShowLoad(false)} onImported={load} />}
 
       {showForm && (
         <DepartmentForm

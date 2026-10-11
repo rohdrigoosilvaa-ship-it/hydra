@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
-import { HardHat, Pencil, Plus, Trash2, X } from "lucide-react";
+import { HardHat, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
 import { api } from "../lib/api";
+import { DataLoadWizard } from "../components/DataLoadWizard";
 import { CboPicker } from "../components/CboPicker";
 import { PositionRequiredEpisModal } from "../components/positions/PositionRequiredEpisModal";
 import { useCompanyFilterStore } from "../lib/company-filter-store";
@@ -11,6 +12,7 @@ export function PositionsPage() {
   const [companies, setCompanies] = useState<Company[]>([]);
   const [search, setSearch] = useState("");
   const [showForm, setShowForm] = useState(false);
+  const [showLoad, setShowLoad] = useState(false);
   const [editing, setEditing] = useState<Position | null>(null);
   const [managingEpis, setManagingEpis] = useState<Position | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -68,9 +70,14 @@ export function PositionsPage() {
               : "Cargos/funções reaproveitáveis entre unidades da empresa."}
           </p>
         </div>
-        <button className="btn-primary flex items-center gap-1.5" onClick={() => setShowForm(true)}>
-          <Plus size={15} /> Novo cargo
-        </button>
+        <div className="flex items-center gap-2">
+          <button className="btn-secondary flex items-center gap-1.5" onClick={() => setShowLoad(true)}>
+            <Upload size={15} /> Carga de dados
+          </button>
+          <button className="btn-primary flex items-center gap-1.5" onClick={() => setShowForm(true)}>
+            <Plus size={15} /> Novo cargo
+          </button>
+        </div>
       </div>
 
       <input
@@ -81,6 +88,8 @@ export function PositionsPage() {
       />
 
       {error && <p className="mt-4 rounded-md border-l-2 border-amber bg-amber-tint px-3 py-2 text-sm">{error}</p>}
+
+      {showLoad && <DataLoadWizard onClose={() => setShowLoad(false)} onImported={load} />}
 
       {showForm && (
         <PositionForm
