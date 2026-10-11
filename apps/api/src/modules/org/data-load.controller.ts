@@ -31,9 +31,10 @@ export class DataLoadController {
   async load(
     @CurrentUser() user: HydraRequestUser,
     @Query("dryRun") dryRun: string | undefined,
+    @Query("companyId") companyId: string | undefined,
     @UploadedFile() file?: Express.Multer.File,
   ) {
     if (!file) throw new BadRequestException("Envie a planilha de carga (.xlsx).");
-    return this.dataLoad.run(user.tenantId, user.id, user.assignments, file.buffer, dryRun !== "false", file.originalname);
+    return this.dataLoad.run(user.tenantId, user.id, user.assignments, file.buffer, dryRun !== "false", file.originalname, companyId || undefined);
   }
 }

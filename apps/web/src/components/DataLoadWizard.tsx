@@ -1,12 +1,14 @@
 import { useRef, useState } from "react";
 import { CheckCircle2, Download, FileSpreadsheet, X } from "lucide-react";
 import { api } from "../lib/api";
+import { useCompanyFilterStore } from "../lib/company-filter-store";
 
 interface RowResult {
   rowNumber: number;
   label: string;
   status: "new" | "update" | "error";
   errors: string[];
+  warnings?: string[];
 }
 
 interface SheetResult {
@@ -16,6 +18,7 @@ interface SheetResult {
   created: number;
   updated: number;
   errorCount: number;
+  warningCount: number;
   rows: RowResult[];
 }
 
@@ -40,11 +43,13 @@ export function DataLoadWizard({ onClose, onImported }: { onClose: () => void; o
   const [done, setDone] = useState<LoadResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { selectedCompanyId } = useCompanyFilterStore();
 
   async function send(f: File, dryRun: boolean) {
     const form = new FormData();
     form.append("file", f);
-    return api.postForm<LoadResult>(`/data-load?dryRun=${dryRun}`, form);
+    const company = selectedCompanyId ? `&companyId=${encodeURIComponent(selectedCompanyId)}` : "";
+    return api.postForm<LoadResult>(`/data-load?dryRun=${dryRun}${company}`, form);
   }
 
   async function handleFile(f: File) {
@@ -157,9 +162,29 @@ export function DataLoadWizard({ onClose, onImported }: { onClose: () => void; o
                   <div className="flex items-center justify-between bg-paper px-4 py-2 text-sm">
                     <span className="font-medium text-ink">{s.title}</span>
                     <span className="text-xs text-ink-muted">
-                      {s.total} linhas · {s.created} novos · {s.updated} atualizados · {s.errorCount} com erro
+                      {s.total} linhas · {s.created} novos · {s.updated} atualizados · {s.warningCount} com aviso · {s.errorCount} com erro
                     </span>
                   </div>
+                  {s.warningCount > 0 && (
+                    <div className="max-h-36 overflow-y-auto border-t border-line bg-paper px-4 py-2">
+                      <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                        Avisos — as linhas serão importadas, vale conferir
+                      </p>
+                      <table className="w-full text-left text-xs">
+                        <tbody>
+                          {s.rows
+                            .filter((r) => r.warnings?.length)
+                            .map((r) => (
+                              <tr key={r.rowNumber} className="border-t border-line">
+                                <td className="py-1 pr-3">{r.rowNumber}</td>
+                                <td className="py-1 pr-3">{r.label}</td>
+                                <td className="py-1 text-ink-muted">{r.warnings!.join(" ")}</td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
                   {s.errorCount > 0 && (
                     <div className="max-h-44 overflow-y-auto border-t border-line bg-amber-tint/40 px-4 py-2">
                       <table className="w-full text-left text-xs">

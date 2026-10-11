@@ -14,6 +14,8 @@ export interface DataLoadRowResult {
   label: string;
   status: RowStatus;
   errors: string[];
+  /** Linha importada, mas com algo que vale conferir (ex.: empresa escolhida automaticamente). */
+  warnings?: string[];
 }
 
 export interface DataLoadSheetResult {
@@ -23,6 +25,7 @@ export interface DataLoadSheetResult {
   created: number;
   updated: number;
   errorCount: number;
+  warningCount: number;
   rows: DataLoadRowResult[];
 }
 
@@ -43,6 +46,9 @@ class DryRunRollback extends Error {
 }
 
 const lower = (s?: string | null) => (s ?? "").trim().toLowerCase();
+/** Compara nomes ignorando acento, caixa e espaços repetidos. */
+const fold = (s?: string | null) =>
+  (s ?? "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/\s+/g, " ").trim().toLowerCase();
 const digits = (s?: string | null) => (s ?? "").replace(/\D/g, "");
 
 function formatCnpj(d: string) {
@@ -68,7 +74,7 @@ function parseEmployeeStatus(raw?: string): "ACTIVE" | "ON_LEAVE" | "TERMINATED"
 function matchRef(list: CodedRec[], ref: string, companyId?: string): { rec?: CodedRec; ambiguous: boolean } {
   const scope = companyId ? list.filter((r) => r.companyId === companyId) : list;
   const byCode = scope.filter((r) => lower(r.code) === lower(ref));
-  const found = byCode.length ? byCode : scope.filter((r) => lower(r.name) === lower(ref));
+  const found = byCode.length ? byCode : scope.filter((r) => fold(r.name) === fold(ref));
   return { rec: found.length === 1 ? found[0] : undefined, ambiguous: found.length > 1 };
 }
 
@@ -86,6 +92,8 @@ interface Ctx {
   departments: CodedRec[];
   positions: CodedRec[];
   employeesByKey: Map<string, string>; // `${companyId}|${cpf}` → id
+  /** Empresa escolhida no filtro do topo — desempata quando a unidade existe em várias empresas. */
+  preferredCompanyId?: string;
 }
 
 @Injectable()
@@ -99,6 +107,7 @@ export class DataLoadService {
     buffer: Buffer,
     dryRun: boolean,
     fileName?: string,
+    preferredCompanyId?: string,
   ): Promise<DataLoadResult> {
     let sheets: ParsedSheet[];
     try {
@@ -122,6 +131,7 @@ export class DataLoadService {
       return await this.prisma.$transaction(
         async (tx) => {
           const ctx = await this.loadContext(tx, tenantId, userId, assignments);
+          ctx.preferredCompanyId = preferredCompanyId;
           const results: DataLoadSheetResult[] = [];
           for (const sheet of sheets) {
             results.push(await this.processSheet(ctx, sheet));
@@ -208,6 +218,7 @@ export class DataLoadService {
       created: rows.filter((r) => r.status === "new").length,
       updated: rows.filter((r) => r.status === "update").length,
       errorCount: rows.filter((r) => r.status === "error").length,
+      warningCount: rows.filter((r) => r.warnings?.length).length,
       rows,
     };
   }
@@ -464,34 +475,57 @@ export class DataLoadService {
     if (candidateIds.length === 0) {
       return this.fail(row, label, `Unidade "${row.branch}" não encontrada (cadastre na aba Carga Unidade e use o código dela).`);
     }
-    const viable = candidateIds
-      .map((companyId) => ({
-        companyId,
-        branch: matchRef(ctx.branches, row.branch!, companyId).rec,
-        department: matchRef(ctx.departments, row.department!, companyId).rec,
-        position: matchRef(ctx.positions, row.position!, companyId).rec,
-      }))
-      .filter((c) => c.branch && c.department && c.position);
-    if (viable.length > 1) {
-      return this.fail(
-        row,
-        label,
-        `Unidade "${row.branch}", Setor "${row.department}" e Cargo "${row.position}" existem em mais de uma empresa — adicione a coluna Empresa (CNPJ ou nome) na aba Carga Funcionarios.`,
+    const warnings: string[] = [];
+    const options = candidateIds.map((companyId) => ({
+      companyId,
+      branch: matchRef(ctx.branches, row.branch!, companyId).rec,
+      department: matchRef(ctx.departments, row.department!, companyId).rec,
+      position: matchRef(ctx.positions, row.position!, companyId).rec,
+    }));
+    const usable = options.filter((o) => o.branch);
+    if (usable.length === 0) {
+      return this.fail(row, label, `Unidade "${row.branch}" não encontrada (cadastre na aba Carga Unidade e use o código ou o nome dela).`);
+    }
+    // Prefere a empresa onde Unidade, Setor e Cargo existem juntos; depois a empresa do filtro do topo.
+    const complete = usable.filter((o) => o.department && o.position);
+    const pool = complete.length ? complete : usable;
+    let chosen = pool[0]!;
+    if (pool.length > 1) {
+      chosen =
+        pool.find((o) => o.companyId === ctx.preferredCompanyId) ??
+        [...pool].sort((x, y) => fold(companyName(ctx, x.companyId)).localeCompare(fold(companyName(ctx, y.companyId))))[0]!;
+      warnings.push(
+        `"${row.branch}" existe em mais de uma empresa; a linha foi para ${companyName(ctx, chosen.companyId)}. Se estiver errado, ajuste na tela do colaborador (ou preencha a coluna Empresa).`,
       );
     }
-    if (viable.length === 0) {
-      const c = candidateIds[0]!;
-      const linkErrors: string[] = [];
-      if (!matchRef(ctx.branches, row.branch!, c).rec) linkErrors.push(`Unidade "${row.branch}" não encontrada na empresa informada (aba Carga Unidade).`);
-      if (!matchRef(ctx.departments, row.department!, c).rec) linkErrors.push(`Setor "${row.department}" não encontrado na empresa da unidade "${row.branch}" (cadastre na aba Carga Setor).`);
-      if (!matchRef(ctx.positions, row.position!, c).rec) linkErrors.push(`Cargo "${row.position}" não encontrado na empresa da unidade "${row.branch}" (cadastre na aba Carga Cargo).`);
-      return this.fail(row, label, ...(candidateIds.length > 1 ? [`Unidade "${row.branch}" existe em mais de uma empresa e Setor/Cargo não batem com nenhuma — confira os nomes ou adicione a coluna Empresa.`] : linkErrors));
-    }
-    const { companyId, branch: branchRec, department, position } = viable[0]!;
+    const companyId = chosen.companyId;
+    const branchRec = chosen.branch;
+    let department = chosen.department;
+    let position = chosen.position;
     const branch = { rec: branchRec! };
 
     if (!this.can(ctx, PERMISSIONS.ORG_EMPLOYEE_WRITE, companyId)) {
       return this.fail(row, label, "Você não tem acesso a esta empresa.");
+    }
+
+    // Setor/Cargo que não existem no cadastro são criados na hora (como na antiga importação) e ficam editáveis.
+    if (!department) {
+      const created = await ctx.tx.department.create({
+        data: { tenantId: ctx.tenantId, companyId, branchId: branch.rec.id, name: row.department!.trim() },
+        select: { id: true, companyId: true, code: true, name: true },
+      });
+      ctx.departments.push(created);
+      department = created;
+      warnings.push(`Setor "${row.department}" não existia e foi criado.`);
+    }
+    if (!position) {
+      const created = await ctx.tx.position.create({
+        data: { tenantId: ctx.tenantId, companyId, name: row.position!.trim() },
+        select: { id: true, companyId: true, code: true, name: true },
+      });
+      ctx.positions.push(created);
+      position = created;
+      warnings.push(`Cargo "${row.position}" não existia e foi criado.`);
     }
 
     const data = {
@@ -512,7 +546,7 @@ export class DataLoadService {
         // reativar limpa a data de inativação; inativar numa reimportação mantém a data anterior, se houver.
         data: { ...data, updatedById: ctx.userId, ...(status === "ACTIVE" ? { inactivatedAt: null } : {}) },
       });
-      return { rowNumber: row.rowNumber, label, status: "update", errors: [] };
+      return { rowNumber: row.rowNumber, label, status: "update", errors: [], warnings };
     }
     const created = await ctx.tx.employee.create({
       data: {
@@ -526,8 +560,16 @@ export class DataLoadService {
       select: { id: true },
     });
     ctx.employeesByKey.set(key, created.id);
-    return { rowNumber: row.rowNumber, label, status: "new", errors: [] };
+    return { rowNumber: row.rowNumber, label, status: "new", errors: [], warnings };
   }
+}
+
+function companyName(ctx: Ctx, id: string) {
+  for (const list of ctx.companiesByName.values()) {
+    const c = list.find((x) => x.id === id);
+    if (c) return c.name;
+  }
+  return "outra empresa";
 }
 
 function requiredErrors(row: RawRow, required: Record<string, string>): string[] {
