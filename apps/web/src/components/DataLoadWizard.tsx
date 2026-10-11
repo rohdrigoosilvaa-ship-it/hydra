@@ -9,6 +9,8 @@ interface RowResult {
   status: "new" | "update" | "error";
   errors: string[];
   warnings?: string[];
+  company?: string;
+  info?: string;
 }
 
 interface SheetResult {
@@ -165,6 +167,49 @@ export function DataLoadWizard({ onClose, onImported }: { onClose: () => void; o
                       {s.total} linhas · {s.created} novos · {s.updated} atualizados · {s.warningCount} com aviso · {s.errorCount} com erro
                     </span>
                   </div>
+                  {s.rows.length > 0 && (
+                    <details open={s.key === "employee"} className="border-t border-line">
+                      <summary className="cursor-pointer px-4 py-2 text-xs font-medium text-ink-muted">
+                        Ver todas as linhas ({s.rows.length})
+                      </summary>
+                      <div className="max-h-72 overflow-y-auto px-4 pb-3">
+                        <table className="w-full text-left text-xs">
+                          <thead>
+                            <tr className="text-ink-muted">
+                              <th className="py-1 pr-3">Linha</th>
+                              <th className="py-1 pr-3">Registro</th>
+                              <th className="py-1 pr-3">O que acontece</th>
+                              <th className="py-1 pr-3">Empresa</th>
+                              <th className="py-1">Detalhe</th>
+                            </tr>
+                          </thead>
+                          <tbody>
+                            {s.rows.map((r) => (
+                              <tr key={r.rowNumber} className="border-t border-line align-top">
+                                <td className="py-1 pr-3">{r.rowNumber}</td>
+                                <td className="py-1 pr-3 text-ink">{r.label}</td>
+                                <td className="py-1 pr-3">
+                                  <span
+                                    className={`rounded px-1.5 py-0.5 font-medium ${
+                                      r.status === "new"
+                                        ? "bg-teal-tint text-teal-deep"
+                                        : r.status === "update"
+                                          ? "bg-amber-tint text-amber"
+                                          : "bg-red-100 text-red-700"
+                                    }`}
+                                  >
+                                    {r.status === "new" ? "Cria novo" : r.status === "update" ? "Atualiza (já existe)" : "Não importa"}
+                                  </span>
+                                </td>
+                                <td className="py-1 pr-3 text-ink-muted">{r.company ?? "—"}</td>
+                                <td className="py-1 text-ink-muted">{r.info ?? "—"}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    </details>
+                  )}
                   {s.warningCount > 0 && (
                     <div className="max-h-36 overflow-y-auto border-t border-line bg-paper px-4 py-2">
                       <p className="mb-1 text-xs font-semibold uppercase tracking-wide text-ink-muted">

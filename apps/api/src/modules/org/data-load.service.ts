@@ -16,6 +16,10 @@ export interface DataLoadRowResult {
   errors: string[];
   /** Linha importada, mas com algo que vale conferir (ex.: empresa escolhida automaticamente). */
   warnings?: string[];
+  /** Empresa de destino da linha (para o usuário conferir antes de aprovar a carga). */
+  company?: string;
+  /** Resumo do que será gravado (ex.: Unidade › Setor › Cargo). */
+  info?: string;
 }
 
 export interface DataLoadSheetResult {
@@ -313,7 +317,7 @@ export class DataLoadService {
         select: { id: true, name: true, cnpj: true },
       });
       this.indexCompany(ctx, updated);
-      return { rowNumber: row.rowNumber, label, status: "update", errors: [] };
+      return { rowNumber: row.rowNumber, label, status: "update", errors: [], company: updated.name, info: `CNPJ ${data.cnpj}` };
     }
 
     if (!hasTenantWideAccess(ctx.assignments, PERMISSIONS.ORG_COMPANY_WRITE)) {
@@ -324,7 +328,7 @@ export class DataLoadService {
       select: { id: true, name: true, cnpj: true },
     });
     this.indexCompany(ctx, created);
-    return { rowNumber: row.rowNumber, label, status: "new", errors: [] };
+    return { rowNumber: row.rowNumber, label, status: "new", errors: [], company: created.name, info: `CNPJ ${data.cnpj}` };
   }
 
   // ------------------------------------------------- Unidade / Setor / Cargo
@@ -417,7 +421,9 @@ export class DataLoadService {
         : await ctx.tx.position.create({ data: { ...data, tenantId: ctx.tenantId, companyId: company.id } });
       this.upsertIndex(ctx.positions, existing, rec.id, company.id, rec.code, rec.name);
     }
-    return { rowNumber: row.rowNumber, label, status: existing ? "update" : "new", errors: [] };
+    const info =
+      kind === "branch" ? row.cityState : kind === "department" ? `Unidade ${row.branch}` : `CBO ${row.cbo}`;
+    return { rowNumber: row.rowNumber, label, status: existing ? "update" : "new", errors: [], company: company.name, info };
   }
 
   private upsertIndex(
@@ -546,7 +552,7 @@ export class DataLoadService {
         // reativar limpa a data de inativação; inativar numa reimportação mantém a data anterior, se houver.
         data: { ...data, updatedById: ctx.userId, ...(status === "ACTIVE" ? { inactivatedAt: null } : {}) },
       });
-      return { rowNumber: row.rowNumber, label, status: "update", errors: [], warnings };
+      return { rowNumber: row.rowNumber, label, status: "update", errors: [], warnings, company: companyName(ctx, companyId), info: `${branch.rec.name} › ${department.name} › ${position.name}` };
     }
     const created = await ctx.tx.employee.create({
       data: {
@@ -560,7 +566,7 @@ export class DataLoadService {
       select: { id: true },
     });
     ctx.employeesByKey.set(key, created.id);
-    return { rowNumber: row.rowNumber, label, status: "new", errors: [], warnings };
+    return { rowNumber: row.rowNumber, label, status: "new", errors: [], warnings, company: companyName(ctx, companyId), info: `${branch.rec.name} › ${department.name} › ${position.name}` };
   }
 }
 
