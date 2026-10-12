@@ -68,14 +68,13 @@ export function TemplatesTab({ companyId }: { companyId?: string }) {
       <div className="flex items-center justify-between">
         <p className="text-sm text-ink-muted">Roteiros reutilizáveis de inspeção — cada um vira um checklist ao iniciar uma nova inspeção.</p>
         <button className="btn-primary flex items-center gap-1.5 text-sm" onClick={() => setShowForm(true)}>
-          <Plus size={15} /> Novo roteiro
+          <Plus size={15} /> Criar Checklist
         </button>
       </div>
 
       {showForm && (
-        <NewTemplateForm
+        <CreateChecklistForm
           companyId={companyId}
-          blocks={blocks ?? []}
           onClose={() => setShowForm(false)}
           onCreated={() => {
             setShowForm(false);
@@ -309,146 +308,149 @@ function EditTemplateForm({
   );
 }
 
-function NewTemplateForm({
+/** Tipos de checklist da lista suspensa (gravados no campo "categoria" do roteiro). */
+const CHECKLIST_TYPES = ["Checklist", "Inspeção", "Auditoria", "Observação comportamental"];
+
+/**
+ * Criação de checklist em duas abas:
+ *  - DADOS CADASTRAIS: tipo (lista suspensa), nome, assunto e descrição;
+ *  - ESTRUTURA: um quadro com nome e um texto livre — cada linha do texto vira um item do checklist.
+ * Tipo e assunto ficam juntos em `category` ("Tipo · Assunto"), sem mudar o banco de dados.
+ */
+function CreateChecklistForm({
   companyId,
-  blocks,
   onClose,
   onCreated,
 }: {
   companyId?: string;
-  blocks: InspectionBlock[];
   onClose: () => void;
   onCreated: () => void;
 }) {
+  const [tab, setTab] = useState<"dados" | "estrutura">("dados");
+  const [type, setType] = useState(CHECKLIST_TYPES[0]!);
   const [name, setName] = useState("");
-  const [category, setCategory] = useState("");
-  const [items, setItems] = useState<DraftItem[]>([blankItem()]);
-  const [blockToInsert, setBlockToInsert] = useState("");
+  const [subject, setSubject] = useState("");
+  const [description, setDescription] = useState("");
+  const [areaName, setAreaName] = useState("");
+  const [areaText, setAreaText] = useState("");
   const [saving, setSaving] = useState(false);
-
-  function updateItem(index: number, patch: Partial<DraftItem>) {
-    setItems((prev) => prev.map((it, i) => (i === index ? { ...it, ...patch } : it)));
-  }
-
-  function addItem() {
-    setItems((prev) => [...prev, blankItem()]);
-  }
-
-  function removeItem(index: number) {
-    setItems((prev) => prev.filter((_, i) => i !== index));
-  }
-
-  function moveItem(index: number, direction: -1 | 1) {
-    setItems((prev) => {
-      const target = index + direction;
-      if (target < 0 || target >= prev.length) return prev;
-      const next = [...prev];
-      [next[index], next[target]] = [next[target]!, next[index]!];
-      return next;
-    });
-  }
-
-  function insertBlock() {
-    const block = blocks.find((b) => b.id === blockToInsert);
-    if (!block) return;
-    setItems((prev) => {
-      const base = prev.length === 1 && !prev[0]!.text.trim() ? [] : prev;
-      return [
-        ...base,
-        ...block.items.map((it): DraftItem => ({
-          text: it.text,
-          responseType: it.responseType,
-          options: it.options,
-          blockLabel: block.name,
-          category: it.category ?? undefined,
-          allowPhoto: it.allowPhoto,
-        })),
-      ];
-    });
-    setBlockToInsert("");
-  }
+  const [error, setError] = useState<string | null>(null);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (!name.trim()) {
+      setTab("dados");
+      setError("Informe o nome do checklist.");
+      return;
+    }
     setSaving(true);
+    setError(null);
     try {
+      const lines = areaText.split("\n").map((l) => l.trim()).filter(Boolean);
       await api.post("/field-ops/inspection-templates", {
         companyId,
-        name,
-        category: category || undefined,
-        items: items
-          .filter((it) => it.text.trim())
-          .map((it, order) => ({
-            order,
-            text: it.text,
-            responseType: it.responseType,
-            options: it.responseType === "SELECAO_MULTIPLA" ? it.options.filter((o) => o.trim()) : undefined,
-            blockLabel: it.blockLabel,
-            category: it.category,
-            allowPhoto: it.allowPhoto,
-          })),
+        name: name.trim(),
+        category: subject.trim() ? `${type} · ${subject.trim()}` : type,
+        description: description.trim() || undefined,
+        items: lines.map((text, order) => ({
+          order,
+          text,
+          responseType: "CONFORME_NAO_CONFORME" as InspectionItemType,
+          blockLabel: (areaName.trim() || name.trim()),
+          allowPhoto: true,
+        })),
       });
       onCreated();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao salvar.");
     } finally {
       setSaving(false);
     }
   }
 
+  const tabClass = (active: boolean) =>
+    `border-b-2 px-4 py-3 font-mono text-xs font-semibold uppercase tracking-wider transition-colors ${
+      active ? "border-teal text-teal-deep" : "border-transparent text-ink-muted hover:text-ink"
+    }`;
+
   return (
-    <form onSubmit={handleSubmit} className="card mt-4 flex flex-col gap-3">
-      <div className="flex flex-wrap gap-3">
-        <label className="flex flex-1 flex-col gap-1 text-sm">
-          <span className="text-ink-muted">Nome do roteiro</span>
-          <input className="input" value={name} onChange={(e) => setName(e.target.value)} required />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-ink-muted">Categoria</span>
-          <input className="input w-40" value={category} onChange={(e) => setCategory(e.target.value)} placeholder="Ex.: EPI, 5S" />
-        </label>
-      </div>
-
-      {blocks.length > 0 && (
-        <div className="flex flex-wrap items-end gap-2 rounded-md bg-paper-raised p-2">
-          <label className="flex flex-1 flex-col gap-1 text-sm">
-            <span className="text-ink-muted">Adicionar bloco da biblioteca</span>
-            <select className="input" value={blockToInsert} onChange={(e) => setBlockToInsert(e.target.value)}>
-              <option value="">Selecione um bloco…</option>
-              {blocks.map((b) => (
-                <option key={b.id} value={b.id}>{b.name} ({b.items.length} itens)</option>
-              ))}
-            </select>
-          </label>
-          <button type="button" onClick={insertBlock} disabled={!blockToInsert} className="btn-secondary text-sm">
-            Inserir
-          </button>
-        </div>
-      )}
-
-      <div className="flex flex-col gap-3">
-        <span className="text-sm text-ink-muted">Itens do checklist</span>
-        {items.map((item, index) => (
-          <ChecklistItemEditor
-            key={index}
-            item={item}
-            index={index}
-            onChange={(patch) => updateItem(index, patch)}
-            onRemove={() => removeItem(index)}
-            canRemove={items.length > 1}
-            onMoveUp={() => moveItem(index, -1)}
-            onMoveDown={() => moveItem(index, 1)}
-            canMoveUp={index > 0}
-            canMoveDown={index < items.length - 1}
-            showSection
-          />
-        ))}
-        <button type="button" onClick={addItem} className="flex w-fit items-center gap-1.5 text-xs text-teal-deep hover:underline">
-          <Plus size={13} /> Adicionar item
+    <form onSubmit={handleSubmit} className="card mt-4 flex flex-col gap-0 p-0">
+      <div className="flex border-b border-line px-2">
+        <button type="button" className={tabClass(tab === "dados")} onClick={() => setTab("dados")}>
+          Dados cadastrais
+        </button>
+        <button type="button" className={tabClass(tab === "estrutura")} onClick={() => setTab("estrutura")}>
+          Estrutura
         </button>
       </div>
 
-      <div className="flex gap-2">
-        <button type="submit" disabled={saving || !name} className="btn-primary">{saving ? "Salvando…" : "Salvar roteiro"}</button>
-        <button type="button" onClick={onClose} className="btn-secondary">Cancelar</button>
+      <div className="flex flex-col gap-4 p-5">
+        {tab === "dados" && (
+          <>
+            <div className="flex items-center justify-between">
+              <p className="font-display font-semibold text-ink">Geral</p>
+              <p className="font-mono text-[10px] uppercase tracking-wide text-ink-muted">Campos com * são obrigatórios</p>
+            </div>
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-ink-muted">Tipo de checklist *</span>
+              <select className="input" value={type} onChange={(e) => setType(e.target.value)}>
+                {CHECKLIST_TYPES.map((t) => (
+                  <option key={t} value={t}>{t}</option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-ink-muted">Nome do checklist *</span>
+              <input className="input" value={name} onChange={(e) => setName(e.target.value)} maxLength={255} required />
+              <span className="self-end text-xs text-ink-muted">{name.length} / 255</span>
+            </label>
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-ink-muted">Assunto</span>
+              <input className="input" value={subject} onChange={(e) => setSubject(e.target.value)} placeholder="Ex.: Segurança do Trabalho" />
+            </label>
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-ink-muted">Descrição</span>
+              <textarea className="input min-h-[90px] resize-y" value={description} onChange={(e) => setDescription(e.target.value)} maxLength={5000} />
+              <span className="self-end text-xs text-ink-muted">{description.length} / 5000</span>
+            </label>
+          </>
+        )}
+
+        {tab === "estrutura" && (
+          <div className="overflow-hidden rounded-lg border border-line">
+            <div className="bg-teal px-4 py-2 font-mono text-xs font-semibold uppercase tracking-wider text-white">Quadro</div>
+            <div className="flex flex-col gap-3 p-4">
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="text-ink-muted">Nome do quadro</span>
+                <input
+                  className="input"
+                  value={areaName}
+                  onChange={(e) => setAreaName(e.target.value)}
+                  placeholder={name.trim() || "Nome do checklist"}
+                />
+              </label>
+              <label className="flex flex-col gap-1 text-sm">
+                <span className="text-ink-muted">Texto</span>
+                <textarea
+                  className="input min-h-[180px] resize-y"
+                  value={areaText}
+                  onChange={(e) => setAreaText(e.target.value)}
+                  placeholder="Escreva aqui. Cada linha vira um item do checklist."
+                />
+                <span className="text-xs text-ink-muted">
+                  Cada linha vira um item do checklist, respondido como Conforme / Não conforme.
+                </span>
+              </label>
+            </div>
+          </div>
+        )}
+
+        {error && <p className="text-sm text-amber">{error}</p>}
+
+        <div className="flex gap-2 border-t border-line pt-4">
+          <button type="submit" disabled={saving} className="btn-primary">{saving ? "Salvando…" : "Salvar checklist"}</button>
+          <button type="button" onClick={onClose} className="btn-secondary">Cancelar</button>
+        </div>
       </div>
     </form>
   );
