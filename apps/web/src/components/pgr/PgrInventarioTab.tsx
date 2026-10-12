@@ -1,5 +1,5 @@
 import { FormEvent, useState } from "react";
-import { Pencil, Plus, Sparkles, Trash2, Upload, X } from "lucide-react";
+import { Layers, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
 import { api } from "../../lib/api";
 import { ImportPgrRisksWizard } from "../ImportPgrRisksWizard";
 import type {
@@ -11,7 +11,6 @@ import type {
   PgrRisk,
   RiskCategory,
 } from "../../lib/types";
-import { AI_DISCLAIMER, AiSuggestButton } from "./pgr-shared";
 
 const RISK_LEVEL_STYLE: Record<string, string> = {
   LOW: "bg-teal-tint text-teal-deep",
@@ -113,157 +112,37 @@ export function PgrInventarioTab({
           }}
         />
       )}
-      <div className="mt-3 overflow-hidden rounded-lg border border-line bg-paper-raised">
-        <table className="w-full text-left text-sm">
-          <thead>
-            <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-muted">
-              <th className="px-4 py-3 font-medium">Grupo</th>
-              <th className="px-4 py-3 font-medium">Perigo/Fator de Risco</th>
-              <th className="px-4 py-3 font-medium">GHE</th>
-              <th className="px-4 py-3 font-medium">Prob. × Sev.</th>
-              <th className="px-4 py-3 font-medium">Nível</th>
-              <th className="px-4 py-3 font-medium">Classificação</th>
-              <th className="px-4 py-3 font-medium"></th>
-            </tr>
-          </thead>
-          <tbody>
-            {pgr.risks.length === 0 && (
-              <tr>
-                <td className="px-4 py-6 text-ink-muted" colSpan={7}>
-                  Nenhum risco avaliado ainda.
-                </td>
-              </tr>
-            )}
-            {pgr.risks.map((r) => (
-              <tr key={r.id} className="border-b border-line last:border-none">
-                <td className="px-4 py-3 text-ink-muted">{RISK_CATEGORY_LABEL[r.hazard.category]}</td>
-                <td className="px-4 py-3 text-ink">{r.hazard.name}</td>
-                <td className="px-4 py-3 text-ink-muted">{r.ghe.name}</td>
-                <td className="px-4 py-3 font-mono tabular-nums text-ink-muted">
-                  {r.probability} × {r.severity}
-                </td>
-                <td className="px-4 py-3">
-                  <span className={`rounded px-2 py-0.5 text-xs font-medium ${RISK_LEVEL_STYLE[r.riskLevel]}`}>
-                    {RISK_LEVEL_LABEL[r.riskLevel]}
-                  </span>
-                </td>
-                <td className="px-4 py-3 text-ink-muted">{r.classification ?? "A definir"}</td>
-                <td className="px-4 py-3 text-right">
-                  <div className="flex justify-end gap-3">
-                    <button
-                      onClick={() => setEditingRisk(r)}
-                      className="flex items-center gap-1 text-xs text-teal-deep hover:underline"
-                    >
-                      <Pencil size={12} /> Editar
-                    </button>
-                    <button
-                      onClick={() => handleDeleteRisk(r)}
-                      className="flex items-center gap-1 text-xs text-amber hover:underline"
-                    >
-                      <Trash2 size={12} /> Remover
-                    </button>
+      <RiskSummary risks={pgr.risks} />
+
+      {pgr.risks.length === 0 ? (
+        <p className="mt-4 rounded-xl border border-dashed border-line px-4 py-10 text-center text-sm text-ink-muted">
+          Nenhum risco avaliado ainda. Use “Novo risco” ou “Importar planilha” para começar o inventário.
+        </p>
+      ) : (
+        <div className="mt-4 flex flex-col gap-6">
+          {pgr.ghes
+            .filter((g) => pgr.risks.some((r) => r.gheId === g.id))
+            .map((ghe) => {
+              const risks = pgr.risks
+                .filter((r) => r.gheId === ghe.id)
+                .sort((a, b) => LEVEL_ORDER.indexOf(a.riskLevel) - LEVEL_ORDER.indexOf(b.riskLevel));
+              return (
+                <section key={ghe.id}>
+                  <div className="mb-2 flex items-center gap-2">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-md bg-teal-tint text-teal-deep">
+                      <Layers size={14} />
+                    </span>
+                    <h3 className="font-display text-sm font-semibold text-ink">{ghe.name}</h3>
+                    <span className="rounded-full bg-line px-2 py-0.5 text-xs text-ink-muted">{risks.length} risco(s)</span>
                   </div>
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    </div>
-  );
-}
-
-/** Sugestão de perigos/fatores de risco via IA a partir da atividade do GHE — cada
- * sugestão só vira um Hazard de verdade quando o usuário clica "Usar este perigo". */
-function HazardAiSuggestions({
-  activityDescription,
-  existingHazards,
-  onCreated,
-  onSelect,
-}: {
-  activityDescription: string;
-  existingHazards: Hazard[];
-  onCreated: (hazard: Hazard) => void;
-  onSelect: (id: string) => void;
-}) {
-  type Suggestion = { name: string; category: RiskCategory; description: string; damagePotential: string };
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [suggestions, setSuggestions] = useState<Suggestion[] | null>(null);
-  const [usingIndex, setUsingIndex] = useState<number | null>(null);
-  const disabledReason = activityDescription.trim().length < 5 ? "Preencha a descrição da atividade do GHE primeiro." : undefined;
-
-  async function handleFetch() {
-    setLoading(true);
-    setError(null);
-    setSuggestions(null);
-    try {
-      const res = await api.post<{ suggestions: Suggestion[] }>("/pgr/ai/suggest-hazards", { activityDescription });
-      setSuggestions(res.suggestions);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao consultar a IA.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleUse(index: number, s: Suggestion) {
-    const existing = existingHazards.find(
-      (h) => h.category === s.category && h.name.trim().toLowerCase() === s.name.trim().toLowerCase(),
-    );
-    if (existing) {
-      onSelect(existing.id);
-      return;
-    }
-    setUsingIndex(index);
-    try {
-      const created = await api.post<Hazard>("/pgr/hazards", {
-        category: s.category,
-        name: s.name,
-        description: s.description || undefined,
-        damagePotential: s.damagePotential || undefined,
-      });
-      onCreated(created);
-      onSelect(created.id);
-    } finally {
-      setUsingIndex(null);
-    }
-  }
-
-  return (
-    <div className="sm:col-span-2">
-      <button
-        type="button"
-        onClick={handleFetch}
-        disabled={loading || !!disabledReason}
-        title={disabledReason}
-        className="flex items-center gap-1 text-xs text-teal-deep hover:underline disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        <Sparkles size={12} /> {loading ? "Consultando IA…" : "Sugerir perigos com IA"}
-      </button>
-      {error && <p className="mt-1 text-xs text-amber">{error}</p>}
-      {suggestions && (
-        <div className="mt-2 flex flex-col gap-2">
-          <p className="font-mono text-[10px] uppercase tracking-wide text-teal-deep">{AI_DISCLAIMER}</p>
-          {suggestions.length === 0 && <p className="text-xs text-ink-muted">Nenhuma sugestão retornada.</p>}
-          {suggestions.map((s, i) => (
-            <div key={i} className="rounded-md border border-teal-deep/30 bg-teal-tint p-2 text-sm">
-              <p className="text-ink">
-                <span className="font-medium">{s.name}</span>{" "}
-                <span className="font-mono text-[10px] text-ink-muted">({RISK_CATEGORY_LABEL[s.category]})</span>
-              </p>
-              {s.description && <p className="text-ink-muted">{s.description}</p>}
-              {s.damagePotential && <p className="mt-0.5 text-xs text-ink-muted">Potencial de dano: {s.damagePotential}</p>}
-              <button
-                type="button"
-                onClick={() => handleUse(i, s)}
-                disabled={usingIndex === i}
-                className="mt-1 text-xs font-medium text-teal-deep hover:underline disabled:opacity-50"
-              >
-                {usingIndex === i ? "Usando…" : "Usar este perigo"}
-              </button>
-            </div>
-          ))}
+                  <div className="grid grid-cols-1 gap-3 lg:grid-cols-2 2xl:grid-cols-3">
+                    {risks.map((r) => (
+                      <RiskCard key={r.id} risk={r} onEdit={() => setEditingRisk(r)} onRemove={() => handleDeleteRisk(r)} />
+                    ))}
+                  </div>
+                </section>
+              );
+            })}
         </div>
       )}
     </div>
@@ -365,6 +244,86 @@ function HazardPicker({
   );
 }
 
+const LEVEL_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
+const LEVEL_BAR: Record<string, string> = {
+  CRITICAL: "bg-danger",
+  HIGH: "bg-amber",
+  MEDIUM: "bg-[color-mix(in_srgb,var(--amber)_45%,transparent)]",
+  LOW: "bg-teal",
+};
+const LEVEL_BADGE: Record<string, string> = {
+  CRITICAL: "bg-danger text-white",
+  HIGH: "bg-amber-tint text-amber",
+  MEDIUM: "bg-amber-tint text-amber",
+  LOW: "bg-teal-tint text-teal-deep",
+};
+const CATEGORY_CHIP: Record<RiskCategory, string> = {
+  FISICO: "bg-teal-tint text-teal-deep",
+  QUIMICO: "bg-amber-tint text-amber",
+  BIOLOGICO: "bg-teal-tint text-teal-deep",
+  ERGONOMICO: "bg-line text-ink-muted",
+  ACIDENTE: "bg-danger-tint text-danger",
+};
+
+/** Contagem de riscos por nível, em quatro quadros coloridos. */
+function RiskSummary({ risks }: { risks: PgrRisk[] }) {
+  return (
+    <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+      {LEVEL_ORDER.map((level) => {
+        const count = risks.filter((r) => r.riskLevel === level).length;
+        return (
+          <div key={level} className="flex items-center gap-3 overflow-hidden rounded-xl border border-line bg-paper-raised shadow-sm">
+            <span className={`h-full w-1.5 self-stretch ${LEVEL_BAR[level]}`} />
+            <div className="py-3">
+              <p className="font-display text-2xl font-semibold leading-none text-ink tabular-nums">{count}</p>
+              <p className="mt-1 text-xs font-medium text-ink-muted">Risco {(RISK_LEVEL_LABEL[level] ?? level).toLowerCase()}</p>
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function RiskCard({ risk, onEdit, onRemove }: { risk: PgrRisk; onEdit: () => void; onRemove: () => void }) {
+  return (
+    <article className="flex overflow-hidden rounded-xl border border-line bg-paper-raised shadow-sm">
+      <span className={`w-1.5 shrink-0 ${LEVEL_BAR[risk.riskLevel]}`} />
+      <div className="flex min-w-0 flex-1 flex-col gap-2 p-4">
+        <div className="flex items-start justify-between gap-2">
+          <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${CATEGORY_CHIP[risk.hazard.category]}`}>
+            {RISK_CATEGORY_LABEL[risk.hazard.category]}
+          </span>
+          <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${LEVEL_BADGE[risk.riskLevel]}`}>
+            {RISK_LEVEL_LABEL[risk.riskLevel]}
+          </span>
+        </div>
+        <h4 className="font-medium text-ink">{risk.hazard.name}</h4>
+        <dl className="grid grid-cols-2 gap-2 text-xs">
+          <div className="rounded-md bg-paper px-2.5 py-1.5">
+            <dt className="font-mono text-[10px] uppercase tracking-wide text-ink-muted">Prob. × Sev.</dt>
+            <dd className="font-mono tabular-nums text-ink">
+              {risk.probability} × {risk.severity}
+            </dd>
+          </div>
+          <div className="rounded-md bg-paper px-2.5 py-1.5">
+            <dt className="font-mono text-[10px] uppercase tracking-wide text-ink-muted">Classificação</dt>
+            <dd className="truncate text-ink">{risk.classification ?? "A definir"}</dd>
+          </div>
+        </dl>
+        <div className="mt-auto flex justify-end gap-3 pt-1">
+          <button onClick={onEdit} className="flex items-center gap-1 text-xs font-medium text-teal-deep hover:underline">
+            <Pencil size={12} /> Editar
+          </button>
+          <button onClick={onRemove} className="flex items-center gap-1 text-xs font-medium text-amber hover:underline">
+            <Trash2 size={12} /> Remover
+          </button>
+        </div>
+      </div>
+    </article>
+  );
+}
+
 function RiskForm({
   pgrId,
   ghes,
@@ -400,9 +359,6 @@ function RiskForm({
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const selectedGhe = ghes.find((g) => g.id === gheId);
-  const selectedHazard = hazardList.find((h) => h.id === hazardId);
-  const hazardDisabledReason = !selectedHazard ? "Selecione um perigo/fator de risco primeiro." : undefined;
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -486,12 +442,6 @@ function RiskForm({
             onChange={setHazardId}
             onCreated={(h) => setHazardList((prev) => [...prev, h])}
           />
-          <HazardAiSuggestions
-            activityDescription={selectedGhe?.activityDescription ?? ""}
-            existingHazards={hazardList}
-            onCreated={(h) => setHazardList((prev) => [...prev, h])}
-            onSelect={setHazardId}
-          />
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-ink-muted">Possíveis lesões ou agravos à saúde</span>
             <input className="input" value={typicalInjuries} onChange={(e) => setTypicalInjuries(e.target.value)} />
@@ -504,42 +454,6 @@ function RiskForm({
             <span className="text-ink-muted">Meio de propagação</span>
             <input className="input" value={propagationMeans} onChange={(e) => setPropagationMeans(e.target.value)} placeholder="ex.: Pelo ar, Contato" />
           </label>
-        </div>
-        <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2">
-          <AiSuggestButton<{ typicalInjuries: string }>
-            label="Sugerir lesões/agravos com IA"
-            disabledReason={hazardDisabledReason}
-            onFetch={() =>
-              api.post("/pgr/ai/suggest-consequences", {
-                hazardName: selectedHazard?.name,
-                category: selectedHazard?.category,
-                activityDescription: selectedGhe?.activityDescription || undefined,
-              })
-            }
-            onApply={(r) => setTypicalInjuries(r.typicalInjuries)}
-            renderPreview={(r) => <p className="text-ink">{r.typicalInjuries}</p>}
-          />
-          <AiSuggestButton<{ sourceCircumstances: string; propagationMeans: string }>
-            label="Sugerir fontes/propagação com IA"
-            disabledReason={hazardDisabledReason}
-            onFetch={() =>
-              api.post("/pgr/ai/suggest-sources", {
-                hazardName: selectedHazard?.name,
-                category: selectedHazard?.category,
-                activityDescription: selectedGhe?.activityDescription || undefined,
-              })
-            }
-            onApply={(r) => {
-              setSourceCircumstances(r.sourceCircumstances);
-              setPropagationMeans(r.propagationMeans);
-            }}
-            renderPreview={(r) => (
-              <div>
-                <p className="text-ink">{r.sourceCircumstances}</p>
-                <p className="mt-1 text-ink-muted">Propagação: {r.propagationMeans}</p>
-              </div>
-            )}
-          />
         </div>
       </div>
 
@@ -583,31 +497,6 @@ function RiskForm({
         <p className="mt-2 text-xs text-ink-muted">
           O Nível de Risco é calculado automaticamente a partir de Probabilidade × Severidade.
         </p>
-        <AiSuggestButton<{ probability: number; severity: number; classification: string; justification: string }>
-          label="Sugerir avaliação (prob./sev./classificação) com IA"
-          disabledReason={hazardDisabledReason}
-          onFetch={() =>
-            api.post("/pgr/ai/evaluate-risk", {
-              hazardName: selectedHazard?.name,
-              category: selectedHazard?.category,
-              activityDescription: selectedGhe?.activityDescription || undefined,
-              exposureType: exposureType || undefined,
-            })
-          }
-          onApply={(r) => {
-            setProbability(r.probability);
-            setSeverity(r.severity);
-            setClassification(r.classification);
-          }}
-          renderPreview={(r) => (
-            <div>
-              <p className="text-ink">
-                Probabilidade {r.probability} × Severidade {r.severity} — {r.classification}
-              </p>
-              <p className="mt-1 text-ink-muted">{r.justification}</p>
-            </div>
-          )}
-        />
         <label className="mt-3 flex flex-col gap-1 text-sm">
           <span className="text-ink-muted">Conclusão</span>
           <textarea className="input min-h-[70px] resize-y" value={conclusion} onChange={(e) => setConclusion(e.target.value)} />
@@ -617,38 +506,6 @@ function RiskForm({
       <div className="border-t border-line pt-4">
         <div className="mb-3 flex items-center justify-between">
           <p className="font-mono text-[10px] uppercase tracking-wide text-ink-muted">Prevenção e controle</p>
-          <AiSuggestButton<{
-            adminControls: string;
-            engineeringControls: string;
-            epcMeasures: string;
-            epiMeasures: string;
-          }>
-            label="Sugerir medidas de controle com IA"
-            disabledReason={hazardDisabledReason}
-            onFetch={() =>
-              api.post("/pgr/ai/suggest-controls", {
-                hazardName: selectedHazard?.name,
-                category: selectedHazard?.category,
-                activityDescription: selectedGhe?.activityDescription || undefined,
-                exposureType: exposureType || undefined,
-                riskLevel: classification || undefined,
-              })
-            }
-            onApply={(r) => {
-              setAdminControls(r.adminControls);
-              setEngineeringControls(r.engineeringControls);
-              setEpcMeasures(r.epcMeasures);
-              setEpiMeasures(r.epiMeasures);
-            }}
-            renderPreview={(r) => (
-              <div className="flex flex-col gap-1.5">
-                {r.adminControls && <p className="text-ink"><span className="font-medium">Administrativas:</span> {r.adminControls}</p>}
-                {r.engineeringControls && <p className="text-ink"><span className="font-medium">Engenharia:</span> {r.engineeringControls}</p>}
-                {r.epcMeasures && <p className="text-ink"><span className="font-medium">EPC:</span> {r.epcMeasures}</p>}
-                {r.epiMeasures && <p className="text-ink"><span className="font-medium">EPI:</span> {r.epiMeasures}</p>}
-              </div>
-            )}
-          />
         </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="flex flex-col gap-1 text-sm">

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { AlertTriangle, CheckCircle2, Download, ShieldCheck, Trash2 } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ClipboardList, Download, Layers, ShieldAlert, ShieldCheck, Trash2, Users } from "lucide-react";
 import { api } from "../lib/api";
 import { PgrDadosGeraisTab } from "../components/pgr/PgrDadosGeraisTab";
 import { PgrGheTab } from "../components/pgr/PgrGheTab";
@@ -8,7 +8,7 @@ import { PgrInventarioTab } from "../components/pgr/PgrInventarioTab";
 import { PgrPlanoAcoesTab } from "../components/pgr/PgrPlanoAcoesTab";
 import { PgrCronogramaTab } from "../components/pgr/PgrCronogramaTab";
 import { PgrFinalizacaoTab } from "../components/pgr/PgrFinalizacaoTab";
-import { PgrProgressBar, PgrTabNav, type PgrTabId } from "../components/pgr/pgr-shared";
+import { PgrProgressBar, PgrTabNav, StatTile, type PgrTabId } from "../components/pgr/pgr-shared";
 import type { Department, Hazard, PgrDetail, Position } from "../lib/types";
 
 const INCONSISTENCY_SEVERITY_STYLE: Record<string, string> = {
@@ -101,7 +101,7 @@ export function PgrDetailPage() {
     setCheckingInconsistencies(true);
     setInconsistenciesError(null);
     try {
-      const res = await api.get<{ alerts: typeof inconsistencies }>(`/pgr/ai/analyze-inconsistencies/${id}`);
+      const res = await api.get<{ alerts: typeof inconsistencies }>(`/pgr/${id}/inconsistencies`);
       setInconsistencies(res.alerts ?? []);
     } catch (err) {
       setInconsistenciesError(err instanceof Error ? err.message : "Erro ao verificar inconsistências.");
@@ -112,43 +112,79 @@ export function PgrDetailPage() {
 
   if (!pgr) return <p className="text-sm text-ink-muted">Carregando…</p>;
 
+  const approved = pgr.status === "APPROVED";
+  const employees = pgr.ghes.reduce((n, g) => n + (g.employeesCount ?? 0), 0);
+  const severeRisks = pgr.risks.filter((r) => r.riskLevel === "HIGH" || r.riskLevel === "CRITICAL").length;
+  const lateActions = pgr.actions.filter((a) => a.status === "LATE").length;
+
   return (
     <div>
-      <div className="flex items-start justify-between">
-        <div>
-          <h1 className="font-display text-2xl font-semibold text-ink">{pgr.title}</h1>
-          <p className="mt-1 font-mono text-xs text-ink-muted">
-            v{pgr.version} · {pgr.status === "APPROVED" ? "aprovado" : "em elaboração"}
-            {pgr.code ? ` · ${pgr.code}` : ""}
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={handleCheckInconsistencies}
-            disabled={checkingInconsistencies}
-            className="btn-secondary flex items-center gap-1.5"
-          >
-            <ShieldCheck size={15} /> {checkingInconsistencies ? "Verificando…" : "Verificar inconsistências"}
-          </button>
-          <button
-            onClick={handleDownloadPdf}
-            disabled={downloadingPdf}
-            className="btn-secondary flex items-center gap-1.5"
-          >
-            <Download size={15} /> {downloadingPdf ? "Gerando…" : "Baixar PDF"}
-          </button>
-          {pgr.status !== "APPROVED" && (
-            <button onClick={handleApprove} disabled={approving} className="btn-primary flex items-center gap-1.5">
-              <CheckCircle2 size={15} /> {approving ? "Aprovando…" : "Aprovar PGR"}
+      <div className="overflow-hidden rounded-2xl border border-line bg-paper-raised shadow-sm">
+        <div className="h-1.5 bg-gradient-to-r from-teal to-teal-deep" />
+        <div className="flex flex-wrap items-start justify-between gap-4 p-5">
+          <div className="flex items-start gap-4">
+            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-teal-tint text-teal-deep">
+              <ShieldCheck size={24} />
+            </span>
+            <div>
+              <h1 className="font-display text-2xl font-semibold text-ink">{pgr.title}</h1>
+              <div className="mt-1.5 flex flex-wrap items-center gap-2 text-xs">
+                <span className={`rounded-full px-2.5 py-1 font-medium ${approved ? "bg-teal-tint text-teal-deep" : "bg-amber-tint text-amber"}`}>
+                  {approved ? "Aprovado" : "Em elaboração"}
+                </span>
+                <span className="rounded-full bg-line px-2.5 py-1 font-mono text-ink-muted">v{pgr.version}</span>
+                {pgr.code && <span className="rounded-full bg-line px-2.5 py-1 font-mono text-ink-muted">{pgr.code}</span>}
+              </div>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button
+              onClick={handleCheckInconsistencies}
+              disabled={checkingInconsistencies}
+              className="btn-secondary flex items-center gap-1.5"
+            >
+              <ShieldCheck size={15} /> {checkingInconsistencies ? "Verificando…" : "Verificar inconsistências"}
             </button>
-          )}
-          <button onClick={handleDeletePgr} className="text-ink-muted hover:text-danger" title="Excluir PGR">
-            <Trash2 size={16} />
-          </button>
+            <button
+              onClick={handleDownloadPdf}
+              disabled={downloadingPdf}
+              className="btn-secondary flex items-center gap-1.5"
+            >
+              <Download size={15} /> {downloadingPdf ? "Gerando…" : "Baixar PDF"}
+            </button>
+            {!approved && (
+              <button onClick={handleApprove} disabled={approving} className="btn-primary flex items-center gap-1.5">
+                <CheckCircle2 size={15} /> {approving ? "Aprovando…" : "Aprovar PGR"}
+              </button>
+            )}
+            <button onClick={handleDeletePgr} className="rounded-md p-2 text-ink-muted hover:bg-danger-tint hover:text-danger" title="Excluir PGR" aria-label="Excluir PGR">
+              <Trash2 size={16} />
+            </button>
+          </div>
+        </div>
+        <div className="border-t border-line px-5 py-4">
+          <PgrProgressBar percent={pgr.progressPercent} />
         </div>
       </div>
 
-      <PgrProgressBar percent={pgr.progressPercent} />
+      <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile label="GHEs" value={pgr.ghes.length} icon={Layers} />
+        <StatTile label="Colaboradores nos GHEs" value={employees} icon={Users} tone="neutral" />
+        <StatTile
+          label="Riscos avaliados"
+          value={pgr.risks.length}
+          hint={severeRisks ? `${severeRisks} alto(s) ou crítico(s)` : undefined}
+          icon={ShieldAlert}
+          tone={severeRisks ? "amber" : "teal"}
+        />
+        <StatTile
+          label="Ações no plano"
+          value={pgr.actions.length}
+          hint={lateActions ? `${lateActions} atrasada(s)` : undefined}
+          icon={ClipboardList}
+          tone={lateActions ? "danger" : "teal"}
+        />
+      </div>
 
       {pdfError && (
         <p className="mt-3 rounded-md border-l-2 border-amber bg-amber-tint px-3 py-2 text-sm">{pdfError}</p>

@@ -1,7 +1,8 @@
 import { FormEvent, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { CalendarRange, Plus, Trash2 } from "lucide-react";
 import { api } from "../../lib/api";
 import type { PgrCronogramaItem, PgrDetail } from "../../lib/types";
+import { SectionCard } from "./pgr-shared";
 
 const MONTH_LABELS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
@@ -58,13 +59,12 @@ export function PgrCronogramaTab({ pgr, onChanged }: { pgr: PgrDetail; onChanged
   }
 
   return (
-    <div>
-      <h2 className="font-display text-lg font-semibold text-ink">Cronograma do PGR</h2>
-      <p className="mt-1 text-sm text-ink-muted">
-        Plano de ação por mês — clique em um mês para marcar ou desmarcar. Os meses seguem a vigência do documento.
-      </p>
-
-      <div className="mt-4 overflow-x-auto rounded-xl border border-line bg-paper-raised">
+    <SectionCard
+      title="Cronograma do PGR"
+      subtitle="Plano de ação por mês — clique em um mês para marcar ou desmarcar. Os meses seguem a vigência do documento."
+      icon={CalendarRange}
+    >
+      <div className="overflow-x-auto rounded-lg border border-line">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="bg-paper text-xs font-medium uppercase tracking-wide text-ink-muted">
@@ -94,7 +94,7 @@ export function PgrCronogramaTab({ pgr, onChanged }: { pgr: PgrDetail; onChanged
         </table>
       </div>
 
-      <form onSubmit={handleAdd} className="mt-3 flex flex-wrap items-end gap-2">
+      <form onSubmit={handleAdd} className="mt-4 flex flex-wrap items-end gap-2 rounded-lg bg-paper p-3">
         <label className="flex min-w-[220px] flex-1 flex-col gap-1 text-sm">
           <span className="text-ink-muted">Nova ação</span>
           <input className="input" value={description} onChange={(e) => setDescription(e.target.value)} />
@@ -108,7 +108,7 @@ export function PgrCronogramaTab({ pgr, onChanged }: { pgr: PgrDetail; onChanged
         </button>
       </form>
       {error && <p className="mt-2 text-sm text-amber">{error}</p>}
-    </div>
+    </SectionCard>
   );
 }
 
