@@ -91,7 +91,7 @@ export function UsersPage() {
         />
       )}
 
-      <div className="mt-6 overflow-hidden rounded-lg border border-line bg-paper-raised">
+      <div className="mt-6 panel">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-muted">

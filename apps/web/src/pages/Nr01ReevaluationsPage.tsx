@@ -21,7 +21,7 @@ export function Nr01ReevaluationsPage() {
 
       <div className="mt-6 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         {REASONS.map((reason) => (
-          <div key={reason} className="rounded-lg border border-line bg-paper-raised p-4 text-sm text-ink-muted">
+          <div key={reason} className="rounded-xl border border-line bg-paper-raised shadow-sm p-4 text-sm text-ink-muted">
             {reason}
           </div>
         ))}

@@ -176,7 +176,7 @@ function ItemCard({
   const hasFieldChoice = cfg.kind === "TEXTO" || cfg.kind === "DATA" || cfg.kind === "LISTA";
 
   return (
-    <div className="rounded-lg border border-line bg-paper-raised">
+    <div className="rounded-xl border border-line bg-paper-raised shadow-sm">
       <div className="flex items-center justify-between border-b border-line px-4 py-2">
         <p className="font-mono text-xs font-semibold uppercase tracking-wide text-teal-deep">Item {index + 1}</p>
         <div className="flex items-center gap-1 text-ink-muted">

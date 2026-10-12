@@ -123,7 +123,7 @@ export function PsychosocialDetailPage() {
 
         <div className="mt-3 flex flex-col gap-4">
           {Object.entries(questionsByDimension).map(([dimension, questions]) => (
-            <div key={dimension} className="rounded-lg border border-line bg-paper-raised p-4">
+            <div key={dimension} className="rounded-xl border border-line bg-paper-raised shadow-sm p-4">
               <p className="mb-2 font-mono text-[10px] uppercase tracking-wide text-ink-muted">{dimension}</p>
               <ul className="flex flex-col gap-1.5">
                 {questions.map((q) => (
@@ -150,7 +150,7 @@ export function PsychosocialDetailPage() {
 
       <section className="mt-8">
         <h2 className="font-display text-lg font-semibold text-ink">Participação</h2>
-        <div className="mt-3 overflow-hidden rounded-lg border border-line bg-paper-raised">
+        <div className="mt-3 panel">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-muted">

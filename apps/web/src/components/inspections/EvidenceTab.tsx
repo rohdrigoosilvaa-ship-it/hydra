@@ -41,7 +41,7 @@ export function EvidenceTab({ companyId }: { companyId?: string }) {
           href={ev.fileUrl}
           target="_blank"
           rel="noreferrer"
-          className="group overflow-hidden rounded-lg border border-line bg-paper-raised"
+          className="group panel"
         >
           <img src={ev.fileUrl} alt={ev.fileName} className="aspect-square w-full object-cover" />
           <p className="truncate px-2 py-1.5 text-[11px] text-ink-muted">{SOURCE_LABEL[ev.sourceType] ?? ev.sourceType}</p>

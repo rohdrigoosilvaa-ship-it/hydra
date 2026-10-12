@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
-import { HardHat, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
+import { HardHat, Pencil, Plus, Trash2, Upload, X, BriefcaseBusiness, CheckCircle2, CircleOff } from "lucide-react";
 import { api } from "../lib/api";
+import { StatTile } from "../components/ui/cards";
 import { DataLoadWizard } from "../components/DataLoadWizard";
 import { CboPicker } from "../components/CboPicker";
 import { PositionRequiredEpisModal } from "../components/positions/PositionRequiredEpisModal";
@@ -121,7 +122,13 @@ export function PositionsPage() {
         />
       )}
 
-      <div className="mt-6 overflow-hidden rounded-lg border border-line bg-paper-raised">
+      <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <StatTile label="Cargos" value={positions?.length ?? 0} icon={BriefcaseBusiness} tone="teal" />
+        <StatTile label="Ativos" value={positions?.filter((p) => p.status === "ACTIVE").length ?? 0} icon={CheckCircle2} tone="teal" />
+        <StatTile label="Inativos" value={positions?.filter((p) => p.status !== "ACTIVE").length ?? 0} icon={CircleOff} tone="neutral" />
+      </div>
+
+      <div className="mt-6 panel">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-muted">

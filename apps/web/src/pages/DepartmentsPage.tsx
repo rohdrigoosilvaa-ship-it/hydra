@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Pencil, Plus, Trash2, Upload, X } from "lucide-react";
+import { Pencil, Plus, Trash2, Upload, X, UsersRound, CheckCircle2, CircleOff } from "lucide-react";
 import { api } from "../lib/api";
+import { StatTile } from "../components/ui/cards";
 import { DataLoadWizard } from "../components/DataLoadWizard";
 import { useCompanyFilterStore } from "../lib/company-filter-store";
 import type { Branch, Company, Department } from "../lib/types";
@@ -115,7 +116,13 @@ export function DepartmentsPage() {
         />
       )}
 
-      <div className="mt-6 overflow-hidden rounded-lg border border-line bg-paper-raised">
+      <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <StatTile label="Setores" value={departments?.length ?? 0} icon={UsersRound} tone="teal" />
+        <StatTile label="Ativos" value={departments?.filter((d) => d.status === "ACTIVE").length ?? 0} icon={CheckCircle2} tone="teal" />
+        <StatTile label="Inativos" value={departments?.filter((d) => d.status !== "ACTIVE").length ?? 0} icon={CircleOff} tone="neutral" />
+      </div>
+
+      <div className="mt-6 panel">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-muted">

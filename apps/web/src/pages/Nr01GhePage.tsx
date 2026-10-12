@@ -49,7 +49,7 @@ export function Nr01GhePage() {
           <Link
             key={g.id}
             to={`/pgr/${g.pgrId}`}
-            className="flex flex-col gap-2 rounded-lg border border-line bg-paper-raised p-4 transition hover:border-teal-deep/40"
+            className="flex flex-col gap-2 rounded-xl border border-line bg-paper-raised shadow-sm p-4 transition hover:border-teal-deep/40"
           >
             <div className="flex items-start justify-between gap-2">
               <div className="flex items-center gap-2">

@@ -86,7 +86,7 @@ export function PendenciasPage() {
         )}
       </div>
 
-      <div className="mt-4 overflow-hidden rounded-xl border border-line bg-paper-raised">
+      <div className="mt-4 panel">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="bg-paper text-xs font-medium uppercase tracking-wide text-ink-muted">
