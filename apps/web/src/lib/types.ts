@@ -847,7 +847,26 @@ export interface SearchResult {
 
 // ---- Operação de campo: Inspeções, Não Conformidades, Evidências ----
 
-export type InspectionItemType = "CONFORME_NAO_CONFORME" | "SIM_NAO" | "NOTA" | "TEXTO_LIVRE" | "SELECAO_MULTIPLA";
+export type InspectionItemType =
+  | "CONFORME_NAO_CONFORME"
+  | "SIM_NAO"
+  | "NOTA"
+  | "TEXTO_LIVRE"
+  | "SELECAO_MULTIPLA"
+  | "TEXTO_CURTO"
+  | "TEXTO_LONGO"
+  | "SELECAO_UNICA"
+  | "NUMERO"
+  | "DATA"
+  | "HORA"
+  | "ESCALA"
+  | "LISTA_SUSPENSA"
+  | "UPLOAD"
+  | "CLASSIFICACAO"
+  | "GRADE";
+export type ChecklistTemplateStatus = "RASCUNHO" | "ATIVO" | "INATIVO" | "ARQUIVADO";
+export type ChecklistFrequency = "DIARIA" | "SEMANAL" | "MENSAL" | "POR_TURNO" | "POR_EVENTO" | "PERSONALIZADA";
+export type NonConformityCreation = "MANUAL" | "AUTOMATICA";
 export type InspectionResponseValue = "CONFORME" | "NAO_CONFORME" | "NAO_APLICAVEL";
 export type InspectionStatus = "EM_ANDAMENTO" | "CONCLUIDA" | "CANCELADA";
 export type NonConformitySeverity = "BAIXA" | "MEDIA" | "ALTA" | "CRITICA";
@@ -862,15 +881,35 @@ export type EvidenceSourceType =
   | "AUDIT"
   | "PGR";
 
+export interface InspectionTemplateSection {
+  id: string;
+  name: string;
+  order: number;
+}
+
 export interface InspectionTemplateItem {
   id: string;
   order: number;
+  sectionId: string | null;
   text: string;
+  instruction: string | null;
   responseType: InspectionItemType;
   category: string | null;
   options: string[];
   blockLabel: string | null;
+  required: boolean;
+  weight: number | null;
+  allowComment: boolean;
   allowPhoto: boolean;
+  allowActionPlan: boolean;
+  scaleMin: number | null;
+  scaleMax: number | null;
+  scaleMinLabel: string | null;
+  scaleMaxLabel: string | null;
+  rows: string[];
+  conditionItemId: string | null;
+  conditionOperator: "IGUAL" | "DIFERENTE" | null;
+  conditionValue: string | null;
 }
 
 export interface InspectionTemplate {
@@ -880,7 +919,29 @@ export interface InspectionTemplate {
   description: string | null;
   category: string | null;
   active: boolean;
+  code: string | null;
+  status: ChecklistTemplateStatus;
+  version: number;
+  previousVersionId: string | null;
+  frequency: ChecklistFrequency | null;
+  branchId: string | null;
+  departmentId: string | null;
+  process: string | null;
+  responsibleId: string | null;
+  ncCreation: NonConformityCreation;
+  createdAt: string;
+  updatedAt: string;
+  sections: InspectionTemplateSection[];
   items: InspectionTemplateItem[];
+  _count?: { inspections: number };
+}
+
+export interface InspectionTemplateHistoryEntry {
+  id: string;
+  action: string;
+  details: string | null;
+  userName: string | null;
+  createdAt: string;
 }
 
 export interface InspectionBlockItem {

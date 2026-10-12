@@ -1,12 +1,13 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, ChevronLeft, ChevronRight, TriangleAlert } from "lucide-react";
 import { api } from "../../lib/api";
-import { decodeItem, visibleOptions } from "../../lib/checklist-item-config";
+import { AnswerInput } from "./AnswerInput";
 import { EvidenceUploader } from "../EvidenceUploader";
 import type {
   InspectionDetail,
   InspectionResponseValue,
   InspectionTemplate,
+  InspectionTemplateItem,
   NonConformitySeverity,
 } from "../../lib/types";
 
@@ -22,7 +23,8 @@ export function NewInspectionTab({ companyId, onFinished }: { companyId?: string
 
   useEffect(() => {
     const path = companyId ? `/field-ops/inspection-templates?companyId=${encodeURIComponent(companyId)}` : "/field-ops/inspection-templates";
-    api.get<InspectionTemplate[]>(path).then((list) => {
+    api.get<InspectionTemplate[]>(path).then((all) => {
+      const list = all.filter((t) => t.status === "ATIVO"); // só modelos ativos podem ser aplicados
       setTemplates(list);
       if (list[0]) setTemplateId(list[0].id);
     });
@@ -51,9 +53,9 @@ export function NewInspectionTab({ companyId, onFinished }: { companyId?: string
   if (step === "select") {
     return (
       <div className="card max-w-md">
-        <p className="font-medium text-ink">Escolha um roteiro para começar</p>
+        <p className="font-medium text-ink">Escolha um modelo para começar</p>
         {templates.length === 0 ? (
-          <p className="mt-2 text-sm text-ink-muted">Nenhum roteiro cadastrado — crie um na aba "Modelos/Roteiros" primeiro.</p>
+          <p className="mt-2 text-sm text-ink-muted">Nenhum modelo ativo — crie e ative um em CheckHub › Criar Checklist.</p>
         ) : (
           <>
             <select className="input mt-3 w-full" value={templateId} onChange={(e) => setTemplateId(e.target.value)}>
@@ -103,9 +105,8 @@ export function NewInspectionTab({ companyId, onFinished }: { companyId?: string
           text={item.text}
           blockLabel={item.blockLabel}
           category={item.category}
-          allowPhoto={item.allowPhoto}
-          responseType={item.responseType}
-          options={item.options}
+          item={item}
+          autoNonConformity={inspection.template.ncCreation === "AUTOMATICA"}
           initialValue={response?.value ?? null}
           initialTextValue={response?.textValue ?? ""}
           initialComment={response?.comment ?? ""}
@@ -141,9 +142,8 @@ function ChecklistItem({
   text,
   blockLabel,
   category,
-  allowPhoto,
-  responseType,
-  options,
+  item,
+  autoNonConformity,
   initialValue,
   initialTextValue,
   initialComment,
@@ -154,151 +154,105 @@ function ChecklistItem({
   text: string;
   blockLabel: string | null;
   category: string | null;
-  allowPhoto: boolean;
-  responseType: string;
-  options: string[];
+  item: InspectionTemplateItem;
+  autoNonConformity: boolean;
   initialValue: InspectionResponseValue | null;
   initialTextValue: string;
   initialComment: string;
   companyId?: string;
 }) {
-  const cfg = decodeItem({ responseType: responseType as never, options, allowPhoto });
-  const shownOptions = visibleOptions(options);
+  const { responseType, allowPhoto, options } = item;
+  // Modelos antigos guardam a resposta de texto no comentário; os novos tipos usam o campo próprio de resposta.
+  const legacyText = responseType === "TEXTO_LIVRE";
   const [value, setValue] = useState<InspectionResponseValue | null>(initialValue);
-  const [selectedOptions, setSelectedOptions] = useState<string[]>(
-    initialTextValue ? initialTextValue.split(",").filter(Boolean) : [],
-  );
+  const [answer, setAnswer] = useState(initialTextValue);
   const [comment, setComment] = useState(initialComment);
   const [showNcForm, setShowNcForm] = useState(false);
   const [ncDescription, setNcDescription] = useState("");
   const [ncSeverity, setNcSeverity] = useState<NonConformitySeverity>("MEDIA");
   const [ncSaved, setNcSaved] = useState(false);
 
-  async function toggleOption(option: string) {
-    const next =
-      cfg.listField === "UNICA"
-        ? [option]
-        : selectedOptions.includes(option)
-          ? selectedOptions.filter((o) => o !== option)
-          : [...selectedOptions, option];
-    setSelectedOptions(next);
-    await api.post(`/field-ops/inspections/${inspectionId}/responses`, {
-      templateItemId,
-      textValue: next.join(","),
-      comment: comment || undefined,
-    });
+  function save(patch: { value?: InspectionResponseValue; textValue?: string; comment?: string }) {
+    return api.post(`/field-ops/inspections/${inspectionId}/responses`, { templateItemId, ...patch });
+  }
+
+  async function saveAnswer(next: string) {
+    setAnswer(next);
+    await save({ textValue: next, comment: comment || undefined });
+  }
+
+  async function createNonConformity(description: string, severity: NonConformitySeverity) {
+    if (!companyId) return;
+    await api.post("/field-ops/non-conformities", { companyId, inspectionId, description, severity });
+    setNcSaved(true);
   }
 
   async function saveResponse(nextValue: InspectionResponseValue) {
     setValue(nextValue);
-    await api.post(`/field-ops/inspections/${inspectionId}/responses`, {
-      templateItemId,
-      value: nextValue,
-      comment: comment || undefined,
-    });
-    if (nextValue === "NAO_CONFORME" && cfg.actionPlan) {
-      setShowNcForm(true);
-      setNcDescription(text);
+    await save({ value: nextValue, comment: comment || undefined });
+    if (nextValue === "NAO_CONFORME" && item.allowActionPlan) {
+      if (autoNonConformity) await createNonConformity(text, "MEDIA"); // o modelo manda registrar sozinho
+      else {
+        setShowNcForm(true);
+        setNcDescription(text);
+      }
     }
   }
 
   async function saveComment() {
-    await api.post(`/field-ops/inspections/${inspectionId}/responses`, {
-      templateItemId,
+    await save({
       value: value ?? undefined,
+      textValue: legacyText ? undefined : answer || undefined,
       comment: comment || undefined,
     });
   }
 
   async function handleSaveNonConformity() {
-    if (!companyId) return;
-    await api.post("/field-ops/non-conformities", {
-      companyId,
-      inspectionId,
-      description: ncDescription,
-      severity: ncSeverity,
-    });
-    setNcSaved(true);
+    await createNonConformity(ncDescription, ncSeverity);
   }
+
+  const optionButton = (on: boolean, danger = false) =>
+    `rounded-md border px-3 py-3 text-sm font-medium transition-colors ${
+      on ? (danger ? "border-danger bg-danger-tint text-danger" : "border-teal bg-teal-tint text-teal-deep") : "border-line text-ink-muted"
+    }`;
 
   return (
     <div className="card mt-2">
       {blockLabel && <p className="mb-1 font-mono text-[10px] uppercase tracking-wide text-teal-deep">{blockLabel}</p>}
       {category && <p className="mb-1 text-xs font-semibold text-ink-muted">{category}</p>}
-      <p className="font-medium text-ink">{text}</p>
+      <p className="font-medium text-ink">
+        {text} {item.required && <span className="text-danger" title="Resposta obrigatória">*</span>}
+      </p>
+      {item.instruction && <p className="mt-0.5 text-xs text-ink-muted">{item.instruction}</p>}
 
-      {responseType === "TEXTO_LIVRE" ? (
-        cfg.kind === "DATA" ? (
-          <input
-            type={cfg.dateField === "HORA" ? "time" : "date"}
-            className="input mt-3 w-full"
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            onBlur={saveComment}
-          />
-        ) : cfg.textField === "CURTO" && cfg.kind === "TEXTO" ? (
-          <input
-            className="input mt-3 w-full"
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            onBlur={saveComment}
-          />
-        ) : (
-          <textarea
-            className="input mt-3 w-full"
-            rows={3}
-            value={comment}
-            onChange={(e) => setComment(e.target.value)}
-            onBlur={saveComment}
-          />
-        )
-      ) : responseType === "SELECAO_MULTIPLA" ? (
-        <div className="mt-3 flex flex-col gap-1.5">
-          {shownOptions.map((option) => (
-            <label
-              key={option}
-              className="flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm text-ink"
-            >
-              <input
-                type={cfg.listField === "UNICA" ? "radio" : "checkbox"}
-                name={`opt-${templateItemId}`}
-                checked={selectedOptions.includes(option)}
-                onChange={() => toggleOption(option)}
-              />
-              {option}
-            </label>
-          ))}
-        </div>
-      ) : (
+      {legacyText && (
+        <textarea className="input mt-3 w-full" rows={3} value={comment} onChange={(e) => setComment(e.target.value)} onBlur={saveComment} />
+      )}
+      {!legacyText && responseType !== "CONFORME_NAO_CONFORME" && responseType !== "SIM_NAO" && (
+        <AnswerInput item={item} name={`opt-${templateItemId}`} value={answer} onChange={setAnswer} onCommit={saveAnswer} />
+      )}
+      {(responseType === "CONFORME_NAO_CONFORME" || responseType === "SIM_NAO") && (
         <div className="mt-3 flex gap-2">
-          <button
-            onClick={() => saveResponse("CONFORME")}
-            className={`flex-1 rounded-md border py-3 text-sm font-medium transition-colors ${
-              value === "CONFORME" ? "border-teal bg-teal-tint text-teal-deep" : "border-line text-ink-muted"
-            }`}
-          >
+          <button onClick={() => saveResponse("CONFORME")} className={`flex-1 ${optionButton(value === "CONFORME")}`}>
             {responseType === "SIM_NAO" ? "Sim" : "Conforme"}
           </button>
-          <button
-            onClick={() => saveResponse("NAO_CONFORME")}
-            className={`flex-1 rounded-md border py-3 text-sm font-medium transition-colors ${
-              value === "NAO_CONFORME" ? "border-danger bg-danger-tint text-danger" : "border-line text-ink-muted"
-            }`}
-          >
+          <button onClick={() => saveResponse("NAO_CONFORME")} className={`flex-1 ${optionButton(value === "NAO_CONFORME", true)}`}>
             {responseType === "SIM_NAO" ? "Não" : "Não conforme"}
           </button>
-          <button
-            onClick={() => saveResponse("NAO_APLICAVEL")}
-            className={`rounded-md border px-3 py-3 text-sm font-medium transition-colors ${
-              value === "NAO_APLICAVEL" ? "border-ink bg-line text-ink" : "border-line text-ink-muted"
-            }`}
-          >
-            N/A
-          </button>
+          {responseType === "CONFORME_NAO_CONFORME" && (
+            <button
+              onClick={() => saveResponse("NAO_APLICAVEL")}
+              className={`rounded-md border px-3 py-3 text-sm font-medium transition-colors ${
+                value === "NAO_APLICAVEL" ? "border-ink bg-line text-ink" : "border-line text-ink-muted"
+              }`}
+            >
+              N/A
+            </button>
+          )}
         </div>
       )}
 
-      {responseType !== "TEXTO_LIVRE" && cfg.comment && (
+      {!legacyText && item.allowComment && (
         <textarea
           className="input mt-3 w-full"
           rows={2}
@@ -314,17 +268,8 @@ function ChecklistItem({
           <p className="flex items-center gap-1.5 text-xs font-medium text-danger">
             <TriangleAlert size={13} /> Registrar não conformidade
           </p>
-          <textarea
-            className="input mt-2 w-full"
-            rows={2}
-            value={ncDescription}
-            onChange={(e) => setNcDescription(e.target.value)}
-          />
-          <select
-            className="input mt-2 w-full"
-            value={ncSeverity}
-            onChange={(e) => setNcSeverity(e.target.value as NonConformitySeverity)}
-          >
+          <textarea className="input mt-2 w-full" rows={2} value={ncDescription} onChange={(e) => setNcDescription(e.target.value)} />
+          <select className="input mt-2 w-full" value={ncSeverity} onChange={(e) => setNcSeverity(e.target.value as NonConformitySeverity)}>
             <option value="BAIXA">Baixa</option>
             <option value="MEDIA">Média</option>
             <option value="ALTA">Alta</option>
@@ -335,15 +280,23 @@ function ChecklistItem({
           </button>
         </div>
       )}
+      {item.allowActionPlan && !showNcForm && !ncSaved && responseType !== "CONFORME_NAO_CONFORME" && responseType !== "SIM_NAO" && (
+        <button
+          type="button"
+          onClick={() => {
+            setShowNcForm(true);
+            setNcDescription(text);
+          }}
+          className="mt-3 text-sm font-medium text-teal-deep hover:underline"
+        >
+          Registrar plano de ação
+        </button>
+      )}
       {ncSaved && <p className="mt-2 text-xs text-teal-deep">Não conformidade registrada — plano de ação criado.</p>}
 
       {allowPhoto && (
         <div className="mt-3 border-t border-line pt-3">
-          <EvidenceUploader
-            sourceType="INSPECTION_ITEM_RESPONSE"
-            sourceId={`${inspectionId}:${templateItemId}`}
-            companyId={companyId}
-          />
+          <EvidenceUploader sourceType="INSPECTION_ITEM_RESPONSE" sourceId={`${inspectionId}:${templateItemId}`} companyId={companyId} />
         </div>
       )}
     </div>

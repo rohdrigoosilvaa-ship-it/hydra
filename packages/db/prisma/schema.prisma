@@ -1090,17 +1090,68 @@ model InspectionTemplate {
   name        String
   description String?  @db.Text
   category    String?
+  /// false = excluído (legado); o ciclo de vida normal usa `status`.
   active      Boolean  @default(true)
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   createdById String?
 
+  /// Código automático (CHK-0001), igual em todas as versões do mesmo modelo.
+  code              String?
+  status            ChecklistTemplateStatus @default(ATIVO)
+  version           Int                     @default(1)
+  /// Versão anterior do mesmo modelo (cada edição de um modelo já usado cria uma versão nova).
+  previousVersionId String?
+  frequency         ChecklistFrequency?
+  branchId          String? /// unidade relacionada
+  departmentId      String? /// setor relacionado
+  process           String? /// processo relacionado
+  responsibleId     String? /// responsável pelo modelo (usuário)
+  ncCreation        NonConformityCreation   @default(MANUAL)
+
+  sections    InspectionTemplateSection[]
   items       InspectionTemplateItem[]
   inspections Inspection[]
+  history     InspectionTemplateHistory[]
 
+  @@unique([tenantId, code, version])
   @@index([tenantId])
   @@index([companyId])
   @@map("inspection_templates")
+}
+
+/// Seção de um modelo de checklist (agrupa perguntas).
+model InspectionTemplateSection {
+  id         String @id @default(cuid())
+  tenantId   String
+  templateId String
+  name       String
+  order      Int
+
+  template InspectionTemplate       @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  items    InspectionTemplateItem[]
+
+  @@index([tenantId])
+  @@index([templateId])
+  @@map("inspection_template_sections")
+}
+
+/// Histórico de alterações de um modelo (criação, edição, mudança de status, nova versão...).
+model InspectionTemplateHistory {
+  id         String   @id @default(cuid())
+  tenantId   String
+  templateId String
+  userId     String?
+  userName   String?
+  action     String
+  details    String?  @db.Text
+  createdAt  DateTime @default(now())
+
+  template InspectionTemplate @relation(fields: [templateId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([templateId])
+  @@map("inspection_template_history")
 }
 
 enum InspectionItemType {
@@ -1109,6 +1160,40 @@ enum InspectionItemType {
   NOTA
   TEXTO_LIVRE
   SELECAO_MULTIPLA
+  TEXTO_CURTO
+  TEXTO_LONGO
+  SELECAO_UNICA
+  NUMERO
+  DATA
+  HORA
+  ESCALA
+  LISTA_SUSPENSA
+  UPLOAD
+  CLASSIFICACAO
+  GRADE
+}
+
+/// Situação do modelo de checklist. Só modelos ATIVO aparecem para aplicação.
+enum ChecklistTemplateStatus {
+  RASCUNHO
+  ATIVO
+  INATIVO
+  ARQUIVADO
+}
+
+enum ChecklistFrequency {
+  DIARIA
+  SEMANAL
+  MENSAL
+  POR_TURNO
+  POR_EVENTO
+  PERSONALIZADA
+}
+
+/// Como nasce a não conformidade quando uma resposta é "não conforme": sozinha ou por decisão de quem aplica.
+enum NonConformityCreation {
+  MANUAL
+  AUTOMATICA
 }
 
 /// Item do roteiro de inspeção (pergunta/verificação).
@@ -1124,6 +1209,27 @@ model InspectionTemplateItem {
   blockLabel   String?            // nome do InspectionBlock de origem, congelado no momento em que foi inserido no roteiro
   allowPhoto   Boolean            @default(true) // se falso, não mostra a opção de anexar foto/evidência pra este item
 
+  sectionId       String?
+  /// Orientação mostrada junto da pergunta.
+  instruction     String?  @db.Text
+  required        Boolean  @default(false)
+  /// Peso/pontuação (quando aplicável).
+  weight          Int?
+  allowComment    Boolean  @default(true)
+  allowActionPlan Boolean  @default(false)
+  /// Escala de avaliação (tipo ESCALA): de scaleMin a scaleMax.
+  scaleMin        Int?
+  scaleMax        Int?
+  scaleMinLabel   String?
+  scaleMaxLabel   String?
+  /// Linhas da grade (tipo GRADE); as colunas ficam em `options`.
+  rows            String[]  @default([])
+  /// Regra condicional: a pergunta só aparece se a resposta da pergunta `conditionItemId` for/não for `conditionValue`.
+  conditionItemId   String?
+  conditionOperator String? // "IGUAL" | "DIFERENTE"
+  conditionValue    String?
+
+  section   InspectionTemplateSection? @relation(fields: [sectionId], references: [id], onDelete: SetNull)
   template  InspectionTemplate       @relation(fields: [templateId], references: [id], onDelete: Cascade)
   responses InspectionItemResponse[]
 

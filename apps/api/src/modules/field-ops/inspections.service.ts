@@ -26,7 +26,7 @@ export class InspectionsService {
     const inspection = await this.prisma.inspection.findFirst({
       where: { ...where, id },
       include: {
-        template: { include: { items: { orderBy: { order: "asc" } } } },
+        template: { include: { sections: { orderBy: { order: "asc" } }, items: { orderBy: { order: "asc" } } } },
         responses: true,
         nonConformities: true,
       },
@@ -48,7 +48,7 @@ export class InspectionsService {
         scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : undefined,
         createdById: userId,
       },
-      include: { template: { include: { items: { orderBy: { order: "asc" } } } } },
+      include: { template: { include: { sections: { orderBy: { order: "asc" } }, items: { orderBy: { order: "asc" } } } } },
     });
   }
 
