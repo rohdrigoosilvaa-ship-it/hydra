@@ -144,14 +144,18 @@ export function ChecklistStructureEditor({
   /** Ordem final: seções na ordem da tela, e os itens de cada uma na ordem em que estão. */
   const ordered = (): DraftItem[] => sections.flatMap((s) => items.filter((i) => i.sectionKey === s.key));
   const list = ordered();
+  const labels: Record<string, string> = {};
+  sections.forEach((sec, si) =>
+    items.filter((i) => i.sectionKey === sec.key).forEach((i, ii) => (labels[i.key] = `Seção ${si + 1} · Item ${ii + 1}`)),
+  );
 
   function patchItem(key: string, change: Partial<DraftItem>) {
     dirty();
     setItems((prev) => prev.map((it) => (it.key === key ? { ...it, ...change } : it)));
   }
-  function addItem() {
+  function addItem(sectionKey: string) {
     dirty();
-    const item = blankItem(sections[sections.length - 1]!.key);
+    const item = blankItem(sectionKey);
     setItems((prev) => [...prev, item]);
     setActiveKey(item.key);
   }
@@ -181,6 +185,37 @@ export function ChecklistStructureEditor({
       return next;
     });
   }
+  function addSection() {
+    dirty();
+    const section: DraftSection = { key: nextKey("s"), name: "" };
+    const item = blankItem(section.key);
+    setSections((prev) => [...prev, section]);
+    setItems((prev) => [...prev, item]);
+    setActiveKey(item.key);
+  }
+  function renameSection(key: string, name: string) {
+    dirty();
+    setSections((prev) => prev.map((s) => (s.key === key ? { ...s, name } : s)));
+  }
+  function moveSection(index: number, dir: -1 | 1) {
+    dirty();
+    setSections((prev) => {
+      const t = index + dir;
+      if (t < 0 || t >= prev.length) return prev;
+      const next = [...prev];
+      [next[index], next[t]] = [next[t]!, next[index]!];
+      return next;
+    });
+  }
+  function removeSection(section: DraftSection) {
+    const count = items.filter((i) => i.sectionKey === section.key).length;
+    if (!window.confirm(count ? `Excluir esta seção e os ${count} item(ns) dela?` : "Excluir esta seção?")) return;
+    dirty();
+    const gone = new Set(items.filter((i) => i.sectionKey === section.key).map((i) => i.key));
+    setSections((prev) => prev.filter((s) => s.key !== section.key));
+    setItems((prev) => prev.filter((i) => !gone.has(i.key)).map((i) => (gone.has(i.conditionKey) ? { ...i, conditionKey: "" } : i)));
+    setActiveKey(null);
+  }
   function removeItem(item: DraftItem) {
     if (!window.confirm("Excluir este item?")) return;
     dirty();
@@ -194,25 +229,27 @@ export function ChecklistStructureEditor({
     setError(null);
     const flat = ordered();
     if (title.trim().length < 2) return setError("Escreva o nome do checklist em “Formulário sem título”.");
+    const noName = sections.findIndex((sec) => !sec.name.trim());
+    if (noName >= 0) return setError(`Dê um título à seção ${noName + 1}.`);
     const noText = flat.findIndex((i) => i.text.trim().length < 2);
     if (noText >= 0) {
       setActiveKey(flat[noText]!.key);
-      return setError(`Escreva o texto do item ${noText + 1}.`);
+      return setError(`Escreva o texto do item (${labels[flat[noText]!.key]}).`);
     }
     const badChoice = flat.findIndex((i) => usesOptions(i.responseType) && i.options.filter((o) => o.trim()).length < 2);
     if (badChoice >= 0) {
       setActiveKey(flat[badChoice]!.key);
-      return setError(`O item ${badChoice + 1} precisa de pelo menos 2 ${flat[badChoice]!.responseType === "GRADE" ? "colunas" : "opções"}.`);
+      return setError(`O item (${labels[flat[badChoice]!.key]}) precisa de pelo menos 2 ${flat[badChoice]!.responseType === "GRADE" ? "colunas" : "opções"}.`);
     }
     const badRows = flat.findIndex((i) => i.responseType === "GRADE" && i.rows.filter((o) => o.trim()).length < 1);
     if (badRows >= 0) {
       setActiveKey(flat[badRows]!.key);
-      return setError(`O item ${badRows + 1} precisa de pelo menos 1 linha.`);
+      return setError(`O item (${labels[flat[badRows]!.key]}) precisa de pelo menos 1 linha.`);
     }
     const badScale = flat.findIndex((i) => i.responseType === "ESCALA" && i.scaleMax <= i.scaleMin);
     if (badScale >= 0) {
       setActiveKey(flat[badScale]!.key);
-      return setError(`No item ${badScale + 1}, o máximo da escala deve ser maior que o mínimo.`);
+      return setError(`No item (${labels[flat[badScale]!.key]}), o máximo da escala deve ser maior que o mínimo.`);
     }
 
     setSaving(true);
@@ -220,7 +257,7 @@ export function ChecklistStructureEditor({
       const updated = await api.put<InspectionTemplate>(`/field-ops/inspection-templates/${template.id}/structure`, {
         name: title.trim(),
         description: description.trim(),
-        sections: sections.map((s) => ({ key: s.key, id: s.id, name: s.name.trim() || "Geral" })),
+        sections: sections.map((s) => ({ key: s.key, id: s.id, name: s.name.trim() })),
         items: flat.map((i) => ({
           key: i.key,
           id: i.id,
@@ -296,29 +333,59 @@ export function ChecklistStructureEditor({
         />
       </div>
 
-      {list.map((item, index) => (
-        <ItemCard
-          key={item.key}
-          number={index + 1}
-          item={item}
-          active={activeKey === item.key}
-          previous={list.slice(0, index)}
-          canUp={index > 0}
-          canDown={index < list.length - 1}
-          onActivate={() => setActiveKey(item.key)}
-          onChange={(change) => patchItem(item.key, change)}
-          onMove={(dir) => moveItem(item.key, dir)}
-          onDuplicate={() => duplicateItem(item)}
-          onRemove={() => removeItem(item)}
-        />
-      ))}
+      {sections.map((section, sIndex) => {
+        const sectionItems = items.filter((i) => i.sectionKey === section.key);
+        return (
+          <section key={section.key} className="flex flex-col gap-3" aria-label={`Seção ${sIndex + 1}`}>
+            <div className="flex flex-wrap items-center gap-2 rounded-md border-l-4 border-teal bg-paper-raised px-4 py-3">
+              <span className="font-mono text-[10px] font-semibold uppercase tracking-wide text-teal-deep">Seção {sIndex + 1}</span>
+              <input
+                className="input min-w-[200px] flex-1"
+                placeholder="Título da seção (ex.: Identificação da visita)"
+                aria-label={`Título da seção ${sIndex + 1}`}
+                value={section.name}
+                onChange={(e) => renameSection(section.key, e.target.value)}
+              />
+              <button type="button" onClick={() => moveSection(sIndex, -1)} disabled={sIndex === 0} title="Subir seção" className="p-1 text-ink-muted hover:text-ink disabled:opacity-30"><ArrowUp size={16} /></button>
+              <button type="button" onClick={() => moveSection(sIndex, 1)} disabled={sIndex === sections.length - 1} title="Descer seção" className="p-1 text-ink-muted hover:text-ink disabled:opacity-30"><ArrowDown size={16} /></button>
+              <button type="button" onClick={() => removeSection(section)} disabled={sections.length === 1} title="Excluir seção" className="p-1 text-ink-muted hover:text-danger disabled:opacity-30"><Trash2 size={16} /></button>
+            </div>
+
+            {sectionItems.map((item, index) => (
+              <ItemCard
+                key={item.key}
+                number={index + 1}
+                item={item}
+                active={activeKey === item.key}
+                previous={list.slice(0, list.findIndex((i) => i.key === item.key))}
+                labels={labels}
+                canUp={index > 0}
+                canDown={index < sectionItems.length - 1}
+                onActivate={() => setActiveKey(item.key)}
+                onChange={(change) => patchItem(item.key, change)}
+                onMove={(dir) => moveItem(item.key, dir)}
+                onDuplicate={() => duplicateItem(item)}
+                onRemove={() => removeItem(item)}
+              />
+            ))}
+
+            <button
+              type="button"
+              onClick={() => addItem(section.key)}
+              className="flex w-fit items-center gap-1.5 rounded-md border border-line bg-paper-raised px-4 py-2.5 text-sm font-medium text-teal-deep hover:bg-teal-tint"
+            >
+              <Plus size={16} /> Adicionar item
+            </button>
+          </section>
+        );
+      })}
 
       <button
         type="button"
-        onClick={addItem}
+        onClick={addSection}
         className="flex w-fit items-center gap-1.5 rounded-md border border-line bg-paper-raised px-4 py-2.5 text-sm font-medium text-teal-deep hover:bg-teal-tint"
       >
-        <Plus size={16} /> Adicionar item
+        <Plus size={16} /> Adicionar seção
       </button>
 
       {error && <p className="text-sm text-amber" role="alert">{error}</p>}
@@ -343,6 +410,7 @@ function ItemCard({
   item,
   active,
   previous,
+  labels,
   canUp,
   canDown,
   onActivate,
@@ -355,6 +423,7 @@ function ItemCard({
   item: DraftItem;
   active: boolean;
   previous: DraftItem[];
+  labels: Record<string, string>;
   canUp: boolean;
   canDown: boolean;
   onActivate: () => void;
@@ -426,14 +495,6 @@ function ItemCard({
           </optgroup>
         </select>
       </div>
-      <input
-        className="input"
-        placeholder="Subitem"
-        aria-label="Subitem"
-        value={item.instruction}
-        onChange={(e) => onChange({ instruction: e.target.value })}
-      />
-
       <TypeConfig item={item} onChange={onChange} />
 
       <div className="flex flex-col gap-2">
@@ -490,9 +551,9 @@ function ItemCard({
                     onChange={(e) => onChange({ conditionKey: e.target.value, conditionValue: "", conditionOperator: "IGUAL" })}
                   >
                     <option value="">Sempre mostrar</option>
-                    {previous.map((p, i) => (
+                    {previous.map((p) => (
                       <option key={p.key} value={p.key}>
-                        {i + 1}. {p.text.trim() || "(sem texto)"}
+                        {labels[p.key]}: {p.text.trim() || "(sem texto)"}
                       </option>
                     ))}
                   </select>
