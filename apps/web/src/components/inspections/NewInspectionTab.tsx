@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
-import { CheckCircle2, ChevronLeft, ChevronRight, TriangleAlert } from "lucide-react";
+import { CheckCircle2, ChevronLeft, ChevronRight, Plus, TriangleAlert } from "lucide-react";
 import { api } from "../../lib/api";
+import { buildSteps, evidenceSourceId, repetitionCounts, repetitionTitle } from "../../lib/checklist-config";
 import { AnswerInput } from "./AnswerInput";
 import { EvidenceUploader } from "../EvidenceUploader";
 import type {
@@ -19,6 +20,7 @@ export function NewInspectionTab({ companyId, onFinished }: { companyId?: string
   const [templateId, setTemplateId] = useState("");
   const [inspection, setInspection] = useState<InspectionDetail | null>(null);
   const [index, setIndex] = useState(0);
+  const [counts, setCounts] = useState<Record<string, number>>({});
   const [starting, setStarting] = useState(false);
 
   useEffect(() => {
@@ -38,6 +40,7 @@ export function NewInspectionTab({ companyId, onFinished }: { companyId?: string
       const full = await api.get<InspectionDetail>(`/field-ops/inspections/${created.id}`);
       setInspection(full);
       setIndex(0);
+      setCounts(repetitionCounts(full.responses, full.template));
       setStep("running");
     } finally {
       setStarting(false);
@@ -88,20 +91,34 @@ export function NewInspectionTab({ companyId, onFinished }: { companyId?: string
   }
 
   if (!inspection) return null;
-  const items = inspection.template.items;
-  const item = items[index];
-  const response = inspection.responses.find((r) => r.templateItemId === item?.id);
+  const steps = buildSteps(inspection.template, counts);
+  const current = steps[Math.min(index, steps.length - 1)];
+  const item = current?.item;
+  const response = current
+    ? inspection.responses.find((r) => r.templateItemId === current.item.id && r.repetition === current.repetition)
+    : undefined;
+  const section = current?.section ?? null;
+  const lastOfRepetition = Boolean(section?.repeatable && current && current.position === current.total);
+  const lastRepetition = Boolean(section && current && current.repetition === Math.max(1, counts[section.id] ?? 1) - 1);
+  const repeatLabel = section?.repeatLabel?.trim() || section?.name || "";
 
   return (
     <div className="max-w-md">
       <p className="text-xs text-ink-muted">
-        Item {index + 1} de {items.length} · {inspection.template.name}
+        Item {Math.min(index, steps.length - 1) + 1} de {steps.length} · {inspection.template.name}
       </p>
-      {item && (
+      {section && (
+        <p className="mt-1 font-mono text-xs font-semibold uppercase tracking-wide text-teal-deep">
+          {section.repeatable && current ? repetitionTitle(section, current.repetition) : section.name}
+          {current && ` · ${current.position}/${current.total}`}
+        </p>
+      )}
+      {item && current && (
         <ChecklistItem
-          key={item.id}
+          key={`${item.id}-${current.repetition}`}
           inspectionId={inspection.id}
           templateItemId={item.id}
+          repetition={current.repetition}
           text={item.text}
           blockLabel={item.blockLabel}
           category={item.category}
@@ -114,6 +131,19 @@ export function NewInspectionTab({ companyId, onFinished }: { companyId?: string
         />
       )}
 
+      {lastOfRepetition && lastRepetition && section && (
+        <button
+          type="button"
+          onClick={() => {
+            setCounts((c) => ({ ...c, [section.id]: Math.max(1, c[section.id] ?? 1) + 1 }));
+            setIndex((i) => i + 1);
+          }}
+          className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-md border border-dashed border-teal px-3 py-2.5 text-sm font-medium text-teal-deep hover:bg-teal-tint"
+        >
+          <Plus size={15} /> Adicionar outro {repeatLabel.toLowerCase()}
+        </button>
+      )}
+
       <div className="mt-4 flex items-center justify-between">
         <button
           onClick={() => setIndex((i) => Math.max(0, i - 1))}
@@ -122,7 +152,7 @@ export function NewInspectionTab({ companyId, onFinished }: { companyId?: string
         >
           <ChevronLeft size={15} /> Anterior
         </button>
-        {index < items.length - 1 ? (
+        {index < steps.length - 1 ? (
           <button onClick={() => setIndex((i) => i + 1)} className="btn-primary flex items-center gap-1 text-sm">
             Próximo <ChevronRight size={15} />
           </button>
@@ -139,6 +169,7 @@ export function NewInspectionTab({ companyId, onFinished }: { companyId?: string
 function ChecklistItem({
   inspectionId,
   templateItemId,
+  repetition,
   text,
   blockLabel,
   category,
@@ -151,6 +182,7 @@ function ChecklistItem({
 }: {
   inspectionId: string;
   templateItemId: string;
+  repetition: number;
   text: string;
   blockLabel: string | null;
   category: string | null;
@@ -173,7 +205,7 @@ function ChecklistItem({
   const [ncSaved, setNcSaved] = useState(false);
 
   function save(patch: { value?: InspectionResponseValue; textValue?: string; comment?: string }) {
-    return api.post(`/field-ops/inspections/${inspectionId}/responses`, { templateItemId, ...patch });
+    return api.post(`/field-ops/inspections/${inspectionId}/responses`, { templateItemId, repetition, ...patch });
   }
 
   async function saveAnswer(next: string) {
@@ -296,7 +328,7 @@ function ChecklistItem({
 
       {allowPhoto && (
         <div className="mt-3 border-t border-line pt-3">
-          <EvidenceUploader sourceType="INSPECTION_ITEM_RESPONSE" sourceId={`${inspectionId}:${templateItemId}`} companyId={companyId} />
+          <EvidenceUploader sourceType="INSPECTION_ITEM_RESPONSE" sourceId={evidenceSourceId(inspectionId, templateItemId, repetition)} companyId={companyId} />
         </div>
       )}
     </div>

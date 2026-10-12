@@ -45,7 +45,11 @@ export function ChecklistPreview({ template, onClose }: { template: InspectionTe
             .filter((g) => g.items.length > 0)
             .map((group) => (
               <section key={group.id ?? "geral"} className="mb-6">
-                <h3 className="mb-3 font-mono text-xs font-semibold uppercase tracking-wide text-teal-deep">{group.name}</h3>
+                <h3 className="mb-3 font-mono text-xs font-semibold uppercase tracking-wide text-teal-deep">{group.name}
+                  {template.sections.find((s) => s.id === group.id)?.repeatable && (
+                    <span className="ml-2 rounded-full bg-teal-tint px-2 py-0.5 text-[10px] normal-case tracking-normal text-teal-deep">repetível</span>
+                  )}
+                </h3>
                 <div className="flex flex-col gap-3">
                   {group.items.filter(visible).map((item) => (
                     <PreviewQuestion key={item.id} item={item} value={answers[item.id] ?? ""} onChange={(v) => setAnswers((a) => ({ ...a, [item.id]: v }))} />

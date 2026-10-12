@@ -109,6 +109,14 @@ export class StructureSectionDto {
   @IsString()
   @MinLength(1)
   name!: string;
+
+  @IsOptional()
+  @IsBoolean()
+  repeatable?: boolean;
+
+  @IsOptional()
+  @IsString()
+  repeatLabel?: string;
 }
 
 export class StructureItemDto {
@@ -408,6 +416,12 @@ export class UpsertInspectionResponseDto {
   @IsOptional()
   @IsString()
   comment?: string;
+
+  /** Repetição da seção repetível (0 = primeira). */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  repetition?: number;
 }
 
 export class CreateNonConformityDto {
