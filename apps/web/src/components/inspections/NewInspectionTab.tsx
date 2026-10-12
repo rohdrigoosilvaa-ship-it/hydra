@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, ChevronLeft, ChevronRight, TriangleAlert } from "lucide-react";
 import { api } from "../../lib/api";
+import { decodeItem, visibleOptions } from "../../lib/checklist-item-config";
 import { EvidenceUploader } from "../EvidenceUploader";
 import type {
   InspectionDetail,
@@ -161,6 +162,8 @@ function ChecklistItem({
   initialComment: string;
   companyId?: string;
 }) {
+  const cfg = decodeItem({ responseType: responseType as never, options, allowPhoto });
+  const shownOptions = visibleOptions(options);
   const [value, setValue] = useState<InspectionResponseValue | null>(initialValue);
   const [selectedOptions, setSelectedOptions] = useState<string[]>(
     initialTextValue ? initialTextValue.split(",").filter(Boolean) : [],
@@ -172,9 +175,12 @@ function ChecklistItem({
   const [ncSaved, setNcSaved] = useState(false);
 
   async function toggleOption(option: string) {
-    const next = selectedOptions.includes(option)
-      ? selectedOptions.filter((o) => o !== option)
-      : [...selectedOptions, option];
+    const next =
+      cfg.listField === "UNICA"
+        ? [option]
+        : selectedOptions.includes(option)
+          ? selectedOptions.filter((o) => o !== option)
+          : [...selectedOptions, option];
     setSelectedOptions(next);
     await api.post(`/field-ops/inspections/${inspectionId}/responses`, {
       templateItemId,
@@ -190,7 +196,7 @@ function ChecklistItem({
       value: nextValue,
       comment: comment || undefined,
     });
-    if (nextValue === "NAO_CONFORME") {
+    if (nextValue === "NAO_CONFORME" && cfg.actionPlan) {
       setShowNcForm(true);
       setNcDescription(text);
     }
@@ -222,22 +228,40 @@ function ChecklistItem({
       <p className="font-medium text-ink">{text}</p>
 
       {responseType === "TEXTO_LIVRE" ? (
-        <textarea
-          className="input mt-3 w-full"
-          rows={3}
-          value={comment}
-          onChange={(e) => setComment(e.target.value)}
-          onBlur={saveComment}
-        />
+        cfg.kind === "DATA" ? (
+          <input
+            type={cfg.dateField === "HORA" ? "time" : "date"}
+            className="input mt-3 w-full"
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            onBlur={saveComment}
+          />
+        ) : cfg.textField === "CURTO" && cfg.kind === "TEXTO" ? (
+          <input
+            className="input mt-3 w-full"
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            onBlur={saveComment}
+          />
+        ) : (
+          <textarea
+            className="input mt-3 w-full"
+            rows={3}
+            value={comment}
+            onChange={(e) => setComment(e.target.value)}
+            onBlur={saveComment}
+          />
+        )
       ) : responseType === "SELECAO_MULTIPLA" ? (
         <div className="mt-3 flex flex-col gap-1.5">
-          {options.map((option) => (
+          {shownOptions.map((option) => (
             <label
               key={option}
               className="flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm text-ink"
             >
               <input
-                type="checkbox"
+                type={cfg.listField === "UNICA" ? "radio" : "checkbox"}
+                name={`opt-${templateItemId}`}
                 checked={selectedOptions.includes(option)}
                 onChange={() => toggleOption(option)}
               />
@@ -274,7 +298,7 @@ function ChecklistItem({
         </div>
       )}
 
-      {responseType !== "TEXTO_LIVRE" && (
+      {responseType !== "TEXTO_LIVRE" && cfg.comment && (
         <textarea
           className="input mt-3 w-full"
           rows={2}

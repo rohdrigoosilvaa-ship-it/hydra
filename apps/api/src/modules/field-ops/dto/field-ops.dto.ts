@@ -73,6 +73,45 @@ export class CreateInspectionTemplateItemDto {
   allowPhoto?: boolean;
 }
 
+export class StructureItemDto {
+  /** Presente = item que já existe no roteiro; ausente = item novo. */
+  @IsOptional()
+  @IsString()
+  id?: string;
+
+  @IsString()
+  @MinLength(2)
+  text!: string;
+
+  @IsIn(ITEM_TYPES)
+  responseType!: InspectionItemType;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  options?: string[];
+
+  @IsOptional()
+  @IsBoolean()
+  allowPhoto?: boolean;
+
+  @IsOptional()
+  @IsString()
+  blockLabel?: string;
+
+  @IsOptional()
+  @IsString()
+  category?: string;
+}
+
+/** Estrutura completa do checklist (itens na ordem em que devem aparecer). */
+export class ReplaceChecklistStructureDto {
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => StructureItemDto)
+  items!: StructureItemDto[];
+}
+
 export class CreateInspectionBlockItemDto {
   @IsInt()
   order!: number;

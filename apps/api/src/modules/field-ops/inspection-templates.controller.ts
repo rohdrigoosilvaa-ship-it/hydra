@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Put, Query } from "@nestjs/common";
 import { CurrentUser } from "../../core/decorators/current-user.decorator";
 import { RequirePermission } from "../../core/decorators/require-permission.decorator";
 import { PERMISSIONS } from "../../core/permissions/permissions";
@@ -6,6 +6,7 @@ import type { HydraRequestUser } from "../../core/auth/jwt.types";
 import { InspectionTemplatesService } from "./inspection-templates.service";
 import {
   CreateInspectionTemplateDto,
+  ReplaceChecklistStructureDto,
   UpdateInspectionTemplateDto,
   UpdateInspectionTemplateItemDto,
 } from "./dto/field-ops.dto";
@@ -40,6 +41,16 @@ export class InspectionTemplatesController {
     @Body() dto: UpdateInspectionTemplateDto,
   ) {
     return this.templates.update(user.tenantId, id, dto, user.assignments);
+  }
+
+  @Put(":id/structure")
+  @RequirePermission(PERMISSIONS.OCCURRENCE_WRITE)
+  replaceStructure(
+    @CurrentUser() user: HydraRequestUser,
+    @Param("id") id: string,
+    @Body() dto: ReplaceChecklistStructureDto,
+  ) {
+    return this.templates.replaceStructure(user.tenantId, id, dto, user.assignments);
   }
 
   @Patch(":id/items/:itemId")
