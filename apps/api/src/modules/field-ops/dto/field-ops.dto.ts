@@ -37,6 +37,10 @@ const ITEM_TYPES: InspectionItemType[] = [
   "DATA",
   "HORA",
   "ESCALA",
+  "LISTA_SUSPENSA",
+  "UPLOAD",
+  "CLASSIFICACAO",
+  "GRADE",
 ];
 const FREQUENCIES: ChecklistFrequency[] = ["DIARIA", "SEMANAL", "MENSAL", "POR_TURNO", "POR_EVENTO", "PERSONALIZADA"];
 const TEMPLATE_STATUSES: ChecklistTemplateStatus[] = ["RASCUNHO", "ATIVO", "INATIVO", "ARQUIVADO"];
@@ -165,6 +169,20 @@ export class StructureItemDto {
   @IsInt()
   scaleMax?: number;
 
+  @IsOptional()
+  @IsString()
+  scaleMinLabel?: string;
+
+  @IsOptional()
+  @IsString()
+  scaleMaxLabel?: string;
+
+  /** Linhas da grade (tipo GRADE); as colunas ficam em `options`. */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  rows?: string[];
+
   /** Chave da pergunta que condiciona esta (ela precisa vir antes). */
   @IsOptional()
   @IsString()
@@ -189,6 +207,14 @@ export class StructureItemDto {
 
 /** Estrutura completa do modelo: seções e perguntas na ordem em que devem aparecer. */
 export class ReplaceChecklistStructureDto {
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => StructureSectionDto)

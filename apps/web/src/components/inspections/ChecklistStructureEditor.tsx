@@ -1,13 +1,13 @@
 import { useState } from "react";
-import { ArrowDown, ArrowUp, MessageSquare, Paperclip, Plus, Trash2, TriangleAlert } from "lucide-react";
+import { ArrowDown, ArrowUp, Copy, GripVertical, MessageSquare, Paperclip, Plus, Star, Trash2, TriangleAlert, X } from "lucide-react";
 import { api } from "../../lib/api";
 import type { InspectionItemType, InspectionTemplate } from "../../lib/types";
 import {
+  EXTRA_RESPONSE_TYPES,
   RESPONSE_TYPES,
   conditionChoices,
   groupBySection,
   hasOptions,
-  isEvaluative,
   responseTypeLabel,
 } from "../../lib/checklist-config";
 
@@ -25,6 +25,9 @@ interface DraftItem {
   instruction: string;
   responseType: InspectionItemType;
   options: string[];
+  rows: string[];
+  scaleMinLabel: string;
+  scaleMaxLabel: string;
   required: boolean;
   weight: string;
   allowComment: boolean;
@@ -48,11 +51,14 @@ function blankItem(sectionKey: string): DraftItem {
     sectionKey,
     text: "",
     instruction: "",
-    responseType: "CONFORME_NAO_CONFORME",
-    options: [],
+    responseType: "SELECAO_UNICA",
+    options: ["Opção 1", "Opção 2"],
+    rows: [],
+    scaleMinLabel: "",
+    scaleMaxLabel: "",
     required: false,
     weight: "",
-    allowComment: true,
+    allowComment: false,
     allowPhoto: false,
     allowActionPlan: false,
     scaleMin: 1,
@@ -80,6 +86,9 @@ function fromTemplate(template: InspectionTemplate): { sections: DraftSection[];
       instruction: it.instruction ?? "",
       responseType: it.responseType,
       options: it.options,
+      rows: it.rows ?? [],
+      scaleMinLabel: it.scaleMinLabel ?? "",
+      scaleMaxLabel: it.scaleMaxLabel ?? "",
       required: it.required,
       weight: it.weight === null ? "" : String(it.weight),
       allowComment: it.allowComment,
@@ -97,7 +106,21 @@ function fromTemplate(template: InspectionTemplate): { sections: DraftSection[];
   return { sections, items };
 }
 
-/** Aba ESTRUTURA: seções e perguntas do checklist. */
+const usesOptions = (type: InspectionItemType) => hasOptions(type) || type === "GRADE";
+
+/** Textos de apoio por tipo, quando a configuração é só uma amostra do campo. */
+function switchType(item: DraftItem, responseType: InspectionItemType): Partial<DraftItem> {
+  const change: Partial<DraftItem> = { responseType };
+  if (usesOptions(responseType) && item.options.filter((o) => o.trim()).length < 2) {
+    change.options = responseType === "GRADE" ? ["Coluna 1", "Coluna 2"] : ["Opção 1", "Opção 2"];
+  }
+  if (responseType === "GRADE" && item.rows.length === 0) change.rows = ["Linha 1"];
+  if (responseType === "ESCALA" && item.scaleMax <= item.scaleMin) change.scaleMax = 5;
+  if (responseType === "UPLOAD") change.allowPhoto = true;
+  return change;
+}
+
+/** Aba ESTRUTURA: título, descrição e itens do checklist, no estilo de um formulário. */
 export function ChecklistStructureEditor({
   template,
   onSaved,
@@ -106,27 +129,42 @@ export function ChecklistStructureEditor({
   onSaved: (updated: InspectionTemplate, versionedFrom?: InspectionTemplate) => void;
 }) {
   const initial = fromTemplate(template);
+  // Os itens ficam numa lista única; as seções (modelos antigos) continuam existindo por baixo, sem aparecer na tela.
   const [sections, setSections] = useState<DraftSection[]>(initial.sections);
   const [items, setItems] = useState<DraftItem[]>(initial.items);
+  const [title, setTitle] = useState(template.name);
+  const [description, setDescription] = useState(template.description ?? "");
+  const [activeKey, setActiveKey] = useState<string | null>(initial.items[0]?.key ?? null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
 
   const dirty = () => setNotice(null);
 
+  /** Ordem final: seções na ordem da tela, e os itens de cada uma na ordem em que estão. */
+  const ordered = (): DraftItem[] => sections.flatMap((s) => items.filter((i) => i.sectionKey === s.key));
+  const list = ordered();
+
   function patchItem(key: string, change: Partial<DraftItem>) {
     dirty();
     setItems((prev) => prev.map((it) => (it.key === key ? { ...it, ...change } : it)));
   }
-  function moveSection(index: number, dir: -1 | 1) {
+  function addItem() {
     dirty();
-    setSections((prev) => {
-      const t = index + dir;
-      if (t < 0 || t >= prev.length) return prev;
+    const item = blankItem(sections[sections.length - 1]!.key);
+    setItems((prev) => [...prev, item]);
+    setActiveKey(item.key);
+  }
+  function duplicateItem(item: DraftItem) {
+    dirty();
+    const copy: DraftItem = { ...item, key: nextKey("q"), id: undefined, text: item.text, conditionKey: item.conditionKey };
+    setItems((prev) => {
+      const at = prev.findIndex((i) => i.key === item.key);
       const next = [...prev];
-      [next[index], next[t]] = [next[t]!, next[index]!];
+      next.splice(at + 1, 0, copy);
       return next;
     });
+    setActiveKey(copy.key);
   }
   function moveItem(key: string, dir: -1 | 1) {
     dirty();
@@ -143,45 +181,46 @@ export function ChecklistStructureEditor({
       return next;
     });
   }
-  function removeSection(section: DraftSection) {
-    const count = items.filter((i) => i.sectionKey === section.key).length;
-    const msg = count
-      ? `Excluir a seção "${section.name}" e as ${count} pergunta(s) dela?`
-      : `Excluir a seção "${section.name}"?`;
-    if (!window.confirm(msg)) return;
-    dirty();
-    setSections((prev) => prev.filter((s) => s.key !== section.key));
-    setItems((prev) => prev.filter((i) => i.sectionKey !== section.key));
-  }
   function removeItem(item: DraftItem) {
-    if (!window.confirm("Excluir esta pergunta?")) return;
+    if (!window.confirm("Excluir este item?")) return;
     dirty();
     setItems((prev) =>
       prev.filter((i) => i.key !== item.key).map((i) => (i.conditionKey === item.key ? { ...i, conditionKey: "" } : i)),
     );
-  }
-
-  /** Ordem final: seções na ordem da tela, e as perguntas de cada uma na ordem em que estão. */
-  function orderedItems(): DraftItem[] {
-    return sections.flatMap((s) => items.filter((i) => i.sectionKey === s.key));
+    setActiveKey(null);
   }
 
   async function handleSave() {
     setError(null);
-    const flat = orderedItems();
-    const blankSection = sections.findIndex((s) => !s.name.trim());
-    if (blankSection >= 0) return setError(`Dê um nome à seção ${blankSection + 1}.`);
+    const flat = ordered();
+    if (title.trim().length < 2) return setError("Escreva o nome do checklist em “Formulário sem título”.");
     const noText = flat.findIndex((i) => i.text.trim().length < 2);
-    if (noText >= 0) return setError(`Escreva o enunciado da pergunta ${noText + 1}.`);
-    const badChoice = flat.findIndex((i) => hasOptions(i.responseType) && i.options.filter((o) => o.trim()).length < 2);
-    if (badChoice >= 0) return setError(`A pergunta ${badChoice + 1} precisa de pelo menos 2 opções.`);
+    if (noText >= 0) {
+      setActiveKey(flat[noText]!.key);
+      return setError(`Escreva o texto do item ${noText + 1}.`);
+    }
+    const badChoice = flat.findIndex((i) => usesOptions(i.responseType) && i.options.filter((o) => o.trim()).length < 2);
+    if (badChoice >= 0) {
+      setActiveKey(flat[badChoice]!.key);
+      return setError(`O item ${badChoice + 1} precisa de pelo menos 2 ${flat[badChoice]!.responseType === "GRADE" ? "colunas" : "opções"}.`);
+    }
+    const badRows = flat.findIndex((i) => i.responseType === "GRADE" && i.rows.filter((o) => o.trim()).length < 1);
+    if (badRows >= 0) {
+      setActiveKey(flat[badRows]!.key);
+      return setError(`O item ${badRows + 1} precisa de pelo menos 1 linha.`);
+    }
     const badScale = flat.findIndex((i) => i.responseType === "ESCALA" && i.scaleMax <= i.scaleMin);
-    if (badScale >= 0) return setError(`Na pergunta ${badScale + 1}, o máximo da escala deve ser maior que o mínimo.`);
+    if (badScale >= 0) {
+      setActiveKey(flat[badScale]!.key);
+      return setError(`No item ${badScale + 1}, o máximo da escala deve ser maior que o mínimo.`);
+    }
 
     setSaving(true);
     try {
       const updated = await api.put<InspectionTemplate>(`/field-ops/inspection-templates/${template.id}/structure`, {
-        sections: sections.map((s) => ({ key: s.key, id: s.id, name: s.name.trim() })),
+        name: title.trim(),
+        description: description.trim(),
+        sections: sections.map((s) => ({ key: s.key, id: s.id, name: s.name.trim() || "Geral" })),
         items: flat.map((i) => ({
           key: i.key,
           id: i.id,
@@ -189,14 +228,17 @@ export function ChecklistStructureEditor({
           text: i.text.trim(),
           instruction: i.instruction.trim() || undefined,
           responseType: i.responseType,
-          options: hasOptions(i.responseType) ? i.options.map((o) => o.trim()).filter(Boolean) : undefined,
+          options: usesOptions(i.responseType) ? i.options.map((o) => o.trim()).filter(Boolean) : undefined,
+          rows: i.responseType === "GRADE" ? i.rows.map((o) => o.trim()).filter(Boolean) : undefined,
           required: i.required,
           weight: i.weight.trim() === "" ? undefined : Math.max(0, Math.round(Number(i.weight) || 0)),
           allowComment: i.allowComment,
-          allowPhoto: i.allowPhoto,
-          allowActionPlan: isEvaluative(i.responseType) ? i.allowActionPlan : false,
+          allowPhoto: i.responseType === "UPLOAD" ? true : i.allowPhoto,
+          allowActionPlan: i.allowActionPlan,
           scaleMin: i.responseType === "ESCALA" ? i.scaleMin : undefined,
-          scaleMax: i.responseType === "ESCALA" ? i.scaleMax : undefined,
+          scaleMax: i.responseType === "ESCALA" || i.responseType === "CLASSIFICACAO" ? i.scaleMax : undefined,
+          scaleMinLabel: i.responseType === "ESCALA" ? i.scaleMinLabel.trim() || undefined : undefined,
+          scaleMaxLabel: i.responseType === "ESCALA" ? i.scaleMaxLabel.trim() || undefined : undefined,
           conditionKey: i.conditionKey || undefined,
           conditionOperator: i.conditionKey ? i.conditionOperator : undefined,
           conditionValue: i.conditionKey ? i.conditionValue : undefined,
@@ -207,6 +249,7 @@ export function ChecklistStructureEditor({
       const fresh = fromTemplate(updated);
       setSections(fresh.sections);
       setItems(fresh.items);
+      setActiveKey(null);
       setNotice(
         updated.id !== template.id
           ? `Estrutura salva. Como este modelo já foi aplicado, foi criada a versão ${updated.version} — as aplicações anteriores continuam na versão ${template.version}.`
@@ -221,79 +264,61 @@ export function ChecklistStructureEditor({
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="mx-auto flex w-full max-w-3xl flex-col gap-4">
       {template.status === "ATIVO" && (template._count?.inspections ?? 0) > 0 && (
         <p className="rounded-md border-l-2 border-amber bg-amber-tint px-3 py-2 text-sm text-ink">
           Este modelo já foi aplicado. Ao salvar, será criada uma <strong>nova versão</strong> para as próximas aplicações — as aplicações já feitas não mudam.
         </p>
       )}
 
-      {sections.map((section, sIndex) => {
-        const sectionItems = items.filter((i) => i.sectionKey === section.key);
-        return (
-          <section key={section.key} className="rounded-lg border border-line">
-            <div className="flex flex-wrap items-center gap-2 border-b border-line bg-paper px-4 py-3">
-              <span className="font-mono text-[10px] font-semibold uppercase tracking-wide text-teal-deep">Seção {sIndex + 1}</span>
-              <input
-                className="input min-w-[180px] flex-1"
-                value={section.name}
-                aria-label={`Nome da seção ${sIndex + 1}`}
-                onChange={(e) => {
-                  dirty();
-                  setSections((prev) => prev.map((s) => (s.key === section.key ? { ...s, name: e.target.value } : s)));
-                }}
-              />
-              <button type="button" onClick={() => moveSection(sIndex, -1)} disabled={sIndex === 0} title="Subir seção" className="p-1 text-ink-muted hover:text-ink disabled:opacity-30">
-                <ArrowUp size={15} />
-              </button>
-              <button type="button" onClick={() => moveSection(sIndex, 1)} disabled={sIndex === sections.length - 1} title="Descer seção" className="p-1 text-ink-muted hover:text-ink disabled:opacity-30">
-                <ArrowDown size={15} />
-              </button>
-              <button type="button" onClick={() => removeSection(section)} disabled={sections.length === 1} title="Excluir seção" className="p-1 text-ink-muted hover:text-danger disabled:opacity-30">
-                <Trash2 size={15} />
-              </button>
-            </div>
+      <div className="panel flex flex-col gap-2 p-5">
+        <input
+          className="w-full border-0 border-b border-line bg-transparent pb-2 font-display text-2xl font-semibold text-ink outline-none placeholder:text-ink-muted focus:border-teal"
+          placeholder="Formulário sem título"
+          aria-label="Nome do checklist"
+          maxLength={255}
+          value={title}
+          onChange={(e) => {
+            dirty();
+            setTitle(e.target.value);
+          }}
+        />
+        <textarea
+          className="min-h-[56px] w-full resize-y border-0 border-b border-line bg-transparent pb-2 text-sm text-ink outline-none placeholder:text-ink-muted focus:border-teal"
+          placeholder="Descrição do formulário"
+          aria-label="Descrição do checklist"
+          maxLength={5000}
+          value={description}
+          onChange={(e) => {
+            dirty();
+            setDescription(e.target.value);
+          }}
+        />
+      </div>
 
-            <div className="flex flex-col gap-3 p-4">
-              {sectionItems.length === 0 && <p className="text-sm text-ink-muted">Nenhuma pergunta nesta seção.</p>}
-              {sectionItems.map((item, qIndex) => (
-                <QuestionCard
-                  key={item.key}
-                  number={orderedItems().findIndex((i) => i.key === item.key) + 1}
-                  item={item}
-                  sections={sections}
-                  previous={orderedItems().slice(0, orderedItems().findIndex((i) => i.key === item.key))}
-                  canUp={qIndex > 0}
-                  canDown={qIndex < sectionItems.length - 1}
-                  onChange={(change) => patchItem(item.key, change)}
-                  onMove={(dir) => moveItem(item.key, dir)}
-                  onRemove={() => removeItem(item)}
-                />
-              ))}
-              <button
-                type="button"
-                onClick={() => {
-                  dirty();
-                  setItems((prev) => [...prev, blankItem(section.key)]);
-                }}
-                className="flex w-fit items-center gap-1.5 rounded-md border border-line px-3 py-2 text-sm font-medium text-teal-deep hover:bg-teal-tint"
-              >
-                <Plus size={15} /> Adicionar pergunta
-              </button>
-            </div>
-          </section>
-        );
-      })}
+      {list.map((item, index) => (
+        <ItemCard
+          key={item.key}
+          number={index + 1}
+          item={item}
+          active={activeKey === item.key}
+          previous={list.slice(0, index)}
+          canUp={index > 0}
+          canDown={index < list.length - 1}
+          onActivate={() => setActiveKey(item.key)}
+          onChange={(change) => patchItem(item.key, change)}
+          onMove={(dir) => moveItem(item.key, dir)}
+          onDuplicate={() => duplicateItem(item)}
+          onRemove={() => removeItem(item)}
+        />
+      ))}
 
       <button
         type="button"
-        onClick={() => {
-          dirty();
-          setSections((prev) => [...prev, { key: nextKey("s"), name: `Seção ${prev.length + 1}` }]);
-        }}
-        className="flex w-fit items-center gap-1.5 rounded-md border border-line px-3 py-2 text-sm font-medium text-teal-deep hover:bg-teal-tint"
+        onClick={addItem}
+        className="flex w-fit items-center gap-1.5 rounded-md border border-line bg-paper-raised px-4 py-2.5 text-sm font-medium text-teal-deep hover:bg-teal-tint"
       >
-        <Plus size={15} /> Adicionar seção
+        <Plus size={16} /> Adicionar item
       </button>
 
       {error && <p className="text-sm text-amber" role="alert">{error}</p>}
@@ -313,202 +338,326 @@ const chip = (on: boolean) =>
     on ? "border-teal bg-teal-tint text-teal-deep" : "border-line bg-paper-raised text-ink-muted hover:text-ink"
   }`;
 
-function QuestionCard({
+function ItemCard({
   number,
   item,
-  sections,
+  active,
   previous,
   canUp,
   canDown,
+  onActivate,
   onChange,
   onMove,
+  onDuplicate,
   onRemove,
 }: {
   number: number;
   item: DraftItem;
-  sections: DraftSection[];
+  active: boolean;
   previous: DraftItem[];
   canUp: boolean;
   canDown: boolean;
+  onActivate: () => void;
   onChange: (change: Partial<DraftItem>) => void;
   onMove: (dir: -1 | 1) => void;
+  onDuplicate: () => void;
   onRemove: () => void;
 }) {
+  const [more, setMore] = useState(Boolean(item.weight || item.conditionKey));
+
+  if (!active) {
+    return (
+      <button
+        type="button"
+        onClick={onActivate}
+        className="card w-full text-left transition-colors hover:border-teal"
+        aria-label={`Editar item ${number}`}
+      >
+        <p className="font-mono text-[10px] font-semibold uppercase tracking-wide text-teal-deep">Item {number}</p>
+        <p className="mt-1 text-sm font-medium text-ink">
+          {item.text.trim() || <span className="text-ink-muted">(sem texto)</span>}
+          {item.required && <span className="ml-1 text-danger">*</span>}
+        </p>
+        {item.instruction.trim() && <p className="text-xs text-ink-muted">{item.instruction}</p>}
+        <p className="mt-1 text-[11px] text-ink-muted">
+          {responseTypeLabel(item.responseType)}
+          {item.allowComment ? " · comentário" : ""}
+          {item.allowActionPlan ? " · plano de ação" : ""}
+          {item.allowPhoto && item.responseType !== "UPLOAD" ? " · anexo" : ""}
+        </p>
+      </button>
+    );
+  }
+
   const condParent = previous.find((p) => p.key === item.conditionKey);
   const choices = condParent ? conditionChoices({ responseType: condParent.responseType, options: condParent.options.filter((o) => o.trim()) }) : null;
-  const isLegacy = !RESPONSE_TYPES.some((t) => t.value === item.responseType);
+  const isExtra = EXTRA_RESPONSE_TYPES.some((t) => t.value === item.responseType);
+  const isLegacy = !RESPONSE_TYPES.some((t) => t.value === item.responseType) && !isExtra;
 
   return (
-    <div className="rounded-lg border border-line bg-paper-raised">
-      <div className="flex items-center justify-between border-b border-line px-4 py-2">
-        <p className="font-mono text-xs font-semibold uppercase tracking-wide text-teal-deep">Pergunta {number}</p>
-        <div className="flex items-center gap-1 text-ink-muted">
-          <button type="button" onClick={() => onMove(-1)} disabled={!canUp} title="Subir pergunta" className="p-1 hover:text-ink disabled:opacity-30"><ArrowUp size={15} /></button>
-          <button type="button" onClick={() => onMove(1)} disabled={!canDown} title="Descer pergunta" className="p-1 hover:text-ink disabled:opacity-30"><ArrowDown size={15} /></button>
-          <button type="button" onClick={onRemove} title="Excluir pergunta" className="p-1 hover:text-danger"><Trash2 size={15} /></button>
-        </div>
+    <div className="panel flex flex-col gap-4 p-5" aria-label={`Item ${number}`}>
+      <div className="flex items-center justify-between">
+        <p className="font-mono text-xs font-semibold uppercase tracking-wide text-teal-deep">Item {number}</p>
+        <GripVertical size={16} className="text-ink-muted" aria-hidden />
       </div>
 
-      <div className="flex flex-col gap-4 p-4">
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-ink-muted">Enunciado da pergunta *</span>
-          <input className="input" value={item.text} onChange={(e) => onChange({ text: e.target.value })} placeholder="Digite a pergunta ou o que será verificado" />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-ink-muted">Instrução ou orientação</span>
-          <textarea className="input min-h-[60px] resize-y" value={item.instruction} onChange={(e) => onChange({ instruction: e.target.value })} placeholder="Opcional — ajuda quem vai responder" />
-        </label>
+      <div className="flex flex-col gap-3 sm:flex-row">
+        <input
+          className="input flex-[2]"
+          placeholder="Item"
+          aria-label="Item"
+          value={item.text}
+          onChange={(e) => onChange({ text: e.target.value })}
+        />
+        <select
+          className="input flex-1"
+          aria-label="Tipo"
+          value={item.responseType}
+          onChange={(e) => onChange(switchType(item, e.target.value as InspectionItemType))}
+        >
+          {isLegacy && <option value={item.responseType}>{responseTypeLabel(item.responseType)}</option>}
+          {RESPONSE_TYPES.map((t) => (
+            <option key={t.value} value={t.value}>{t.label}</option>
+          ))}
+          <optgroup label="Avaliação e outros">
+            {EXTRA_RESPONSE_TYPES.map((t) => (
+              <option key={t.value} value={t.value}>{t.label}</option>
+            ))}
+          </optgroup>
+        </select>
+      </div>
+      <input
+        className="input"
+        placeholder="Subitem"
+        aria-label="Subitem"
+        value={item.instruction}
+        onChange={(e) => onChange({ instruction: e.target.value })}
+      />
 
-        <div className="flex flex-wrap gap-3">
-          <label className="flex min-w-[240px] flex-1 flex-col gap-1 text-sm">
-            <span className="text-ink-muted">Tipo de resposta</span>
-            <select
-              className="input"
-              value={item.responseType}
-              onChange={(e) => onChange({ responseType: e.target.value as InspectionItemType, allowActionPlan: false })}
-            >
-              {isLegacy && <option value={item.responseType}>{responseTypeLabel(item.responseType)}</option>}
-              {RESPONSE_TYPES.map((t) => (
-                <option key={t.value} value={t.value}>{t.label}</option>
-              ))}
-            </select>
-          </label>
-          <label className="flex w-36 flex-col gap-1 text-sm">
-            <span className="text-ink-muted">Peso / pontuação</span>
-            <input type="number" min={0} step={1} className="input" value={item.weight} onChange={(e) => onChange({ weight: e.target.value })} placeholder="Opcional" />
-          </label>
-          <label className="flex w-48 flex-col gap-1 text-sm">
-            <span className="text-ink-muted">Seção</span>
-            <select className="input" value={item.sectionKey} onChange={(e) => onChange({ sectionKey: e.target.value })}>
-              {sections.map((s) => (
-                <option key={s.key} value={s.key}>{s.name || "Sem nome"}</option>
-              ))}
-            </select>
-          </label>
-        </div>
+      <TypeConfig item={item} onChange={onChange} />
 
-        {hasOptions(item.responseType) && (
-          <OptionsEditor
-            options={item.options}
-            multiple={item.responseType === "SELECAO_MULTIPLA"}
-            onChange={(options) => onChange({ options })}
-          />
-        )}
-
-        {item.responseType === "ESCALA" && (
-          <div className="flex flex-wrap items-end gap-3">
-            <label className="flex w-28 flex-col gap-1 text-sm">
-              <span className="text-ink-muted">Mínimo</span>
-              <input type="number" className="input" value={item.scaleMin} onChange={(e) => onChange({ scaleMin: Number(e.target.value) })} />
-            </label>
-            <label className="flex w-28 flex-col gap-1 text-sm">
-              <span className="text-ink-muted">Máximo</span>
-              <input type="number" className="input" value={item.scaleMax} onChange={(e) => onChange({ scaleMax: Number(e.target.value) })} />
-            </label>
-            <p className="pb-2 text-xs text-ink-muted">De {item.scaleMin} a {item.scaleMax}.</p>
-          </div>
-        )}
-
-        <div className="flex flex-col gap-2">
-          <p className="text-sm font-semibold text-ink">Opções da resposta</p>
-          <div className="flex flex-wrap gap-2">
-            <button type="button" className={chip(item.required)} aria-pressed={item.required} onClick={() => onChange({ required: !item.required })}>
-              Resposta obrigatória
-            </button>
-            <button type="button" className={chip(item.allowComment)} aria-pressed={item.allowComment} onClick={() => onChange({ allowComment: !item.allowComment })}>
-              <MessageSquare size={14} /> Comentário
-            </button>
+      <div className="flex flex-col gap-2">
+        <p className="text-sm font-semibold text-ink">Selecione os complementos desejados.</p>
+        <div className="flex flex-wrap gap-2">
+          <button type="button" className={chip(item.allowComment)} aria-pressed={item.allowComment} onClick={() => onChange({ allowComment: !item.allowComment })}>
+            <MessageSquare size={14} /> Comentário
+          </button>
+          <button type="button" className={chip(item.allowActionPlan)} aria-pressed={item.allowActionPlan} onClick={() => onChange({ allowActionPlan: !item.allowActionPlan })}>
+            <TriangleAlert size={14} /> Plano de ação
+          </button>
+          {item.responseType !== "UPLOAD" && (
             <button type="button" className={chip(item.allowPhoto)} aria-pressed={item.allowPhoto} onClick={() => onChange({ allowPhoto: !item.allowPhoto })}>
-              <Paperclip size={14} /> Foto ou arquivo
+              <Paperclip size={14} /> Anexo
             </button>
-            {isEvaluative(item.responseType) && (
-              <button type="button" className={chip(item.allowActionPlan)} aria-pressed={item.allowActionPlan} onClick={() => onChange({ allowActionPlan: !item.allowActionPlan })}>
-                <TriangleAlert size={14} /> Não conformidade / Plano de ação
-              </button>
-            )}
-          </div>
-        </div>
-
-        <div className="flex flex-col gap-2 rounded-md bg-paper p-3">
-          <p className="text-sm font-semibold text-ink">Regra condicional</p>
-          {previous.length === 0 ? (
-            <p className="text-xs text-ink-muted">Disponível a partir da segunda pergunta.</p>
-          ) : (
-            <div className="flex flex-wrap items-end gap-2 text-sm">
-              <label className="flex min-w-[220px] flex-1 flex-col gap-1">
-                <span className="text-ink-muted">Mostrar esta pergunta somente se a pergunta…</span>
-                <select
-                  className="input"
-                  value={item.conditionKey}
-                  onChange={(e) => onChange({ conditionKey: e.target.value, conditionValue: "", conditionOperator: "IGUAL" })}
-                >
-                  <option value="">Sempre mostrar</option>
-                  {previous.map((p, i) => (
-                    <option key={p.key} value={p.key}>
-                      {i + 1}. {p.text.trim() || "(sem enunciado)"}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              {item.conditionKey && (
-                <>
-                  <label className="flex w-40 flex-col gap-1">
-                    <span className="text-ink-muted">for</span>
-                    <select className="input" value={item.conditionOperator} onChange={(e) => onChange({ conditionOperator: e.target.value as "IGUAL" | "DIFERENTE" })}>
-                      <option value="IGUAL">igual a</option>
-                      <option value="DIFERENTE">diferente de</option>
-                    </select>
-                  </label>
-                  <label className="flex min-w-[160px] flex-1 flex-col gap-1">
-                    <span className="text-ink-muted">Resposta</span>
-                    {choices ? (
-                      <select className="input" value={item.conditionValue} onChange={(e) => onChange({ conditionValue: e.target.value })}>
-                        <option value="">Escolha…</option>
-                        {choices.map((c) => (
-                          <option key={c.value} value={c.value}>{c.label}</option>
-                        ))}
-                      </select>
-                    ) : (
-                      <input className="input" value={item.conditionValue} onChange={(e) => onChange({ conditionValue: e.target.value })} />
-                    )}
-                  </label>
-                </>
-              )}
-            </div>
           )}
         </div>
       </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-line pt-3">
+        <div className="flex items-center gap-3">
+          <label className="flex items-center gap-2 text-sm text-ink">
+            <input type="checkbox" checked={item.required} onChange={(e) => onChange({ required: e.target.checked })} /> Obrigatório
+          </label>
+          <button type="button" onClick={() => setMore((m) => !m)} className="text-sm font-medium text-teal-deep hover:underline" aria-expanded={more}>
+            Mais opções
+          </button>
+        </div>
+        <div className="flex items-center gap-1 text-ink-muted">
+          <button type="button" onClick={() => onMove(-1)} disabled={!canUp} title="Subir item" className="p-1.5 hover:text-ink disabled:opacity-30"><ArrowUp size={16} /></button>
+          <button type="button" onClick={() => onMove(1)} disabled={!canDown} title="Descer item" className="p-1.5 hover:text-ink disabled:opacity-30"><ArrowDown size={16} /></button>
+          <button type="button" onClick={onDuplicate} title="Duplicar item" className="p-1.5 hover:text-ink"><Copy size={16} /></button>
+          <button type="button" onClick={onRemove} title="Excluir item" className="p-1.5 hover:text-danger"><Trash2 size={16} /></button>
+        </div>
+      </div>
+
+      {more && (
+        <div className="flex flex-col gap-3 rounded-md bg-paper p-3">
+          <label className="flex w-40 flex-col gap-1 text-sm">
+            <span className="text-ink-muted">Peso / pontuação</span>
+            <input type="number" min={0} step={1} className="input" value={item.weight} onChange={(e) => onChange({ weight: e.target.value })} placeholder="Opcional" />
+          </label>
+          <div className="flex flex-col gap-2">
+            <p className="text-sm font-semibold text-ink">Regra condicional</p>
+            {previous.length === 0 ? (
+              <p className="text-xs text-ink-muted">Disponível a partir do segundo item.</p>
+            ) : (
+              <div className="flex flex-wrap items-end gap-2 text-sm">
+                <label className="flex min-w-[220px] flex-1 flex-col gap-1">
+                  <span className="text-ink-muted">Mostrar este item somente se o item…</span>
+                  <select
+                    className="input"
+                    value={item.conditionKey}
+                    onChange={(e) => onChange({ conditionKey: e.target.value, conditionValue: "", conditionOperator: "IGUAL" })}
+                  >
+                    <option value="">Sempre mostrar</option>
+                    {previous.map((p, i) => (
+                      <option key={p.key} value={p.key}>
+                        {i + 1}. {p.text.trim() || "(sem texto)"}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                {item.conditionKey && (
+                  <>
+                    <label className="flex w-40 flex-col gap-1">
+                      <span className="text-ink-muted">for</span>
+                      <select className="input" value={item.conditionOperator} onChange={(e) => onChange({ conditionOperator: e.target.value as "IGUAL" | "DIFERENTE" })}>
+                        <option value="IGUAL">igual a</option>
+                        <option value="DIFERENTE">diferente de</option>
+                      </select>
+                    </label>
+                    <label className="flex min-w-[160px] flex-1 flex-col gap-1">
+                      <span className="text-ink-muted">Resposta</span>
+                      {choices ? (
+                        <select className="input" value={item.conditionValue} onChange={(e) => onChange({ conditionValue: e.target.value })}>
+                          <option value="">Escolha…</option>
+                          {choices.map((c) => (
+                            <option key={c.value} value={c.value}>{c.label}</option>
+                          ))}
+                        </select>
+                      ) : (
+                        <input className="input" value={item.conditionValue} onChange={(e) => onChange({ conditionValue: e.target.value })} />
+                      )}
+                    </label>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
 
-function OptionsEditor({ options, multiple, onChange }: { options: string[]; multiple: boolean; onChange: (options: string[]) => void }) {
-  function move(i: number, dir: -1 | 1) {
-    const t = i + dir;
-    if (t < 0 || t >= options.length) return;
-    const next = [...options];
-    [next[i], next[t]] = [next[t]!, next[i]!];
-    onChange(next);
+/** Configuração própria de cada tipo, no formato em que quem responde vai ver. */
+function TypeConfig({ item, onChange }: { item: DraftItem; onChange: (change: Partial<DraftItem>) => void }) {
+  const ghost = "input pointer-events-none opacity-60";
+  switch (item.responseType) {
+    case "TEXTO_CURTO":
+      return <input className={`${ghost} w-full sm:w-1/2`} disabled placeholder="Texto de resposta curta" aria-hidden />;
+    case "TEXTO_LONGO":
+    case "TEXTO_LIVRE":
+      return <textarea className={`${ghost} w-full`} rows={3} disabled placeholder="Texto de resposta longa" aria-hidden />;
+    case "NUMERO":
+    case "NOTA":
+      return <input className={`${ghost} w-40`} disabled placeholder="Número" aria-hidden />;
+    case "DATA":
+      return <input type="date" className={`${ghost} w-48`} disabled aria-hidden />;
+    case "HORA":
+      return <input type="time" className={`${ghost} w-40`} disabled aria-hidden />;
+    case "UPLOAD":
+      return (
+        <p className="rounded-md border border-dashed border-line px-3 py-4 text-sm text-ink-muted">
+          Quem responder poderá enviar um arquivo (foto, PDF, documento).
+        </p>
+      );
+    case "SELECAO_UNICA":
+      return <ListEditor label="Opção" values={item.options} marker="radio" onChange={(options) => onChange({ options })} />;
+    case "SELECAO_MULTIPLA":
+      return <ListEditor label="Opção" values={item.options} marker="checkbox" onChange={(options) => onChange({ options })} />;
+    case "LISTA_SUSPENSA":
+      return <ListEditor label="Opção" values={item.options} marker="number" onChange={(options) => onChange({ options })} />;
+    case "ESCALA":
+      return (
+        <div className="flex flex-col gap-3 text-sm">
+          <div className="flex flex-wrap items-center gap-2 text-ink">
+            <select className="input w-20" aria-label="Início da escala" value={item.scaleMin} onChange={(e) => onChange({ scaleMin: Number(e.target.value) })}>
+              {[0, 1].map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
+            <span>até</span>
+            <select className="input w-20" aria-label="Fim da escala" value={item.scaleMax} onChange={(e) => onChange({ scaleMax: Number(e.target.value) })}>
+              {Array.from({ length: 9 }, (_, i) => i + 2).map((n) => (
+                <option key={n} value={n}>{n}</option>
+              ))}
+            </select>
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-4 text-ink-muted">{item.scaleMin}</span>
+            <input className="input flex-1" placeholder="Rótulo (opcional)" aria-label="Rótulo do início" value={item.scaleMinLabel} onChange={(e) => onChange({ scaleMinLabel: e.target.value })} />
+          </div>
+          <div className="flex items-center gap-2">
+            <span className="w-4 text-ink-muted">{item.scaleMax}</span>
+            <input className="input flex-1" placeholder="Rótulo (opcional)" aria-label="Rótulo do fim" value={item.scaleMaxLabel} onChange={(e) => onChange({ scaleMaxLabel: e.target.value })} />
+          </div>
+        </div>
+      );
+    case "CLASSIFICACAO":
+      return (
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <select className="input w-24" aria-label="Quantidade de estrelas" value={item.scaleMax} onChange={(e) => onChange({ scaleMax: Number(e.target.value) })}>
+            {Array.from({ length: 8 }, (_, i) => i + 3).map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+          <div className="flex gap-1 text-line-strong" aria-hidden>
+            {Array.from({ length: item.scaleMax }, (_, i) => (
+              <Star key={i} size={22} />
+            ))}
+          </div>
+        </div>
+      );
+    case "GRADE":
+      return (
+        <div className="grid gap-4 sm:grid-cols-2">
+          <ListEditor label="Linha" title="Linhas" values={item.rows} marker="number" min={1} onChange={(rows) => onChange({ rows })} />
+          <ListEditor label="Coluna" title="Colunas" values={item.options} marker="radio" onChange={(options) => onChange({ options })} />
+        </div>
+      );
+    case "CONFORME_NAO_CONFORME":
+      return <p className="text-sm text-ink-muted">Respostas: Conforme, Não conforme ou Não aplicável.</p>;
+    case "SIM_NAO":
+      return <p className="text-sm text-ink-muted">Respostas: Sim ou Não.</p>;
+    default:
+      return null;
   }
+}
+
+function ListEditor({
+  label,
+  title,
+  values,
+  marker,
+  min = 2,
+  onChange,
+}: {
+  label: string;
+  title?: string;
+  values: string[];
+  marker: "radio" | "checkbox" | "number";
+  min?: number;
+  onChange: (values: string[]) => void;
+}) {
   return (
     <div className="flex flex-col gap-2">
-      <p className="text-sm text-ink-muted">Opções ({multiple ? "pode marcar várias" : "marca uma só"}) — mínimo de 2</p>
-      {options.map((opt, i) => (
+      {title && <p className="text-sm font-medium text-ink">{title}</p>}
+      {values.map((value, i) => (
         <div key={i} className="flex items-center gap-2">
+          <span className="flex w-5 justify-center text-xs text-ink-muted" aria-hidden>
+            {marker === "number" ? `${i + 1}.` : <input type={marker} disabled className="pointer-events-none" tabIndex={-1} />}
+          </span>
           <input
             className="input flex-1"
-            value={opt}
-            placeholder={`Opção ${i + 1}`}
-            aria-label={`Opção ${i + 1}`}
-            onChange={(e) => onChange(options.map((o, j) => (j === i ? e.target.value : o)))}
+            value={value}
+            placeholder={`${label} ${i + 1}`}
+            aria-label={`${label} ${i + 1}`}
+            onChange={(e) => onChange(values.map((o, j) => (j === i ? e.target.value : o)))}
           />
-          <button type="button" onClick={() => move(i, -1)} disabled={i === 0} title="Subir opção" className="p-1 text-ink-muted hover:text-ink disabled:opacity-30"><ArrowUp size={15} /></button>
-          <button type="button" onClick={() => move(i, 1)} disabled={i === options.length - 1} title="Descer opção" className="p-1 text-ink-muted hover:text-ink disabled:opacity-30"><ArrowDown size={15} /></button>
-          <button type="button" onClick={() => onChange(options.filter((_, j) => j !== i))} title="Excluir opção" className="p-1 text-ink-muted hover:text-danger"><Trash2 size={15} /></button>
+          <button
+            type="button"
+            onClick={() => onChange(values.filter((_, j) => j !== i))}
+            disabled={values.length <= min}
+            title={`Remover ${label.toLowerCase()}`}
+            className="p-1 text-ink-muted hover:text-danger disabled:opacity-30"
+          >
+            <X size={15} />
+          </button>
         </div>
       ))}
-      <button type="button" onClick={() => onChange([...options, ""])} className="flex w-fit items-center gap-1.5 text-sm font-medium text-teal-deep hover:underline">
-        <Plus size={14} /> Adicionar opção
+      <button type="button" onClick={() => onChange([...values, ""])} className="flex w-fit items-center gap-1.5 text-sm font-medium text-teal-deep hover:underline">
+        <Plus size={14} /> Adicionar {label.toLowerCase()}
       </button>
     </div>
   );

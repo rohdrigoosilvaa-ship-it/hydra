@@ -22,6 +22,10 @@ ALTER TYPE "InspectionItemType" ADD VALUE 'NUMERO';
 ALTER TYPE "InspectionItemType" ADD VALUE 'DATA';
 ALTER TYPE "InspectionItemType" ADD VALUE 'HORA';
 ALTER TYPE "InspectionItemType" ADD VALUE 'ESCALA';
+ALTER TYPE "InspectionItemType" ADD VALUE 'LISTA_SUSPENSA';
+ALTER TYPE "InspectionItemType" ADD VALUE 'UPLOAD';
+ALTER TYPE "InspectionItemType" ADD VALUE 'CLASSIFICACAO';
+ALTER TYPE "InspectionItemType" ADD VALUE 'GRADE';
 
 -- AlterTable
 ALTER TABLE "inspection_templates" ADD COLUMN     "branchId" TEXT,
@@ -44,6 +48,9 @@ ADD COLUMN     "conditionValue" TEXT,
 ADD COLUMN     "instruction" TEXT,
 ADD COLUMN     "required" BOOLEAN NOT NULL DEFAULT false,
 ADD COLUMN     "scaleMax" INTEGER,
+ADD COLUMN     "rows" TEXT[] DEFAULT ARRAY[]::TEXT[],
+ADD COLUMN     "scaleMaxLabel" TEXT,
+ADD COLUMN     "scaleMinLabel" TEXT,
 ADD COLUMN     "scaleMin" INTEGER,
 ADD COLUMN     "sectionId" TEXT,
 ADD COLUMN     "weight" INTEGER;

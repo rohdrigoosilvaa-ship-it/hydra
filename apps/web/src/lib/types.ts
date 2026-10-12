@@ -859,7 +859,11 @@ export type InspectionItemType =
   | "NUMERO"
   | "DATA"
   | "HORA"
-  | "ESCALA";
+  | "ESCALA"
+  | "LISTA_SUSPENSA"
+  | "UPLOAD"
+  | "CLASSIFICACAO"
+  | "GRADE";
 export type ChecklistTemplateStatus = "RASCUNHO" | "ATIVO" | "INATIVO" | "ARQUIVADO";
 export type ChecklistFrequency = "DIARIA" | "SEMANAL" | "MENSAL" | "POR_TURNO" | "POR_EVENTO" | "PERSONALIZADA";
 export type NonConformityCreation = "MANUAL" | "AUTOMATICA";
@@ -900,6 +904,9 @@ export interface InspectionTemplateItem {
   allowActionPlan: boolean;
   scaleMin: number | null;
   scaleMax: number | null;
+  scaleMinLabel: string | null;
+  scaleMaxLabel: string | null;
+  rows: string[];
   conditionItemId: string | null;
   conditionOperator: "IGUAL" | "DIFERENTE" | null;
   conditionValue: string | null;

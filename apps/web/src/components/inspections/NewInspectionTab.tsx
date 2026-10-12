@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { CheckCircle2, ChevronLeft, ChevronRight, TriangleAlert } from "lucide-react";
 import { api } from "../../lib/api";
+import { AnswerInput } from "./AnswerInput";
 import { EvidenceUploader } from "../EvidenceUploader";
 import type {
   InspectionDetail,
@@ -170,7 +171,6 @@ function ChecklistItem({
   const [ncDescription, setNcDescription] = useState("");
   const [ncSeverity, setNcSeverity] = useState<NonConformitySeverity>("MEDIA");
   const [ncSaved, setNcSaved] = useState(false);
-  const selected = answer ? answer.split(",").filter(Boolean) : [];
 
   function save(patch: { value?: InspectionResponseValue; textValue?: string; comment?: string }) {
     return api.post(`/field-ops/inspections/${inspectionId}/responses`, { templateItemId, ...patch });
@@ -179,16 +179,6 @@ function ChecklistItem({
   async function saveAnswer(next: string) {
     setAnswer(next);
     await save({ textValue: next, comment: comment || undefined });
-  }
-
-  async function toggleOption(option: string) {
-    const next =
-      responseType === "SELECAO_UNICA"
-        ? [option]
-        : selected.includes(option)
-          ? selected.filter((o) => o !== option)
-          : [...selected, option];
-    await saveAnswer(next.join(","));
   }
 
   async function createNonConformity(description: string, severity: NonConformitySeverity) {
@@ -238,44 +228,8 @@ function ChecklistItem({
       {legacyText && (
         <textarea className="input mt-3 w-full" rows={3} value={comment} onChange={(e) => setComment(e.target.value)} onBlur={saveComment} />
       )}
-      {responseType === "TEXTO_CURTO" && (
-        <input className="input mt-3 w-full" value={answer} onChange={(e) => setAnswer(e.target.value)} onBlur={() => saveAnswer(answer)} />
-      )}
-      {responseType === "TEXTO_LONGO" && (
-        <textarea className="input mt-3 w-full" rows={3} value={answer} onChange={(e) => setAnswer(e.target.value)} onBlur={() => saveAnswer(answer)} />
-      )}
-      {(responseType === "NUMERO" || responseType === "NOTA") && (
-        <input type="number" className="input mt-3 w-full" value={answer} onChange={(e) => setAnswer(e.target.value)} onBlur={() => saveAnswer(answer)} />
-      )}
-      {responseType === "DATA" && (
-        <input type="date" className="input mt-3 w-full" value={answer} onChange={(e) => saveAnswer(e.target.value)} />
-      )}
-      {responseType === "HORA" && (
-        <input type="time" className="input mt-3 w-full" value={answer} onChange={(e) => saveAnswer(e.target.value)} />
-      )}
-      {responseType === "ESCALA" && (
-        <div className="mt-3 flex flex-wrap gap-1.5">
-          {Array.from({ length: (item.scaleMax ?? 5) - (item.scaleMin ?? 1) + 1 }, (_, i) => String((item.scaleMin ?? 1) + i)).map((n) => (
-            <button key={n} onClick={() => saveAnswer(n)} className={`${optionButton(answer === n)} w-11 px-0`}>
-              {n}
-            </button>
-          ))}
-        </div>
-      )}
-      {(responseType === "SELECAO_MULTIPLA" || responseType === "SELECAO_UNICA") && (
-        <div className="mt-3 flex flex-col gap-1.5">
-          {options.map((option) => (
-            <label key={option} className="flex items-center gap-2 rounded-md border border-line px-3 py-2 text-sm text-ink">
-              <input
-                type={responseType === "SELECAO_UNICA" ? "radio" : "checkbox"}
-                name={`opt-${templateItemId}`}
-                checked={selected.includes(option)}
-                onChange={() => toggleOption(option)}
-              />
-              {option}
-            </label>
-          ))}
-        </div>
+      {!legacyText && responseType !== "CONFORME_NAO_CONFORME" && responseType !== "SIM_NAO" && (
+        <AnswerInput item={item} name={`opt-${templateItemId}`} value={answer} onChange={setAnswer} onCommit={saveAnswer} />
       )}
       {(responseType === "CONFORME_NAO_CONFORME" || responseType === "SIM_NAO") && (
         <div className="mt-3 flex gap-2">
@@ -325,6 +279,18 @@ function ChecklistItem({
             Salvar não conformidade
           </button>
         </div>
+      )}
+      {item.allowActionPlan && !showNcForm && !ncSaved && responseType !== "CONFORME_NAO_CONFORME" && responseType !== "SIM_NAO" && (
+        <button
+          type="button"
+          onClick={() => {
+            setShowNcForm(true);
+            setNcDescription(text);
+          }}
+          className="mt-3 text-sm font-medium text-teal-deep hover:underline"
+        >
+          Registrar plano de ação
+        </button>
       )}
       {ncSaved && <p className="mt-2 text-xs text-teal-deep">Não conformidade registrada — plano de ação criado.</p>}
 

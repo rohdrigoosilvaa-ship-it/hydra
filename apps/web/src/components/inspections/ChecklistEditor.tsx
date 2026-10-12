@@ -291,6 +291,8 @@ export function ChecklistEditor({
               template={template}
               onSaved={(updated) => {
                 setTemplate(updated);
+                setName(updated.name);
+                setDescription(updated.description ?? "");
                 onChanged();
               }}
             />

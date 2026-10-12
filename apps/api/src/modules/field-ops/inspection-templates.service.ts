@@ -21,7 +21,7 @@ const FULL = {
 type FullTemplate = Prisma.InspectionTemplateGetPayload<{ include: typeof FULL }>;
 
 /** Tipos que escolhem entre opções cadastradas. */
-const CHOICE_TYPES: InspectionItemType[] = ["SELECAO_UNICA", "SELECAO_MULTIPLA"];
+const CHOICE_TYPES: InspectionItemType[] = ["SELECAO_UNICA", "SELECAO_MULTIPLA", "LISTA_SUSPENSA", "GRADE"];
 
 @Injectable()
 export class InspectionTemplatesService {
@@ -181,6 +181,15 @@ export class InspectionTemplatesService {
 
     return this.prisma.$transaction(async (tx) => {
       const { target, sectionIds, itemIds } = await this.resolveEditable(tx, tenantId, template, userId);
+      if (dto.name !== undefined || dto.description !== undefined) {
+        await tx.inspectionTemplate.update({
+          where: { id: target.id },
+          data: {
+            ...(dto.name?.trim() ? { name: dto.name.trim().slice(0, 255) } : {}),
+            ...(dto.description !== undefined ? { description: dto.description.trim() || null } : {}),
+          },
+        });
+      }
       const incomingSectionId = (id?: string) => (id ? (sectionIds.get(id) ?? id) : undefined);
       const incomingItemId = (id?: string) => (id ? (itemIds.get(id) ?? id) : undefined);
 
@@ -201,7 +210,9 @@ export class InspectionTemplatesService {
         if (keptItems.has(id)) throw new BadRequestException("Pergunta repetida na estrutura.");
         keptItems.add(id);
         const locked = current._count.responses > 0;
-        const sameOptions = JSON.stringify(current.options) === JSON.stringify(incoming.options ?? []);
+        const sameOptions =
+          JSON.stringify(current.options) === JSON.stringify(incoming.options ?? []) &&
+          JSON.stringify(current.rows) === JSON.stringify(incoming.rows ?? []);
         if (locked && (current.responseType !== incoming.responseType || !sameOptions)) {
           throw new BadRequestException(
             `A pergunta "${current.text}" já foi respondida em aplicações — só o texto dela pode ser alterado diretamente. Para mudar o tipo, ative uma nova versão do modelo ou crie outra pergunta.`,
@@ -427,6 +438,9 @@ export class InspectionTemplatesService {
           responseType: item.responseType,
           category: item.category,
           options: item.options,
+          rows: item.rows,
+          scaleMinLabel: item.scaleMinLabel,
+          scaleMaxLabel: item.scaleMaxLabel,
           blockLabel: item.blockLabel,
           allowPhoto: item.allowPhoto,
           allowComment: item.allowComment,
@@ -451,20 +465,25 @@ export class InspectionTemplatesService {
 
   private itemData(item: StructureItemDto, order: number, sectionIdByKey: Map<string, string>) {
     const isScale = item.responseType === "ESCALA";
+    const isRating = item.responseType === "CLASSIFICACAO";
+    const clean = (list?: string[]) => (list ?? []).map((o) => o.trim()).filter(Boolean);
     return {
       order,
       sectionId: item.sectionKey ? (sectionIdByKey.get(item.sectionKey) ?? null) : null,
       text: item.text.trim(),
       instruction: item.instruction?.trim() || null,
       responseType: item.responseType,
-      options: CHOICE_TYPES.includes(item.responseType) ? (item.options ?? []).map((o) => o.trim()).filter(Boolean) : [],
+      options: CHOICE_TYPES.includes(item.responseType) ? clean(item.options) : [],
+      rows: item.responseType === "GRADE" ? clean(item.rows) : [],
       required: item.required ?? false,
       weight: item.weight ?? null,
       allowComment: item.allowComment ?? true,
-      allowPhoto: item.allowPhoto ?? false,
+      allowPhoto: item.responseType === "UPLOAD" ? true : (item.allowPhoto ?? false),
       allowActionPlan: item.allowActionPlan ?? false,
       scaleMin: isScale ? (item.scaleMin ?? 1) : null,
-      scaleMax: isScale ? (item.scaleMax ?? 5) : null,
+      scaleMax: isScale ? (item.scaleMax ?? 5) : isRating ? (item.scaleMax ?? 5) : null,
+      scaleMinLabel: isScale ? item.scaleMinLabel?.trim() || null : null,
+      scaleMaxLabel: isScale ? item.scaleMaxLabel?.trim() || null : null,
       blockLabel: item.blockLabel ?? null,
       category: item.category ?? null,
     };
@@ -480,6 +499,12 @@ export class InspectionTemplatesService {
       if (item.sectionKey && !sectionKeys.has(item.sectionKey)) throw new BadRequestException(`${label}: seção inexistente.`);
       if (CHOICE_TYPES.includes(item.responseType) && (item.options ?? []).map((o) => o.trim()).filter(Boolean).length < 2) {
         throw new BadRequestException(`${label}: informe pelo menos 2 opções.`);
+      }
+      if (item.responseType === "GRADE" && (item.rows ?? []).map((o) => o.trim()).filter(Boolean).length < 1) {
+        throw new BadRequestException(`${label}: informe pelo menos 1 linha para a grade.`);
+      }
+      if (item.responseType === "CLASSIFICACAO" && ((item.scaleMax ?? 5) < 2 || (item.scaleMax ?? 5) > 10)) {
+        throw new BadRequestException(`${label}: a classificação vai de 2 a 10.`);
       }
       if (item.responseType === "ESCALA" && (item.scaleMax ?? 5) <= (item.scaleMin ?? 1)) {
         throw new BadRequestException(`${label}: o máximo da escala deve ser maior que o mínimo.`);

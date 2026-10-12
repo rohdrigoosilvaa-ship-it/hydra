@@ -6,18 +6,26 @@ import type {
   InspectionTemplateItem,
 } from "./types";
 
-/** Tipos de resposta que o criador de modelos oferece. */
+/** Tipos de resposta do criador de modelos (estilo formulário). */
 export const RESPONSE_TYPES: { value: InspectionItemType; label: string }[] = [
+  { value: "TEXTO_CURTO", label: "Resposta curta" },
+  { value: "TEXTO_LONGO", label: "Parágrafo" },
+  { value: "SELECAO_UNICA", label: "Multi escolha" },
+  { value: "SELECAO_MULTIPLA", label: "Caixa de seleção" },
+  { value: "LISTA_SUSPENSA", label: "Lista suspensa" },
+  { value: "UPLOAD", label: "Upload de arquivo" },
+  { value: "ESCALA", label: "Escala linear" },
+  { value: "CLASSIFICACAO", label: "Classificação" },
+  { value: "GRADE", label: "Grade de múltipla escolha" },
+  { value: "DATA", label: "Data" },
+  { value: "HORA", label: "Horário" },
+];
+
+/** Tipos de avaliação (geram não conformidade / plano de ação) e extras, oferecidos à parte. */
+export const EXTRA_RESPONSE_TYPES: { value: InspectionItemType; label: string }[] = [
   { value: "CONFORME_NAO_CONFORME", label: "Conforme / Não conforme / Não aplicável" },
   { value: "SIM_NAO", label: "Sim / Não" },
-  { value: "SELECAO_MULTIPLA", label: "Múltipla escolha" },
-  { value: "SELECAO_UNICA", label: "Seleção única" },
-  { value: "TEXTO_CURTO", label: "Texto curto" },
-  { value: "TEXTO_LONGO", label: "Texto longo" },
   { value: "NUMERO", label: "Número" },
-  { value: "DATA", label: "Data" },
-  { value: "HORA", label: "Hora" },
-  { value: "ESCALA", label: "Escala de avaliação" },
 ];
 
 /** Tipos antigos (modelos criados antes da reformulação) — continuam funcionando. */
@@ -27,10 +35,11 @@ const LEGACY_LABEL: Partial<Record<InspectionItemType, string>> = {
 };
 
 export function responseTypeLabel(type: InspectionItemType): string {
-  return RESPONSE_TYPES.find((t) => t.value === type)?.label ?? LEGACY_LABEL[type] ?? type;
+  return [...RESPONSE_TYPES, ...EXTRA_RESPONSE_TYPES].find((t) => t.value === type)?.label ?? LEGACY_LABEL[type] ?? type;
 }
 
-export const hasOptions = (type: InspectionItemType) => type === "SELECAO_UNICA" || type === "SELECAO_MULTIPLA";
+export const hasOptions = (type: InspectionItemType) =>
+  type === "SELECAO_UNICA" || type === "SELECAO_MULTIPLA" || type === "LISTA_SUSPENSA";
 /** Tipos "avaliativos", em que uma resposta negativa pode gerar não conformidade e plano de ação. */
 export const isEvaluative = (type: InspectionItemType) => type === "CONFORME_NAO_CONFORME" || type === "SIM_NAO";
 

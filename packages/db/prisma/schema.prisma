@@ -1167,6 +1167,10 @@ enum InspectionItemType {
   DATA
   HORA
   ESCALA
+  LISTA_SUSPENSA
+  UPLOAD
+  CLASSIFICACAO
+  GRADE
 }
 
 /// Situação do modelo de checklist. Só modelos ATIVO aparecem para aplicação.
@@ -1216,6 +1220,10 @@ model InspectionTemplateItem {
   /// Escala de avaliação (tipo ESCALA): de scaleMin a scaleMax.
   scaleMin        Int?
   scaleMax        Int?
+  scaleMinLabel   String?
+  scaleMaxLabel   String?
+  /// Linhas da grade (tipo GRADE); as colunas ficam em `options`.
+  rows            String[]  @default([])
   /// Regra condicional: a pergunta só aparece se a resposta da pergunta `conditionItemId` for/não for `conditionValue`.
   conditionItemId   String?
   conditionOperator String? // "IGUAL" | "DIFERENTE"
