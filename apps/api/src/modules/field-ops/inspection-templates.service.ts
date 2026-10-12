@@ -1,10 +1,11 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../core/prisma/prisma.service";
 import { PERMISSIONS } from "../../core/permissions/permissions";
 import type { RoleAssignmentClaim } from "../../core/auth/jwt.types";
 import { assertCompanyInScope, companyScopeWhere } from "../org/scope.util";
 import type {
   CreateInspectionTemplateDto,
+  ReplaceChecklistStructureDto,
   UpdateInspectionTemplateDto,
   UpdateInspectionTemplateItemDto,
 } from "./dto/field-ops.dto";
@@ -107,6 +108,70 @@ export class InspectionTemplatesService {
     return this.prisma.inspectionTemplateItem.update({
       where: { id: itemId },
       data: { text: dto.text, blockLabel: dto.blockLabel, category: dto.category, allowPhoto: dto.allowPhoto },
+    });
+  }
+
+  /**
+   * Salva a estrutura do checklist de uma vez (criar, alterar, reordenar e remover itens).
+   * Item que já foi respondido em alguma inspeção não pode ser removido nem ter tipo/opções
+   * alterados — as respostas antigas dependem de como ele foi interpretado; só o texto muda.
+   */
+  async replaceStructure(
+    tenantId: string,
+    templateId: string,
+    dto: ReplaceChecklistStructureDto,
+    assignments: RoleAssignmentClaim[],
+  ) {
+    const where = companyScopeWhere(assignments, PERMISSIONS.OCCURRENCE_WRITE, tenantId);
+    const template = await this.prisma.inspectionTemplate.findFirst({ where: { ...where, id: templateId } });
+    if (!template) throw new NotFoundException("Roteiro de inspeção não encontrado.");
+
+    const existing = await this.prisma.inspectionTemplateItem.findMany({
+      where: { templateId },
+      include: { _count: { select: { responses: true } } },
+    });
+    const byId = new Map(existing.map((i) => [i.id, i]));
+    const keptIds = new Set<string>();
+
+    for (const incoming of dto.items) {
+      if (!incoming.id) continue;
+      const current = byId.get(incoming.id);
+      if (!current) throw new NotFoundException("Item não encontrado neste roteiro.");
+      if (keptIds.has(incoming.id)) throw new BadRequestException("Item repetido na estrutura.");
+      keptIds.add(incoming.id);
+      const locked = current._count.responses > 0;
+      const sameOptions = JSON.stringify(current.options) === JSON.stringify(incoming.options ?? []);
+      if (locked && (current.responseType !== incoming.responseType || !sameOptions)) {
+        throw new BadRequestException(
+          `O item "${current.text}" já foi respondido em inspeções — só o texto dele pode ser alterado. Para mudar o tipo, crie um novo item.`,
+        );
+      }
+    }
+    const removed = existing.filter((i) => !keptIds.has(i.id));
+    const blocked = removed.find((i) => i._count.responses > 0);
+    if (blocked) {
+      throw new BadRequestException(`O item "${blocked.text}" já foi respondido em inspeções e não pode ser removido.`);
+    }
+
+    return this.prisma.$transaction(async (tx) => {
+      if (removed.length) await tx.inspectionTemplateItem.deleteMany({ where: { id: { in: removed.map((i) => i.id) } } });
+      for (const [order, item] of dto.items.entries()) {
+        const data = {
+          order,
+          text: item.text,
+          responseType: item.responseType,
+          options: item.options ?? [],
+          allowPhoto: item.allowPhoto ?? true,
+          blockLabel: item.blockLabel ?? null,
+          category: item.category ?? null,
+        };
+        if (item.id) await tx.inspectionTemplateItem.update({ where: { id: item.id }, data });
+        else await tx.inspectionTemplateItem.create({ data: { ...data, tenantId, templateId } });
+      }
+      return tx.inspectionTemplate.findUniqueOrThrow({
+        where: { id: templateId },
+        include: { items: { orderBy: { order: "asc" } } },
+      });
     });
   }
 }
