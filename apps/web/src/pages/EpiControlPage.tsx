@@ -118,7 +118,7 @@ export function EpiControlPage() {
         </div>
       )}
 
-      <div className="mt-5 overflow-hidden rounded-xl border border-line bg-paper-raised">
+      <div className="mt-5 panel">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="bg-paper text-xs font-medium uppercase tracking-wide text-ink-muted">

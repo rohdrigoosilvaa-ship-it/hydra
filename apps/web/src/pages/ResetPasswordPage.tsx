@@ -34,7 +34,7 @@ export function ResetPasswordPage() {
 
   return (
     <div className="flex min-h-screen items-center justify-center bg-paper px-4">
-      <div className="w-full max-w-sm rounded-lg border border-line bg-paper-raised p-8 shadow-sm">
+      <div className="w-full max-w-sm rounded-xl border border-line bg-paper-raised shadow-sm p-8 shadow-sm">
         <div className="mb-8 flex justify-center">
           <Logo size="lg" />
         </div>

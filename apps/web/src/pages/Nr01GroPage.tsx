@@ -6,7 +6,7 @@ import type { Nr01Overview } from "../lib/types";
 
 function Indicator({ label, value }: { label: string; value: number | string }) {
   return (
-    <div className="rounded-lg border border-line bg-paper-raised p-4">
+    <div className="rounded-xl border border-line bg-paper-raised shadow-sm p-4">
       <p className="font-mono text-[10px] uppercase tracking-wide text-ink-muted">{label}</p>
       <p className="mt-1 font-display text-xl font-semibold text-ink">{value}</p>
     </div>
@@ -53,7 +53,7 @@ export function Nr01GroPage() {
         </div>
       )}
 
-      <div className="mt-8 rounded-lg border border-line bg-paper-raised p-5">
+      <div className="mt-8 rounded-xl border border-line bg-paper-raised shadow-sm p-5">
         <p className="mb-4 font-mono text-[10px] uppercase tracking-wide text-ink-muted">Ciclo de gerenciamento</p>
         <div className="flex flex-wrap items-center gap-2 text-sm text-ink-muted">
           {["Identificar", "Analisar", "Avaliar", "Controlar", "Monitorar", "Verificar eficácia", "Reavaliar"].map(

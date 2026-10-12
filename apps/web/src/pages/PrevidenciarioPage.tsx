@@ -50,7 +50,7 @@ export function PrevidenciarioPage() {
         {showAbsenceForm && (
           <NewAbsenceForm employees={employees} onClose={() => setShowAbsenceForm(false)} onCreated={() => { setShowAbsenceForm(false); load(); }} />
         )}
-        <div className="mt-3 overflow-hidden rounded-lg border border-line bg-paper-raised">
+        <div className="mt-3 panel">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-muted">

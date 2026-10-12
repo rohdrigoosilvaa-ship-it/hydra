@@ -12,8 +12,8 @@ import { PgrRisksController } from "./pgr-risks.controller";
 import { PgrRisksService } from "./pgr-risks.service";
 import { PgrActionsController } from "./pgr-actions.controller";
 import { PgrActionsService } from "./pgr-actions.service";
-import { PgrAiController } from "./pgr-ai.controller";
-import { PgrAiService } from "./pgr-ai.service";
+import { PgrValidationController } from "./pgr-validation.controller";
+import { PgrValidationService } from "./pgr-validation.service";
 import { PgrRisksImportController } from "./pgr-risks-import.controller";
 import { PgrRisksImportService } from "./pgr-risks-import.service";
 import { PgrCronogramaController } from "./pgr-cronograma.controller";
@@ -28,7 +28,7 @@ import { PgrCronogramaService } from "./pgr-cronograma.service";
     GheFunctionsController,
     PgrRisksController,
     PgrActionsController,
-    PgrAiController,
+    PgrValidationController,
     PgrRisksImportController,
   ],
   providers: [
@@ -39,7 +39,7 @@ import { PgrCronogramaService } from "./pgr-cronograma.service";
     GheFunctionsService,
     PgrRisksService,
     PgrActionsService,
-    PgrAiService,
+    PgrValidationService,
     PgrRisksImportService,
     PgrCronogramaService,
   ],

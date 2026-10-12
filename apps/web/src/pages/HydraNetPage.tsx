@@ -88,7 +88,7 @@ export function HydraNetPage() {
 
       <section className="mt-8">
         <h2 className="font-display text-lg font-semibold text-ink">Contratos</h2>
-        <div className="mt-3 overflow-hidden rounded-lg border border-line bg-paper-raised">
+        <div className="mt-3 panel">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-muted">

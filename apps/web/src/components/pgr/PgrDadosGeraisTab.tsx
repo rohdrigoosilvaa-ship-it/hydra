@@ -1,9 +1,9 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link } from "react-router-dom";
-import { Image as ImageIcon, Pencil } from "lucide-react";
+import { BadgeCheck, Building2, CalendarDays, FileText, Image as ImageIcon, Pencil, Users } from "lucide-react";
 import { api } from "../../lib/api";
 import type { Company, PgrDetail } from "../../lib/types";
-import { Field } from "./pgr-shared";
+import { Field, SectionCard } from "./pgr-shared";
 
 export function PgrDadosGeraisTab({ pgr, onChanged }: { pgr: PgrDetail; onChanged: () => void }) {
   const [showDocForm, setShowDocForm] = useState(false);
@@ -13,68 +13,91 @@ export function PgrDadosGeraisTab({ pgr, onChanged }: { pgr: PgrDetail; onChange
     api.get<Company>(`/companies/${pgr.companyId}`).then(setCompany);
   }, [pgr.companyId]);
 
-  return (
-    <div>
-      <div className="mb-4 flex items-center gap-3">
-        {company?.logoUrl ? (
-          <img src={company.logoUrl} alt="" className="h-12 w-12 rounded border border-line object-contain" />
-        ) : (
-          <span className="flex h-12 w-12 items-center justify-center rounded border border-line bg-paper-raised text-ink-muted">
-            <ImageIcon size={18} />
-          </span>
-        )}
-        <div className="text-sm">
-          <p className="text-ink-muted">Logo da empresa</p>
-          <Link to="/minha-empresa" className="text-teal-deep hover:underline">
-            {company?.logoUrl ? "Trocar logo" : "Enviar logo"} em Minha Empresa
-          </Link>
-        </div>
-      </div>
+  const fmt = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString("pt-BR") : null);
+  const council =
+    pgr.technicalResponsibleCouncil || pgr.technicalResponsibleUf
+      ? `${pgr.technicalResponsibleCouncil ?? "—"} / ${pgr.technicalResponsibleUf ?? "—"}`
+      : null;
 
-      <div className="flex items-center justify-between">
-        <h2 className="font-display text-lg font-semibold text-ink">Dados do documento</h2>
-        <button
-          className="btn-secondary flex items-center gap-1.5 text-xs"
-          onClick={() => setShowDocForm((v) => !v)}
-        >
-          <Pencil size={13} /> {showDocForm ? "Fechar" : "Editar"}
-        </button>
-      </div>
+  return (
+    <div className="flex flex-col gap-4">
+      <SectionCard
+        title="Dados do documento"
+        subtitle="Identificação, vigência, equipe e responsáveis que aparecem na capa e nas assinaturas do PGR."
+        icon={FileText}
+        actions={
+          <button className="btn-secondary flex items-center gap-1.5 text-xs" onClick={() => setShowDocForm((v) => !v)}>
+            <Pencil size={13} /> {showDocForm ? "Fechar" : "Editar"}
+          </button>
+        }
+      >
+        <div className="flex items-center gap-3 rounded-lg bg-paper p-3">
+          {company?.logoUrl ? (
+            <img src={company.logoUrl} alt="" className="h-12 w-12 rounded border border-line bg-paper-raised object-contain" />
+          ) : (
+            <span className="flex h-12 w-12 items-center justify-center rounded border border-line bg-paper-raised text-ink-muted">
+              <ImageIcon size={18} />
+            </span>
+          )}
+          <div className="text-sm">
+            <p className="font-medium text-ink">{company?.name ?? "Empresa"}</p>
+            <Link to="/minha-empresa" className="text-xs text-teal-deep hover:underline">
+              {company?.logoUrl ? "Trocar logo" : "Enviar logo"} em Minha Empresa
+            </Link>
+          </div>
+        </div>
+
+        {showDocForm && (
+          <DocumentForm
+            pgr={pgr}
+            onClose={() => setShowDocForm(false)}
+            onSaved={() => {
+              setShowDocForm(false);
+              onChanged();
+            }}
+          />
+        )}
+      </SectionCard>
 
       {!showDocForm && (
-        <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 rounded-lg border border-line bg-paper-raised p-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
-          <Field label="Código" value={pgr.code} />
-          <Field label="Emitido em" value={pgr.issuedAt ? new Date(pgr.issuedAt).toLocaleDateString("pt-BR") : null} />
-          <Field label="Vigência" value={
-            pgr.validFrom || pgr.validUntil
-              ? `${pgr.validFrom ? new Date(pgr.validFrom).toLocaleDateString("pt-BR") : "—"} a ${pgr.validUntil ? new Date(pgr.validUntil).toLocaleDateString("pt-BR") : "—"}`
-              : null
-          } />
-          <Field label="Elaborado por" value={pgr.preparedBy} />
-          <Field label="Revisado por" value={pgr.reviewedBy} />
-          <Field label="Aprovado por" value={pgr.approvedBy} />
-          <Field label="Responsável pela empresa" value={pgr.companyResponsibleName} />
-          <Field label="Cargo do responsável" value={pgr.companyResponsibleRole} />
-          <Field label="Responsável técnico" value={pgr.technicalResponsibleName} />
-          <Field label="Especialidade" value={pgr.technicalResponsibleSpecialty} />
-          <Field label="Registro profissional" value={pgr.technicalResponsibleRegistry} />
-          <Field label="Conselho / UF" value={
-            pgr.technicalResponsibleCouncil || pgr.technicalResponsibleUf
-              ? `${pgr.technicalResponsibleCouncil ?? "—"} / ${pgr.technicalResponsibleUf ?? "—"}`
-              : null
-          } />
-        </div>
-      )}
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <SectionCard title="Documento" icon={CalendarDays}>
+            <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+              <Field label="Código" value={pgr.code} />
+              <Field label="Emitido em" value={fmt(pgr.issuedAt)} />
+              <div className="sm:col-span-2">
+                <Field
+                  label="Vigência"
+                  value={pgr.validFrom || pgr.validUntil ? `${fmt(pgr.validFrom) ?? "—"} a ${fmt(pgr.validUntil) ?? "—"}` : null}
+                />
+              </div>
+            </div>
+          </SectionCard>
 
-      {showDocForm && (
-        <DocumentForm
-          pgr={pgr}
-          onClose={() => setShowDocForm(false)}
-          onSaved={() => {
-            setShowDocForm(false);
-            onChanged();
-          }}
-        />
+          <SectionCard title="Equipe do documento" icon={Users}>
+            <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-3">
+              <Field label="Elaborado por" value={pgr.preparedBy} />
+              <Field label="Revisado por" value={pgr.reviewedBy} />
+              <Field label="Aprovado por" value={pgr.approvedBy} />
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Responsável pela empresa" icon={Building2}>
+            <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+              <Field label="Nome" value={pgr.companyResponsibleName} />
+              <Field label="Cargo" value={pgr.companyResponsibleRole} />
+            </div>
+          </SectionCard>
+
+          <SectionCard title="Responsável técnico" icon={BadgeCheck}>
+            <div className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
+              <Field label="Nome" value={pgr.technicalResponsibleName} />
+              <Field label="Especialidade" value={pgr.technicalResponsibleSpecialty} />
+              <Field label="Registro profissional" value={pgr.technicalResponsibleRegistry} />
+              <Field label="Conselho / UF" value={council} />
+            </div>
+          </SectionCard>
+        </div>
       )}
     </div>
   );

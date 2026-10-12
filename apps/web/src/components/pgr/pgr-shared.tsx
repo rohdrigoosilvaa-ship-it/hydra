@@ -1,7 +1,5 @@
-import { ReactNode, useState } from "react";
-import { Sparkles } from "lucide-react";
-
-export const AI_DISCLAIMER = "Sugestão da IA — validar tecnicamente";
+export { SectionCard, StatTile } from "../ui/cards";
+import { CalendarRange, ClipboardList, FileText, FlagTriangleRight, Layers, ShieldAlert, type LucideIcon } from "lucide-react";
 
 export function naOrValue(v: string | null | undefined) {
   return v && v.trim() ? v : "Não informado";
@@ -11,77 +9,7 @@ export function Field({ label, value }: { label: string; value: string | null | 
   return (
     <div>
       <p className="font-mono text-[10px] uppercase tracking-wide text-ink-muted">{label}</p>
-      <p className="text-ink">{naOrValue(value)}</p>
-    </div>
-  );
-}
-
-/** Botão genérico "Sugerir com IA": busca uma sugestão, mostra em uma caixa rotulada
- * e só aplica aos campos do formulário se o usuário clicar em "Aplicar" — nunca
- * preenche automaticamente. */
-export function AiSuggestButton<T>({
-  label,
-  disabledReason,
-  onFetch,
-  onApply,
-  renderPreview,
-}: {
-  label: string;
-  disabledReason?: string;
-  onFetch: () => Promise<T>;
-  onApply: (result: T) => void;
-  renderPreview: (result: T) => ReactNode;
-}) {
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [result, setResult] = useState<T | null>(null);
-
-  async function handleClick() {
-    setLoading(true);
-    setError(null);
-    setResult(null);
-    try {
-      setResult(await onFetch());
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao consultar a IA.");
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  return (
-    <div>
-      <button
-        type="button"
-        onClick={handleClick}
-        disabled={loading || !!disabledReason}
-        title={disabledReason}
-        className="flex items-center gap-1 text-xs text-teal-deep hover:underline disabled:cursor-not-allowed disabled:opacity-50"
-      >
-        <Sparkles size={12} /> {loading ? "Consultando IA…" : label}
-      </button>
-      {error && <p className="mt-1 text-xs text-amber">{error}</p>}
-      {result && (
-        <div className="mt-2 rounded-md border border-teal-deep/30 bg-teal-tint p-3 text-sm">
-          <p className="mb-1.5 font-mono text-[10px] uppercase tracking-wide text-teal-deep">{AI_DISCLAIMER}</p>
-          {renderPreview(result)}
-          <div className="mt-2 flex items-center gap-3">
-            <button
-              type="button"
-              onClick={() => {
-                onApply(result);
-                setResult(null);
-              }}
-              className="text-xs font-medium text-teal-deep hover:underline"
-            >
-              Aplicar
-            </button>
-            <button type="button" onClick={() => setResult(null)} className="text-xs text-ink-muted hover:underline">
-              Descartar
-            </button>
-          </div>
-        </div>
-      )}
+      <p className={value && value.trim() ? "text-ink" : "text-ink-muted"}>{naOrValue(value)}</p>
     </div>
   );
 }
@@ -89,13 +17,13 @@ export function AiSuggestButton<T>({
 export function PgrProgressBar({ percent }: { percent: number }) {
   const clamped = Math.max(0, Math.min(100, Math.round(percent)));
   return (
-    <div className="mt-4">
+    <div>
       <div className="flex items-center justify-between">
         <p className="font-mono text-[10px] uppercase tracking-wide text-ink-muted">Progresso do PGR</p>
-        <p className="font-mono text-[10px] text-ink-muted">{clamped}%</p>
+        <p className="font-display text-sm font-semibold text-teal-deep tabular-nums">{clamped}%</p>
       </div>
-      <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-line">
-        <div className="h-full rounded-full bg-teal-deep transition-all" style={{ width: `${clamped}%` }} />
+      <div className="mt-1.5 h-2.5 w-full overflow-hidden rounded-full bg-line">
+        <div className="h-full rounded-full bg-gradient-to-r from-teal to-teal-deep transition-all" style={{ width: `${clamped}%` }} />
       </div>
     </div>
   );
@@ -103,32 +31,46 @@ export function PgrProgressBar({ percent }: { percent: number }) {
 
 export type PgrTabId = "dados-gerais" | "ghe" | "inventario" | "plano-acoes" | "cronograma" | "finalizacao";
 
-export const PGR_TABS: { id: PgrTabId; label: string }[] = [
-  { id: "dados-gerais", label: "Dados gerais" },
-  { id: "ghe", label: "GHE" },
-  { id: "inventario", label: "Inventário de riscos" },
-  { id: "plano-acoes", label: "Plano de ações e recomendações" },
-  { id: "cronograma", label: "Cronograma" },
-  { id: "finalizacao", label: "Finalização" },
+export const PGR_TABS: { id: PgrTabId; label: string; icon: LucideIcon }[] = [
+  { id: "dados-gerais", label: "Dados gerais", icon: FileText },
+  { id: "ghe", label: "GHE", icon: Layers },
+  { id: "inventario", label: "Inventário de riscos", icon: ShieldAlert },
+  { id: "plano-acoes", label: "Plano de ações", icon: ClipboardList },
+  { id: "cronograma", label: "Cronograma", icon: CalendarRange },
+  { id: "finalizacao", label: "Finalização", icon: FlagTriangleRight },
 ];
 
+/** Etapas do PGR em abas numeradas: dá para ver em que passo se está e navegar entre eles. */
 export function PgrTabNav({ active, onChange }: { active: PgrTabId; onChange: (id: PgrTabId) => void }) {
   return (
-    <div className="mt-5 flex flex-wrap gap-1.5 border-b border-line">
-      {PGR_TABS.map((tab) => (
-        <button
-          key={tab.id}
-          type="button"
-          onClick={() => onChange(tab.id)}
-          className={`-mb-px border-b-2 px-3 py-2 text-sm font-medium transition-colors ${
-            active === tab.id
-              ? "border-teal-deep text-ink"
-              : "border-transparent text-ink-muted hover:text-ink"
-          }`}
-        >
-          {tab.label}
-        </button>
-      ))}
-    </div>
+    <nav aria-label="Etapas do PGR" className="mt-5 flex gap-2 overflow-x-auto pb-1">
+      {PGR_TABS.map((tab, index) => {
+        const on = active === tab.id;
+        const Icon = tab.icon;
+        return (
+          <button
+            key={tab.id}
+            type="button"
+            onClick={() => onChange(tab.id)}
+            aria-current={on ? "step" : undefined}
+            className={`flex shrink-0 items-center gap-2 rounded-xl border px-3.5 py-2.5 text-sm font-medium transition-colors ${
+              on
+                ? "border-teal bg-teal text-white shadow-sm"
+                : "border-line bg-paper-raised text-ink-muted hover:border-teal/50 hover:text-ink"
+            }`}
+          >
+            <span
+              className={`flex h-5 w-5 items-center justify-center rounded-full font-mono text-[10px] ${
+                on ? "bg-white/20 text-white" : "bg-line text-ink-muted"
+              }`}
+            >
+              {index + 1}
+            </span>
+            <Icon size={15} />
+            {tab.label}
+          </button>
+        );
+      })}
+    </nav>
   );
 }
