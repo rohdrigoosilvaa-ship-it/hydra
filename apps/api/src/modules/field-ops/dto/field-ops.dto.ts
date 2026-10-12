@@ -311,10 +311,6 @@ export class CreateInspectionTemplateDto extends TemplateDataFields {
   @IsOptional()
   @IsString()
   companyId?: string;
-
-  @IsString()
-  @MinLength(2)
-  declare name: string;
 }
 
 export class UpdateInspectionTemplateItemDto {

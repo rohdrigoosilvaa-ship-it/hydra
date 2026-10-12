@@ -11,7 +11,14 @@ WHERE t.id = x.id AND t."code" IS NULL;
 
 UPDATE "inspection_templates" SET "status" = 'ARQUIVADO' WHERE "active" = false;
 
--- 2) Itens criados pela versão anterior da tela de estrutura guardavam tipo/complementos/peso numa
+-- 2) Itens antigos (sem configuração própria) com resposta conforme/não conforme ou sim/não já
+--    registravam não conformidade ao responder "não": mantém esse comportamento.
+UPDATE "inspection_template_items" i
+SET "allowActionPlan" = true
+WHERE i."responseType" IN ('CONFORME_NAO_CONFORME', 'SIM_NAO')
+  AND NOT EXISTS (SELECT 1 FROM unnest(i."options") AS o WHERE o LIKE '\_\_cfg:%');
+
+-- 3) Itens criados pela versão anterior da tela de estrutura guardavam tipo/complementos/peso numa
 --    entrada reservada "__cfg:..." dentro de `options`. Converte para as colunas próprias e remove a entrada.
 WITH cfg AS (
   SELECT i.id,

@@ -75,13 +75,15 @@ export class InspectionTemplatesService {
 
   async create(tenantId: string, dto: CreateInspectionTemplateDto, userId: string, assignments: RoleAssignmentClaim[]) {
     if (dto.companyId) assertCompanyInScope(assignments, PERMISSIONS.OCCURRENCE_WRITE, dto.companyId);
+    const name = dto.name?.trim();
+    if (!name || name.length < 2) throw new BadRequestException("Informe o nome do checklist.");
     return this.prisma.$transaction(async (tx) => {
       const code = await this.nextCode(tx, tenantId);
       const created = await tx.inspectionTemplate.create({
         data: {
           tenantId,
           companyId: dto.companyId,
-          name: dto.name,
+          name,
           description: dto.description,
           category: dto.category,
           frequency: dto.frequency,
