@@ -77,7 +77,7 @@ export class InspectionsService {
     if (!inspection) throw new NotFoundException("Inspeção não encontrada.");
 
     const existing = await this.prisma.inspectionItemResponse.findFirst({
-      where: { inspectionId, templateItemId: dto.templateItemId },
+      where: { inspectionId, templateItemId: dto.templateItemId, repetition: dto.repetition ?? 0 },
     });
 
     if (existing) {
@@ -101,6 +101,7 @@ export class InspectionsService {
         textValue: dto.textValue,
         comment: dto.comment,
         order: templateItem.order,
+        repetition: dto.repetition ?? 0,
       },
     });
   }

@@ -15,6 +15,8 @@ interface DraftSection {
   key: string;
   id?: string;
   name: string;
+  repeatable: boolean;
+  repeatLabel: string;
 }
 
 interface DraftItem {
@@ -75,8 +77,8 @@ function fromTemplate(template: InspectionTemplate): { sections: DraftSection[];
   const keyOfItem = new Map(template.items.map((i) => [i.id, `q-${i.id}`]));
   const sections: DraftSection[] = [...template.sections]
     .sort((a, b) => a.order - b.order)
-    .map((s) => ({ key: `s-${s.id}`, id: s.id, name: s.name }));
-  if (sections.length === 0) sections.push({ key: nextKey("s"), name: "Geral" });
+    .map((s) => ({ key: `s-${s.id}`, id: s.id, name: s.name, repeatable: s.repeatable, repeatLabel: s.repeatLabel ?? "" }));
+  if (sections.length === 0) sections.push({ key: nextKey("s"), name: "Geral", repeatable: false, repeatLabel: "" });
   const items: DraftItem[] = groupBySection(template).flatMap((group) =>
     group.items.map((it): DraftItem => ({
       key: keyOfItem.get(it.id)!,
@@ -187,15 +189,32 @@ export function ChecklistStructureEditor({
   }
   function addSection() {
     dirty();
-    const section: DraftSection = { key: nextKey("s"), name: "" };
+    const section: DraftSection = { key: nextKey("s"), name: "", repeatable: false, repeatLabel: "" };
     const item = blankItem(section.key);
     setSections((prev) => [...prev, section]);
     setItems((prev) => [...prev, item]);
     setActiveKey(item.key);
   }
-  function renameSection(key: string, name: string) {
+  function patchSection(key: string, change: Partial<DraftSection>) {
     dirty();
-    setSections((prev) => prev.map((s) => (s.key === key ? { ...s, name } : s)));
+    setSections((prev) => prev.map((s) => (s.key === key ? { ...s, ...change } : s)));
+  }
+  function duplicateSection(index: number) {
+    dirty();
+    const source = sections[index]!;
+    const copy: DraftSection = { ...source, key: nextKey("s"), id: undefined, name: `${source.name || "Seção"} (cópia)` };
+    const sourceItems = items.filter((i) => i.sectionKey === source.key);
+    const keyMap = new Map(sourceItems.map((i) => [i.key, nextKey("q")]));
+    const copies = sourceItems.map((i): DraftItem => ({
+      ...i,
+      key: keyMap.get(i.key)!,
+      id: undefined,
+      sectionKey: copy.key,
+      conditionKey: keyMap.get(i.conditionKey) ?? i.conditionKey,
+    }));
+    setSections((prev) => [...prev.slice(0, index + 1), copy, ...prev.slice(index + 1)]);
+    setItems((prev) => [...prev, ...copies]);
+    setActiveKey(copies[0]?.key ?? null);
   }
   function moveSection(index: number, dir: -1 | 1) {
     dirty();
@@ -257,7 +276,7 @@ export function ChecklistStructureEditor({
       const updated = await api.put<InspectionTemplate>(`/field-ops/inspection-templates/${template.id}/structure`, {
         name: title.trim(),
         description: description.trim(),
-        sections: sections.map((s) => ({ key: s.key, id: s.id, name: s.name.trim() })),
+        sections: sections.map((s) => ({ key: s.key, id: s.id, name: s.name.trim(), repeatable: s.repeatable, repeatLabel: s.repeatable ? s.repeatLabel.trim() || undefined : undefined })),
         items: flat.map((i) => ({
           key: i.key,
           id: i.id,
@@ -344,11 +363,28 @@ export function ChecklistStructureEditor({
                 placeholder="Título da seção (ex.: Identificação da visita)"
                 aria-label={`Título da seção ${sIndex + 1}`}
                 value={section.name}
-                onChange={(e) => renameSection(section.key, e.target.value)}
+                onChange={(e) => patchSection(section.key, { name: e.target.value })}
               />
+              <button type="button" onClick={() => duplicateSection(sIndex)} title="Duplicar seção" className="p-1 text-ink-muted hover:text-ink"><Copy size={16} /></button>
               <button type="button" onClick={() => moveSection(sIndex, -1)} disabled={sIndex === 0} title="Subir seção" className="p-1 text-ink-muted hover:text-ink disabled:opacity-30"><ArrowUp size={16} /></button>
               <button type="button" onClick={() => moveSection(sIndex, 1)} disabled={sIndex === sections.length - 1} title="Descer seção" className="p-1 text-ink-muted hover:text-ink disabled:opacity-30"><ArrowDown size={16} /></button>
               <button type="button" onClick={() => removeSection(section)} disabled={sections.length === 1} title="Excluir seção" className="p-1 text-ink-muted hover:text-danger disabled:opacity-30"><Trash2 size={16} /></button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 px-1 text-sm">
+              <label className="flex items-center gap-2 text-ink">
+                <input type="checkbox" checked={section.repeatable} onChange={(e) => patchSection(section.key, { repeatable: e.target.checked })} />
+                Esta seção pode ser repetida
+              </label>
+              {section.repeatable && (
+                <input
+                  className="input w-56"
+                  placeholder="Nome de cada repetição (ex.: Setor)"
+                  aria-label={`Nome da repetição da seção ${sIndex + 1}`}
+                  value={section.repeatLabel}
+                  onChange={(e) => patchSection(section.key, { repeatLabel: e.target.value })}
+                />
+              )}
             </div>
 
             {sectionItems.map((item, index) => (

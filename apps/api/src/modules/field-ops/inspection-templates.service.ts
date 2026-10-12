@@ -232,11 +232,11 @@ export class InspectionTemplatesService {
         const existingId = incomingSectionId(section.id);
         if (existingId && sectionById.has(existingId)) {
           keptSections.add(existingId);
-          await tx.inspectionTemplateSection.update({ where: { id: existingId }, data: { name: section.name.trim(), order } });
+          await tx.inspectionTemplateSection.update({ where: { id: existingId }, data: { name: section.name.trim(), order, ...this.sectionRepeat(section) } });
           sectionIdByKey.set(section.key, existingId);
         } else {
           const created = await tx.inspectionTemplateSection.create({
-            data: { tenantId, templateId: target.id, name: section.name.trim(), order },
+            data: { tenantId, templateId: target.id, name: section.name.trim(), order, ...this.sectionRepeat(section) },
           });
           sectionIdByKey.set(section.key, created.id);
         }
@@ -422,7 +422,14 @@ export class InspectionTemplatesService {
     const items = new Map<string, string>();
     for (const section of source.sections) {
       const created = await tx.inspectionTemplateSection.create({
-        data: { tenantId, templateId: targetId, name: section.name, order: section.order },
+        data: {
+          tenantId,
+          templateId: targetId,
+          name: section.name,
+          order: section.order,
+          repeatable: section.repeatable,
+          repeatLabel: section.repeatLabel,
+        },
       });
       sections.set(section.id, created.id);
     }
@@ -461,6 +468,11 @@ export class InspectionTemplatesService {
       if (target) await tx.inspectionTemplateItem.update({ where: { id: items.get(item.id)! }, data: { conditionItemId: target } });
     }
     return { sections, items };
+  }
+
+  private sectionRepeat(section: { repeatable?: boolean; repeatLabel?: string }) {
+    const repeatable = section.repeatable ?? false;
+    return { repeatable, repeatLabel: repeatable ? section.repeatLabel?.trim() || null : null };
   }
 
   private itemData(item: StructureItemDto, order: number, sectionIdByKey: Map<string, string>) {
