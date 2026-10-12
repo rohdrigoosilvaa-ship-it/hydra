@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { Check, ChevronDown, ChevronRight, Loader2, type LucideIcon } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, Loader2, type LucideIcon } from "lucide-react";
 import { api } from "../lib/api";
 import { useAuthStore } from "../lib/auth-store";
 import { useSidebarStore } from "../lib/sidebar-store";
@@ -158,17 +158,19 @@ function NavGroup({
   node,
   depth,
   openMap,
+  defaultOpen,
   onToggle,
   pathname,
 }: {
   node: Extract<NavNode, { kind: "group" }>;
   depth: number;
   openMap: Record<string, boolean>;
+  defaultOpen: boolean;
   onToggle: (id: string) => void;
   pathname: string;
 }) {
   const Icon: LucideIcon = node.icon;
-  const open = openMap[node.id] ?? true;
+  const open = openMap[node.id] ?? defaultOpen;
   const active = nodeMatchesPath(node, pathname);
 
   return (
@@ -190,7 +192,7 @@ function NavGroup({
         }`}
       >
         {node.children.map((child) => (
-          <NavNodeRenderer key={child.kind === "link" ? child.to : child.id} node={child} depth={depth + 1} openMap={openMap} onToggle={onToggle} pathname={pathname} />
+          <NavNodeRenderer key={child.kind === "link" ? child.to : child.id} node={child} depth={depth + 1} openMap={openMap} defaultOpen={defaultOpen} onToggle={onToggle} pathname={pathname} />
         ))}
       </div>
     </div>
@@ -201,18 +203,20 @@ function NavNodeRenderer({
   node,
   depth,
   openMap,
+  defaultOpen,
   onToggle,
   pathname,
 }: {
   node: NavNode;
   depth: number;
   openMap: Record<string, boolean>;
+  defaultOpen: boolean;
   onToggle: (id: string) => void;
   pathname: string;
 }) {
   if (node.kind === "action") return <NavAction item={node} collapsed={false} />;
   if (node.kind === "link") return <NavLeaf item={node} depth={depth} />;
-  return <NavGroup node={node} depth={depth} openMap={openMap} onToggle={onToggle} pathname={pathname} />;
+  return <NavGroup node={node} depth={depth} openMap={openMap} defaultOpen={defaultOpen} onToggle={onToggle} pathname={pathname} />;
 }
 
 export function Sidebar() {
@@ -221,6 +225,8 @@ export function Sidebar() {
   const collapsed = useSidebarStore((s) => s.collapsed);
   const mobileOpen = useSidebarStore((s) => s.mobileOpen);
   const setMobileOpen = useSidebarStore((s) => s.setMobileOpen);
+  const keepCollapsed = useSidebarStore((s) => s.keepCollapsed);
+  const toggleKeepCollapsed = useSidebarStore((s) => s.toggleKeepCollapsed);
   const location = useLocation();
 
   const visibleTop = filterTopItems(assignments);
@@ -231,6 +237,7 @@ export function Sidebar() {
   // Ao navegar, revela (nunca colapsa) a cadeia de seções/grupos que contém a rota ativa —
   // preserva o que o usuário já abriu/fechou manualmente em outros lugares.
   useEffect(() => {
+    if (keepCollapsed) return; // no modo "recolhido" o menu não se abre sozinho
     setOpenMap((prev) => {
       const next = { ...prev };
       for (const section of visibleSections) {
@@ -250,12 +257,43 @@ export function Sidebar() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [location.pathname]);
 
+  const defaultOpen = !keepCollapsed;
+
   function toggle(id: string) {
-    setOpenMap((prev) => ({ ...prev, [id]: !(prev[id] ?? true) }));
+    setOpenMap((prev) => ({ ...prev, [id]: !(prev[id] ?? defaultOpen) }));
   }
 
   function isSectionOpen(section: NavSection) {
-    return openMap[section.id] ?? true;
+    return openMap[section.id] ?? defaultOpen;
+  }
+
+  /** Ids de todas as seções e grupos — para "expandir tudo" / "recolher tudo". */
+  function allIds(): string[] {
+    const ids: string[] = [];
+    const walk = (nodes: NavNode[]) => {
+      for (const n of nodes) {
+        if (n.kind === "group") {
+          ids.push(n.id);
+          walk(n.children);
+        }
+      }
+    };
+    for (const section of visibleSections) {
+      ids.push(section.id);
+      walk(section.items);
+    }
+    return ids;
+  }
+
+  function setAll(open: boolean) {
+    setOpenMap(Object.fromEntries(allIds().map((id) => [id, open])));
+  }
+
+  const everythingOpen = allIds().every((id) => openMap[id] ?? defaultOpen);
+
+  function handleToggleKeepCollapsed() {
+    setOpenMap({}); // recomeça do padrão do novo modo: tudo fechado (recolhido) ou tudo aberto
+    toggleKeepCollapsed();
   }
 
   // Hover só expande temporariamente quando a sidebar está recolhida no desktop —
@@ -313,6 +351,43 @@ export function Sidebar() {
             </div>
           ) : (
             <>
+              <div className="flex items-center gap-1.5">
+                <button
+                  type="button"
+                  role="switch"
+                  aria-checked={keepCollapsed}
+                  onClick={handleToggleKeepCollapsed}
+                  title={
+                    keepCollapsed
+                      ? "Menu recolhido: as seções ficam fechadas até você abrir. Clique para voltar ao normal."
+                      : "Clique para manter o menu recolhido — as seções só abrem quando você quiser."
+                  }
+                  className={`flex min-w-0 flex-1 items-center gap-2 rounded-md px-3 py-2 text-left font-display text-xs font-semibold transition-colors ${
+                    keepCollapsed
+                      ? "bg-sidebar-active text-sidebar-active-text"
+                      : "text-sidebar-ink-muted hover:bg-sidebar-hover hover:text-sidebar-ink"
+                  }`}
+                >
+                  <ChevronsDownUp size={15} />
+                  <span className="flex-1 truncate">Manter recolhido</span>
+                  <span
+                    aria-hidden="true"
+                    className={`relative h-4 w-7 shrink-0 rounded-full transition-colors ${keepCollapsed ? "bg-sidebar-active-text" : "bg-sidebar-border"}`}
+                  >
+                    <span className={`absolute top-0.5 h-3 w-3 rounded-full bg-sidebar transition-all ${keepCollapsed ? "left-3.5" : "left-0.5"}`} />
+                  </span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setAll(!everythingOpen)}
+                  title={everythingOpen ? "Recolher todas as seções" : "Expandir todas as seções"}
+                  aria-label={everythingOpen ? "Recolher todas as seções" : "Expandir todas as seções"}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-sidebar-ink-muted transition-colors hover:bg-sidebar-hover hover:text-sidebar-ink"
+                >
+                  {everythingOpen ? <ChevronsDownUp size={16} /> : <ChevronsUpDown size={16} />}
+                </button>
+              </div>
+
               <div className="flex flex-col gap-1">
                 {visibleTop.map((item) => (
                   <NavLeaf key={item.to} item={item} depth={0} />
@@ -324,9 +399,13 @@ export function Sidebar() {
                   <button
                     type="button"
                     onClick={() => toggle(section.id)}
-                    className="mb-1.5 flex w-full items-center gap-2 px-3 py-1.5 text-left font-mono text-xs font-semibold uppercase tracking-wide text-sidebar-ink-muted hover:text-sidebar-ink"
+                    aria-expanded={isSectionOpen(section)}
+                    className="mb-1.5 flex w-full items-center gap-2 px-3 py-1.5 text-left font-display text-[11px] font-bold uppercase tracking-wider text-sidebar-ink-muted hover:text-sidebar-ink"
                   >
                     <span className="flex-1">{section.label}</span>
+                    {!isSectionOpen(section) && section.items.some((i) => nodeMatchesPath(i, location.pathname)) && (
+                      <span className="h-1.5 w-1.5 rounded-full bg-sidebar-active-text" title="Você está nesta seção" />
+                    )}
                     {isSectionOpen(section) ? <ChevronDown size={13} /> : <ChevronRight size={13} />}
                   </button>
                   <div
@@ -340,6 +419,7 @@ export function Sidebar() {
                         node={node}
                         depth={0}
                         openMap={openMap}
+                        defaultOpen={defaultOpen}
                         onToggle={toggle}
                         pathname={location.pathname}
                       />

@@ -105,7 +105,7 @@ export function Nr01InventoryPage() {
         </select>
       </div>
 
-      <div className="mt-4 overflow-hidden rounded-lg border border-line bg-paper-raised">
+      <div className="mt-4 panel">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-muted">

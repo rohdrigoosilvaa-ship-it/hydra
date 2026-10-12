@@ -1,7 +1,8 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Upload } from "lucide-react";
+import { Plus, Upload, Users, UserCheck, Clock, UserX } from "lucide-react";
 import { api } from "../lib/api";
+import { StatTile } from "../components/ui/cards";
 import { useCompanyFilterStore } from "../lib/company-filter-store";
 import { CreatableSelect } from "../components/CreatableSelect";
 import { DataLoadWizard } from "../components/DataLoadWizard";
@@ -81,7 +82,14 @@ export function EmployeesPage() {
 
       {showLoad && <DataLoadWizard onClose={() => setShowLoad(false)} onImported={load} />}
 
-      <div className="mt-6 overflow-hidden rounded-lg border border-line bg-paper-raised">
+      <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <StatTile label="Colaboradores" value={employees?.length ?? 0} icon={Users} tone="teal" />
+        <StatTile label="Ativos" value={employees?.filter((e) => e.status === "ACTIVE").length ?? 0} icon={UserCheck} tone="teal" />
+        <StatTile label="Afastados" value={employees?.filter((e) => e.status === "ON_LEAVE").length ?? 0} icon={Clock} tone="amber" />
+        <StatTile label="Desligados" value={employees?.filter((e) => e.status === "TERMINATED").length ?? 0} icon={UserX} tone="neutral" />
+      </div>
+
+      <div className="mt-6 panel">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-muted">

@@ -77,7 +77,7 @@ export function HealthPage() {
         {showExamForm && (
           <NewExamForm employees={employees} onClose={() => setShowExamForm(false)} onCreated={() => { setShowExamForm(false); load(); }} />
         )}
-        <div className="mt-3 overflow-hidden rounded-lg border border-line bg-paper-raised">
+        <div className="mt-3 panel">
           <table className="w-full text-left text-sm">
             <thead>
               <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-muted">

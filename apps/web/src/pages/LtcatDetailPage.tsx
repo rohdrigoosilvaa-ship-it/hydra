@@ -180,7 +180,7 @@ export function LtcatDetailPage() {
         </div>
 
         {!showDocForm && (
-          <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 rounded-lg border border-line bg-paper-raised p-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
+          <div className="mt-3 grid grid-cols-1 gap-x-6 gap-y-2 rounded-xl border border-line bg-paper-raised shadow-sm p-4 text-sm sm:grid-cols-2 lg:grid-cols-3">
             <Field label="Código" value={ltcat.code} />
             <Field label="ART" value={ltcat.artNumber} />
             <Field label="Emitido em" value={ltcat.issuedAt ? new Date(ltcat.issuedAt).toLocaleDateString("pt-BR") : null} />
@@ -219,7 +219,7 @@ export function LtcatDetailPage() {
         </div>
 
         {ltcat.ghes.length === 0 ? (
-          <div className="mt-3 rounded-lg border border-line bg-paper-raised p-5 text-center">
+          <div className="mt-3 rounded-xl border border-line bg-paper-raised shadow-sm p-5 text-center">
             <p className="text-sm text-ink-muted">
               Este LTCAT ainda não tem GHE cadastrado — reaproveite a estrutura já existente, sem recadastrar.
             </p>
@@ -552,7 +552,7 @@ function GheCard({
   const [showFunctionForm, setShowFunctionForm] = useState(false);
 
   return (
-    <div className="rounded-lg border border-line bg-paper-raised">
+    <div className="rounded-xl border border-line bg-paper-raised shadow-sm">
       <div className="flex items-center justify-between px-4 py-3">
         <button type="button" onClick={() => setOpen((v) => !v)} className="flex items-center gap-2 text-left">
           {open ? <ChevronDown size={15} /> : <ChevronRight size={15} />}

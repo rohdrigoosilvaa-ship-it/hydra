@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useState } from "react";
-import { Pencil, Plus, Trash2, Upload, X } from "lucide-react";
+import { Pencil, Plus, Trash2, Upload, X, MapPin, CheckCircle2, CircleOff } from "lucide-react";
 import { api } from "../lib/api";
+import { StatTile } from "../components/ui/cards";
 import { DataLoadWizard } from "../components/DataLoadWizard";
 import { useCompanyFilterStore } from "../lib/company-filter-store";
 import type { Branch, Company, Department, Employee, Position } from "../lib/types";
@@ -128,7 +129,13 @@ export function BranchesPage() {
         />
       )}
 
-      <div className="mt-6 overflow-hidden rounded-lg border border-line bg-paper-raised">
+      <div className="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-3">
+        <StatTile label="Unidades" value={branches?.length ?? 0} icon={MapPin} tone="teal" />
+        <StatTile label="Ativas" value={branches?.filter((b) => b.status === "ACTIVE").length ?? 0} icon={CheckCircle2} tone="teal" />
+        <StatTile label="Inativas" value={branches?.filter((b) => b.status !== "ACTIVE").length ?? 0} icon={CircleOff} tone="neutral" />
+      </div>
+
+      <div className="mt-6 panel">
         <table className="w-full text-left text-sm">
           <thead>
             <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-muted">

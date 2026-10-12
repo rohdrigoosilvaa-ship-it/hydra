@@ -193,7 +193,7 @@ export function PgrDetailPage() {
         <p className="mt-3 rounded-md border-l-2 border-amber bg-amber-tint px-3 py-2 text-sm">{inconsistenciesError}</p>
       )}
       {inconsistencies && (
-        <div className="mt-3 rounded-lg border border-line bg-paper-raised p-4">
+        <div className="mt-3 rounded-xl border border-line bg-paper-raised shadow-sm p-4">
           <p className="mb-2 font-mono text-[10px] uppercase tracking-wide text-ink-muted">
             Checklist de validação ({inconsistencies.length} {inconsistencies.length === 1 ? "item" : "itens"})
           </p>

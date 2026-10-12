@@ -90,7 +90,7 @@ export function Topbar() {
           <Menu size={18} />
         </button>
 
-        <nav className="hidden min-w-0 items-center gap-1 truncate font-mono text-xs text-ink-muted sm:flex">
+        <nav className="hidden min-w-0 items-center gap-1 truncate font-display text-xs font-medium text-ink-muted sm:flex">
           <span className="font-medium text-ink">ProtecOne</span>
           {breadcrumb.section && (
             <>
