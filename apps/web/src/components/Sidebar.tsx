@@ -361,8 +361,17 @@ export function Sidebar() {
           mobileOpen ? "translate-x-0" : "-translate-x-full"
         } ${collapsed && !hovering ? "md:w-[72px]" : "md:w-[260px]"} ${expandedOnHover ? "md:shadow-xl" : ""}`}
       >
-        <div className={`flex items-center border-b border-sidebar-border px-4 py-5 ${railMode ? "justify-center px-2" : ""}`}>
-          <Logo variant={railMode ? "mark" : "full"} />
+        <div className={`flex flex-col items-center gap-1.5 border-b border-sidebar-border px-4 py-5 ${railMode ? "px-2" : ""}`}>
+          {railMode ? (
+            <Logo variant="mark" />
+          ) : (
+            <>
+              <Logo variant="full" size="lg" />
+              <p className="text-xs text-sidebar-ink-muted">
+                por <span className="font-display font-bold text-sidebar-ink">ProtecSeg</span>
+              </p>
+            </>
+          )}
         </div>
 
         <nav className="sidebar-scroll flex flex-1 flex-col gap-5 overflow-y-auto overflow-x-hidden px-3 py-4">
