@@ -82,10 +82,19 @@ export interface NavActionItem {
 
 export type NavNode = NavLinkItem | NavGroupItem | NavActionItem;
 
+/** Link para um sistema externo (abre em outra aba), mostrado como item solto no menu. */
+export interface NavExternalLink {
+  href: string;
+  label: string;
+  icon: LucideIcon;
+}
+
 export interface NavSection {
   id: string;
   label: string;
   items: NavNode[];
+  /** Quando presente, a seção é só este link externo (sem cabeçalho nem itens). */
+  external?: NavExternalLink;
 }
 
 export const topItems: NavLinkItem[] = [
@@ -126,21 +135,6 @@ export const navSections: NavSection[] = [
     ],
   },
   {
-    id: "nr01",
-    label: "NR-01",
-    items: [
-      { kind: "link", to: "/nr01", label: "Visão Geral", icon: CircleGauge, permission: PERMISSIONS.PGR_READ, end: true },
-      { kind: "link", to: "/nr01/psicossocial", label: "Riscos Psicossociais", icon: Brain, permission: PERMISSIONS.PSYCHOSOCIAL_READ },
-      { kind: "link", to: "/nr01/avaliacoes", label: "Avaliações", icon: ClipboardCheck, permission: PERMISSIONS.PSYCHOSOCIAL_READ },
-      { kind: "link", to: "/acoes", label: "Planos de Ação", icon: ListChecks, permission: PERMISSIONS.PGR_ACTION_READ },
-      { kind: "link", to: "/nr01/reavaliacoes", label: "Reavaliações", icon: RefreshCw, permission: PERMISSIONS.PGR_READ },
-      { kind: "link", to: "/nr01/indicadores", label: "Indicadores", icon: ChartNoAxesCombined, permission: PERMISSIONS.PGR_READ },
-      { kind: "link", to: "/nr01/relatorios", label: "Relatórios", icon: FileBarChart, permission: PERMISSIONS.REPORT_READ },
-      { kind: "link", to: "/nr01/evidencias", label: "Evidências", icon: Paperclip, permission: PERMISSIONS.PGR_READ },
-      { kind: "link", to: "/nr01/configuracoes", label: "Configurações", icon: Settings, permission: PERMISSIONS.PGR_READ },
-    ],
-  },
-  {
     id: "seguranca",
     label: "Segurança do Trabalho",
     items: [
@@ -165,6 +159,18 @@ export const navSections: NavSection[] = [
       { kind: "link", to: "/ltcat", label: "LTCAT", icon: ClipboardList, permission: PERMISSIONS.LTCAT_READ },
       { kind: "link", to: "/laudos", label: "Laudos", icon: FileText, permission: PERMISSIONS.REPORT_READ },
     ],
+  },
+  {
+    id: "avalia-nr01",
+    label: "Avalia NR-01",
+    items: [],
+    external: { href: "https://avalia-nr-01.vercel.app/", label: "Avalia NR-01", icon: CircleGauge },
+  },
+  {
+    id: "protechub",
+    label: "ProtecHub",
+    items: [],
+    external: { href: "https://protecseg-academy.vercel.app/login", label: "ProtecHub", icon: GraduationCap },
   },
   {
     id: "checkhub",
@@ -252,7 +258,7 @@ function filterNode(node: NavNode, assignments: RoleAssignment[]): NavNode | nul
 export function filterSections(assignments: RoleAssignment[]): NavSection[] {
   return navSections
     .map((section) => ({ ...section, items: section.items.map((i) => filterNode(i, assignments)).filter((i): i is NavNode => i !== null) }))
-    .filter((section) => section.items.length > 0);
+    .filter((section) => section.items.length > 0 || section.external);
 }
 
 export function filterTopItems(assignments: RoleAssignment[]): NavLinkItem[] {

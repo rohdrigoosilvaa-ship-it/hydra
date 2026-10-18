@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { Check, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, Loader2, type LucideIcon } from "lucide-react";
+import { Check, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, ExternalLink as ExternalLinkIcon, Loader2, type LucideIcon } from "lucide-react";
 import { api } from "../lib/api";
 import { useAuthStore } from "../lib/auth-store";
 import { useSidebarStore } from "../lib/sidebar-store";
@@ -11,6 +11,7 @@ import {
   filterTopItems,
   nodeMatchesPath,
   type NavActionItem,
+  type NavExternalLink,
   type NavLinkItem,
   type NavNode,
   type NavSection,
@@ -102,7 +103,41 @@ function NavAction({ item, collapsed }: { item: NavActionItem; collapsed: boolea
   );
 }
 
+/** Link para outro sistema (nova aba), no menu expandido. */
+function ExternalLeaf({ link }: { link: NavExternalLink }) {
+  const Icon = link.icon;
+  return (
+    <a
+      href={link.href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="flex items-center gap-2.5 rounded-md px-3 py-2 font-display text-sm font-semibold text-sidebar-ink-muted transition-colors hover:bg-sidebar-hover hover:text-sidebar-ink"
+    >
+      <Icon size={16} strokeWidth={2} />
+      <span className="flex-1 truncate text-left">{link.label}</span>
+      <ExternalLinkIcon size={13} aria-hidden="true" />
+    </a>
+  );
+}
+
 /** Ícone + tooltip flutuante — usado no modo recolhido (rail de ~72px). */
+function CollapsedExternal({ link }: { link: NavExternalLink }) {
+  const Icon = link.icon;
+  return (
+    <a
+      href={link.href}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="group relative flex items-center justify-center rounded-md py-2.5 text-sidebar-ink-muted transition-colors hover:bg-sidebar-hover hover:text-sidebar-ink"
+    >
+      <Icon size={18} strokeWidth={2} />
+      <span className="pointer-events-none absolute left-full z-50 ml-2 whitespace-nowrap rounded-md bg-ink px-2 py-1 text-xs font-medium text-paper opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100">
+        {link.label}
+      </span>
+    </a>
+  );
+}
+
 function CollapsedLink({ item }: { item: NavLinkItem }) {
   const Icon = item.icon;
   return (
@@ -339,6 +374,7 @@ export function Sidebar() {
               <div className="my-1 border-t border-sidebar-border" />
               {visibleSections.map((section) => (
                 <div key={section.id} className="flex flex-col gap-1 border-b border-sidebar-border pb-1 last:border-none">
+                  {section.external && <CollapsedExternal link={section.external} />}
                   {flattenLinks(section.items).map((item) =>
                     item.kind === "action" ? (
                       <NavAction key={item.id} item={item} collapsed />
@@ -394,7 +430,10 @@ export function Sidebar() {
                 ))}
               </div>
 
-              {visibleSections.map((section) => (
+              {visibleSections.map((section) =>
+                section.external ? (
+                  <ExternalLeaf key={section.id} link={section.external} />
+                ) : (
                 <div key={section.id}>
                   <button
                     type="button"
@@ -426,7 +465,8 @@ export function Sidebar() {
                     ))}
                   </div>
                 </div>
-              ))}
+                ),
+              )}
             </>
           )}
         </nav>
