@@ -161,28 +161,6 @@ export const navSections: NavSection[] = [
     ],
   },
   {
-    id: "avalia-nr01",
-    label: "Avalia NR-01",
-    items: [],
-    external: { href: "https://avalia-nr-01.vercel.app/", label: "Avalia NR-01", icon: CircleGauge },
-  },
-  {
-    id: "protechub",
-    label: "ProtecHub",
-    items: [],
-    external: { href: "https://protecseg-academy.vercel.app/login", label: "ProtecHub", icon: GraduationCap },
-  },
-  {
-    id: "checkhub",
-    label: "CheckHub",
-    items: [
-      { kind: "link", to: "/checkhub/dashboard", label: "Dashboard", icon: LayoutDashboard, permission: PERMISSIONS.OCCURRENCE_READ },
-      { kind: "link", to: "/checkhub/criar-checklist", label: "Criar Checklist", icon: ListChecks, permission: PERMISSIONS.OCCURRENCE_READ },
-      { kind: "link", to: "/checkhub/checklists-aplicados", label: "Checklists Aplicados", icon: ClipboardCheck, permission: PERMISSIONS.OCCURRENCE_READ },
-      { kind: "link", to: "/checkhub/planos-de-acao", label: "Planos de Ação", icon: ListTodo, permission: PERMISSIONS.OCCURRENCE_READ },
-    ],
-  },
-  {
     id: "saude",
     label: "Saúde Ocupacional",
     items: [
@@ -238,6 +216,24 @@ export const navSections: NavSection[] = [
       { kind: "link", to: "/logs-auditoria", label: "Logs e Auditoria", icon: History, permission: PERMISSIONS.ORG_USER_MANAGE },
       { kind: "link", to: "/ajuda", label: "Ajuda e Suporte", icon: CircleHelp },
     ],
+  },
+  {
+    id: "avalia-nr01",
+    label: "Avalia NR-01",
+    items: [],
+    external: { href: "https://avalia-nr-01.vercel.app/#/painel", label: "Avalia NR-01", icon: CircleGauge },
+  },
+  {
+    id: "protechub",
+    label: "ProtecHub",
+    items: [],
+    external: { href: "https://protecseg-academy.vercel.app/login", label: "ProtecHub", icon: GraduationCap },
+  },
+  {
+    id: "checkhub",
+    label: "CheckHub",
+    items: [],
+    external: { href: "https://checkhub-protecseg.vercel.app/", label: "CheckHub", icon: ClipboardCheck },
   },
 ];
 
