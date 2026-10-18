@@ -2,6 +2,7 @@ import { FormEvent, MouseEvent, useEffect, useState } from "react";
 import { ArrowLeft, ClipboardCheck, Pencil, Trash2 } from "lucide-react";
 import { api } from "../../lib/api";
 import { EvidenceUploader } from "../EvidenceUploader";
+import { buildSteps, evidenceSourceId, repetitionCounts, repetitionTitle } from "../../lib/checklist-config";
 import type { Company, Inspection, InspectionDetail, InspectionStatus } from "../../lib/types";
 
 const STATUS_OPTIONS: InspectionStatus[] = ["EM_ANDAMENTO", "CONCLUIDA", "CANCELADA"];
@@ -134,6 +135,8 @@ function InspectionDetailView({
 
   if (!inspection) return <p className="text-sm text-ink-muted">Carregando…</p>;
 
+  const steps = buildSteps(inspection.template, repetitionCounts(inspection.responses, inspection.template));
+
   return (
     <div>
       <div className="flex items-center justify-between">
@@ -176,13 +179,16 @@ function InspectionDetailView({
       )}
 
       <div className="mt-4 flex flex-col gap-3">
-        {inspection.template.items.map((item, index) => {
-          const response = inspection.responses.find((r) => r.templateItemId === item.id);
-          const previous = index > 0 ? inspection.template.items[index - 1] : null;
+        {steps.map(({ item, section, repetition, position }, index) => {
+          const response = inspection.responses.find((r) => r.templateItemId === item.id && r.repetition === repetition);
+          const previous = index > 0 ? steps[index - 1]!.item : null;
           const showBlockHeader = item.blockLabel && item.blockLabel !== previous?.blockLabel;
           const showCategoryHeader = item.category && (item.category !== previous?.category || showBlockHeader);
           return (
-            <div key={item.id}>
+            <div key={`${item.id}-${repetition}`}>
+              {section?.repeatable && position === 1 && (
+                <p className="mb-2 mt-4 font-mono text-xs font-semibold uppercase tracking-wide text-teal-deep">{repetitionTitle(section, repetition)}</p>
+              )}
               {showBlockHeader && (
                 <p className="mb-2 mt-4 font-mono text-xs uppercase tracking-wide text-ink-muted first:mt-0">{item.blockLabel}</p>
               )}
@@ -202,7 +208,7 @@ function InspectionDetailView({
                 {response?.comment && <p className="mt-1 text-sm text-ink-muted">{response.comment}</p>}
                 {item.allowPhoto && (
                   <div className="mt-2">
-                    <EvidenceUploader sourceType="INSPECTION_ITEM_RESPONSE" sourceId={`${inspection.id}:${item.id}`} companyId={inspection.companyId} />
+                    <EvidenceUploader sourceType="INSPECTION_ITEM_RESPONSE" sourceId={evidenceSourceId(inspection.id, item.id, repetition)} companyId={inspection.companyId} />
                   </div>
                 )}
               </div>

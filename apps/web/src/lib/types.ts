@@ -885,6 +885,8 @@ export interface InspectionTemplateSection {
   id: string;
   name: string;
   order: number;
+  repeatable: boolean;
+  repeatLabel: string | null;
 }
 
 export interface InspectionTemplateItem {
@@ -971,6 +973,7 @@ export interface InspectionItemResponse {
   textValue: string | null;
   comment: string | null;
   order: number;
+  repetition: number;
 }
 
 export interface Inspection {

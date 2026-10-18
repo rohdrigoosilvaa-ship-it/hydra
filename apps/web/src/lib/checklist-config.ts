@@ -4,6 +4,7 @@ import type {
   InspectionItemType,
   InspectionTemplate,
   InspectionTemplateItem,
+  InspectionTemplateSection,
 } from "./types";
 
 /** Tipos de resposta do criador de modelos (estilo formulário). */
@@ -103,3 +104,50 @@ export function groupBySection(template: Pick<InspectionTemplate, "sections" | "
 export function formatDateTime(iso: string): string {
   return new Date(iso).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" });
 }
+
+/** Um passo do preenchimento: uma pergunta, numa repetição de sua seção (0 para seções normais). */
+export interface ChecklistStep {
+  item: InspectionTemplateItem;
+  section: InspectionTemplateSection | null;
+  repetition: number;
+  /** Posição da pergunta dentro da seção e total de perguntas da seção. */
+  position: number;
+  total: number;
+}
+
+/**
+ * Sequência de perguntas a preencher. Seção repetível aparece `counts[sectionId]` vezes (mínimo 1),
+ * cada vez com todas as perguntas dela.
+ */
+export function buildSteps(template: Pick<InspectionTemplate, "sections" | "items">, counts: Record<string, number>): ChecklistStep[] {
+  const steps: ChecklistStep[] = [];
+  const groups = groupBySection(template).filter((g) => g.items.length > 0);
+  for (const group of groups) {
+    const section = template.sections.find((s) => s.id === group.id) ?? null;
+    const times = section?.repeatable ? Math.max(1, counts[section.id] ?? 1) : 1;
+    for (let repetition = 0; repetition < times; repetition++) {
+      group.items.forEach((item, i) => steps.push({ item, section, repetition, position: i + 1, total: group.items.length }));
+    }
+  }
+  return steps;
+}
+
+/** Quantas repetições cada seção repetível já tem nas respostas gravadas. */
+export function repetitionCounts(responses: { templateItemId: string; repetition: number }[], template: Pick<InspectionTemplate, "sections" | "items">) {
+  const sectionOfItem = new Map(template.items.map((i) => [i.id, i.sectionId]));
+  const counts: Record<string, number> = {};
+  for (const r of responses) {
+    const sectionId = sectionOfItem.get(r.templateItemId);
+    if (sectionId) counts[sectionId] = Math.max(counts[sectionId] ?? 1, r.repetition + 1);
+  }
+  return counts;
+}
+
+/** Nome mostrado para uma repetição: "Setor 2" (ou "Seção X · 2" sem rótulo). */
+export function repetitionTitle(section: InspectionTemplateSection, repetition: number) {
+  return `${section.repeatLabel?.trim() || section.name} ${repetition + 1}`;
+}
+
+/** Id de origem das evidências de uma resposta (repetição 0 mantém o formato antigo). */
+export const evidenceSourceId = (inspectionId: string, itemId: string, repetition: number) =>
+  repetition > 0 ? `${inspectionId}:${itemId}:${repetition}` : `${inspectionId}:${itemId}`;

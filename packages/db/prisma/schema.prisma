@@ -1127,6 +1127,9 @@ model InspectionTemplateSection {
   templateId String
   name       String
   order      Int
+  /// Seção repetível: ao aplicar o checklist, pode ser preenchida várias vezes (ex.: um setor ou risco por vez).
+  repeatable  Boolean @default(false)
+  repeatLabel String?
 
   template InspectionTemplate       @relation(fields: [templateId], references: [id], onDelete: Cascade)
   items    InspectionTemplateItem[]
@@ -1327,6 +1330,8 @@ model InspectionItemResponse {
   textValue      String?                  @db.Text
   comment        String?                  @db.Text
   order          Int
+  /// Qual repetição da seção repetível esta resposta pertence (0 = primeira / seção normal).
+  repetition     Int                      @default(0)
   createdAt      DateTime                 @default(now())
 
   inspection      Inspection             @relation(fields: [inspectionId], references: [id], onDelete: Cascade)
