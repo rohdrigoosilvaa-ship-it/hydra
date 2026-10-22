@@ -61,7 +61,7 @@ export class Nr01Service {
       }),
     ]);
 
-    const byLevel: Record<RiskLevel, number> = { LOW: 0, MEDIUM: 0, HIGH: 0, CRITICAL: 0 };
+    const byLevel: Record<RiskLevel, number> = { IRRELEVANT: 0, LOW: 0, MEDIUM: 0, HIGH: 0, CRITICAL: 0 };
     for (const r of risks) byLevel[r.riskLevel]++;
     const riskTotal = risks.length;
     const riskEvaluated = risks.filter((r) => !!r.classification).length;

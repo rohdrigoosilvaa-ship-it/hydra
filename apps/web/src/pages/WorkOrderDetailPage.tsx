@@ -17,12 +17,14 @@ const RISK_LEVEL_LABEL: Record<RiskLevel, string> = {
   MEDIUM: "Médio",
   HIGH: "Alto",
   CRITICAL: "Crítico",
+  IRRELEVANT: "Irrelevante",
 };
 const RISK_LEVEL_STYLE: Record<RiskLevel, string> = {
   LOW: "bg-teal-tint text-teal-deep",
   MEDIUM: "bg-amber-tint text-amber",
   HIGH: "bg-amber-tint text-amber",
   CRITICAL: "bg-[color-mix(in_srgb,var(--amber)_18%,transparent)] text-amber",
+  IRRELEVANT: "bg-teal-tint text-teal-deep",
 };
 
 function formatDate(iso: string | null): string {

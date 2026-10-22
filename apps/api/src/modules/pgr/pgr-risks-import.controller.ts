@@ -10,7 +10,7 @@ import { ConfirmRiskImportDto, ImportRiskRowDto } from "./dto/pgr-risks-import.d
 import type { ParsedRiskImportRow } from "./pgr-risks-import.util";
 
 const RISK_CATEGORIES: RiskCategory[] = ["FISICO", "QUIMICO", "BIOLOGICO", "ERGONOMICO", "ACIDENTE"];
-const EXPOSURE_TYPES: ExposureType[] = ["EVENTUAL", "INTERMITENTE", "PERMANENTE"];
+const EXPOSURE_TYPES: ExposureType[] = ["HABITUAL", "EVENTUAL", "INTERMITENTE", "PERMANENTE"];
 const EVALUATION_CRITERIA: EvaluationCriteria[] = ["QUALITATIVO", "QUANTITATIVO"];
 
 /** As linhas voltam do preview (que já as validou) — só remonta os tipos

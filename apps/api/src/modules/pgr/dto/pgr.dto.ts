@@ -2,7 +2,7 @@ import { IsArray, IsDateString, IsIn, IsInt, IsOptional, IsString, Max, Min, Min
 import type { ActionStatus, EvaluationCriteria, ExposureType, RiskCategory } from "@hydra/db";
 
 const RISK_CATEGORIES: RiskCategory[] = ["FISICO", "QUIMICO", "BIOLOGICO", "ERGONOMICO", "ACIDENTE"];
-const EXPOSURE_TYPES: ExposureType[] = ["EVENTUAL", "INTERMITENTE", "PERMANENTE"];
+const EXPOSURE_TYPES: ExposureType[] = ["HABITUAL", "EVENTUAL", "INTERMITENTE", "PERMANENTE"];
 const EVALUATION_CRITERIA: EvaluationCriteria[] = ["QUALITATIVO", "QUANTITATIVO"];
 
 export class CreateHazardDto {
@@ -343,12 +343,12 @@ export class CreatePgrRiskDto extends PgrRiskFields {
 
   @IsInt()
   @Min(1)
-  @Max(5)
+  @Max(4)
   probability!: number;
 
   @IsInt()
   @Min(1)
-  @Max(5)
+  @Max(4)
   severity!: number;
 }
 

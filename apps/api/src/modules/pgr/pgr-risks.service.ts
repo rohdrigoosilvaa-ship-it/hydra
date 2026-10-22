@@ -3,7 +3,7 @@ import { PrismaService } from "../../core/prisma/prisma.service";
 import { PERMISSIONS } from "../../core/permissions/permissions";
 import type { RoleAssignmentClaim } from "../../core/auth/jwt.types";
 import type { CreatePgrRiskDto, UpdatePgrRiskDto } from "./dto/pgr.dto";
-import { computeRiskLevel } from "./risk-level.util";
+import { computeRiskLevel, riskLevelLabel } from "./risk-level.util";
 import { assertCompanyInScope, relatedCompanyScopeWhere } from "../org/scope.util";
 
 @Injectable()
@@ -30,6 +30,7 @@ export class PgrRisksService {
       data: {
         ...dto,
         riskLevel: computeRiskLevel(dto.probability, dto.severity),
+        classification: riskLevelLabel(computeRiskLevel(dto.probability, dto.severity)),
         tenantId,
         createdById: userId,
         updatedById: userId,
@@ -51,6 +52,7 @@ export class PgrRisksService {
       data: {
         ...dto,
         riskLevel: computeRiskLevel(probability, severity),
+        classification: riskLevelLabel(computeRiskLevel(probability, severity)),
         updatedById: userId,
       },
       include: { hazard: true, ghe: true },

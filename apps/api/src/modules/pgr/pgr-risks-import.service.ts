@@ -3,7 +3,7 @@ import { PrismaService } from "../../core/prisma/prisma.service";
 import type { RoleAssignmentClaim } from "../../core/auth/jwt.types";
 import type { RiskCategory } from "@hydra/db";
 import { GheService } from "./ghe.service";
-import { computeRiskLevel } from "./risk-level.util";
+import { computeRiskLevel, riskLevelLabel } from "./risk-level.util";
 import { parseRiskImportWorkbook, type ParsedRiskImportRow } from "./pgr-risks-import.util";
 
 export type RiskImportRowStatus = "new" | "update" | "error";
@@ -47,7 +47,7 @@ function normalizeKey(s: string): string {
 function validateScale(v: number | "__invalid__" | undefined, label: string): { value?: number; error?: string } {
   if (v === undefined) return { error: `${label} é obrigatória.` };
   if (v === "__invalid__") return { error: `${label} inválida — use um número.` };
-  if (!Number.isInteger(v) || v < 1 || v > 5) return { error: `${label} deve ser um número inteiro entre 1 e 5.` };
+  if (!Number.isInteger(v) || v < 1 || v > 4) return { error: `${label} deve ser um número inteiro entre 1 e 4.` };
   return { value: v };
 }
 
@@ -337,7 +337,7 @@ export class PgrRisksImportService {
         exposureType: row.exposureType === "__invalid__" ? undefined : row.exposureType,
         evaluationCriteria: row.evaluationCriteria === "__invalid__" ? undefined : row.evaluationCriteria,
         exposureProfile: row.exposureProfile,
-        classification: row.classification,
+        classification: row.classification ?? riskLevelLabel(computeRiskLevel(probability, severity)),
         conclusion: row.conclusion,
         adminControls: row.adminControls,
         engineeringControls: row.engineeringControls,

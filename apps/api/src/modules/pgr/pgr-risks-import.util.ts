@@ -61,8 +61,8 @@ const COLUMN_ALIASES: Record<Field, string[]> = {
   exposureType: ["tipo de exposicao"],
   evaluationCriteria: ["criterio"],
   exposureProfile: ["perfil de exposicao"],
-  probability: ["probabilidade (1-5)", "probabilidade"],
-  severity: ["severidade (1-5)", "severidade"],
+  probability: ["probabilidade (1-4)", "probabilidade (1-5)", "probabilidade"],
+  severity: ["severidade (1-4)", "severidade (1-5)", "severidade"],
   classification: ["classificacao"],
   conclusion: ["conclusao"],
   adminControls: ["medidas administrativas"],
@@ -76,6 +76,7 @@ const COLUMN_ALIASES: Record<Field, string[]> = {
 // colaboradores reais vinculados ao GHE, então essa coluna nunca é lida.
 
 const EXPOSURE_TYPE_BY_TEXT: Record<string, ExposureType> = {
+  habitual: "HABITUAL",
   eventual: "EVENTUAL",
   intermitente: "INTERMITENTE",
   permanente: "PERMANENTE",

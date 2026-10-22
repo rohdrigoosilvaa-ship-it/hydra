@@ -5,6 +5,7 @@ import { EpiDeliveriesController } from "./epi-deliveries.controller";
 import { EpiDeliveriesService } from "./epi-deliveries.service";
 import { EpiPdfService } from "./epi-pdf.service";
 import { EpiStockController } from "./epi-stock.controller";
+import { EpiStockPdfService } from "./epi-stock-pdf.service";
 import { EpiStockService } from "./epi-stock.service";
 import { EpiSignaturesController } from "./epi-signatures.controller";
 import { EpiSigningPublicController } from "./epi-signing-public.controller";
@@ -12,6 +13,6 @@ import { EpiSignaturesService } from "./epi-signatures.service";
 
 @Module({
   controllers: [EpiStockController, EpiCatalogController, EpiDeliveriesController, EpiSignaturesController, EpiSigningPublicController],
-  providers: [EpiStockService, EpiCatalogService, EpiDeliveriesService, EpiPdfService, EpiSignaturesService],
+  providers: [EpiStockPdfService, EpiStockService, EpiCatalogService, EpiDeliveriesService, EpiPdfService, EpiSignaturesService],
 })
 export class EpiModule {}

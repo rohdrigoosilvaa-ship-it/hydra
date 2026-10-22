@@ -15,11 +15,12 @@ const RISK_CATEGORY_LABEL: Record<string, string> = {
   ACIDENTE: "Acidente",
 };
 const EXPOSURE_TYPE_LABEL: Record<string, string> = {
+  HABITUAL: "Habitual",
   EVENTUAL: "Eventual",
   INTERMITENTE: "Intermitente",
   PERMANENTE: "Permanente",
 };
-const EXPOSURE_TYPE_ABBR: Record<string, string> = { EVENTUAL: "Event", INTERMITENTE: "Int", PERMANENTE: "Perm" };
+const EXPOSURE_TYPE_ABBR: Record<string, string> = { HABITUAL: "Hab", EVENTUAL: "Event", INTERMITENTE: "Int", PERMANENTE: "Perm" };
 const EVALUATION_CRITERIA_LABEL: Record<string, string> = { QUALITATIVO: "Qualitativo", QUANTITATIVO: "Quantitativo" };
 const EVALUATION_CRITERIA_ABBR: Record<string, string> = { QUALITATIVO: "Quali", QUANTITATIVO: "Quant" };
 const RISK_LEVEL_LABEL: Record<string, string> = {
@@ -27,8 +28,9 @@ const RISK_LEVEL_LABEL: Record<string, string> = {
   MEDIUM: "Risco Médio",
   HIGH: "Risco Alto",
   CRITICAL: "Risco Crítico",
+  IRRELEVANT: "Risco Irrelevante",
 };
-// Escalas do modelo (4 níveis) — o cadastro aceita 1-5, o 5 é exibido como o nível máximo.
+// Escalas do modelo (4 níveis) — o cadastro aceita 1-4 (valores antigos de 5 são exibidos como o nível máximo).
 const PROBABILITY_LABEL: Record<number, string> = { 1: "Ocasional", 2: "Intermitente", 3: "Habitual", 4: "Permanente", 5: "Permanente" };
 const SEVERITY_LABEL: Record<number, string> = { 1: "Leve", 2: "Moderado", 3: "Sério", 4: "Severo", 5: "Severo" };
 
@@ -74,6 +76,7 @@ const RISK_LEVEL_TEXT_COLOR: Record<string, string> = {
   MEDIUM: "#8a6d00",
   HIGH: "#b4531a",
   CRITICAL: C_RED,
+  IRRELEVANT: C_GREEN_DARK,
 };
 const LEVEL_COLOR: Record<number, string> = { 1: C_GREEN, 2: C_YELLOW, 3: C_ORANGE, 4: C_RED };
 const LEVEL_TINT: Record<number, string> = { 1: "#f0f7f3", 2: "#fdf8e4", 3: "#faf1ec", 4: "#f9ecec" };
