@@ -1,6 +1,7 @@
 import { FormEvent, useEffect, useMemo, useState } from "react";
 import { AlertTriangle, CalendarClock, FileDown, Package, PackageCheck, Pencil, Plus, Search, Trash2, X } from "lucide-react";
 import { api } from "../lib/api";
+import { useCompanyFilterStore } from "../lib/company-filter-store";
 import { StatTile } from "../components/ui/cards";
 import type { EpiStockItem } from "../lib/types";
 
@@ -39,6 +40,7 @@ export function EpiStockPage() {
   const [editing, setEditing] = useState<EpiStockItem | "new" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [downloading, setDownloading] = useState(false);
+  const selectedCompanyId = useCompanyFilterStore((s) => s.selectedCompanyId);
 
   async function load() {
     setItems(await api.get<EpiStockItem[]>("/epi/stock"));
@@ -66,7 +68,7 @@ export function EpiStockPage() {
     setError(null);
     setDownloading(true);
     try {
-      const { blob, filename } = await api.getBlob("/epi/stock/report/pdf");
+      const { blob, filename } = await api.getBlob(selectedCompanyId ? `/epi/stock/report/pdf?companyId=${encodeURIComponent(selectedCompanyId)}` : "/epi/stock/report/pdf");
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -98,7 +100,7 @@ export function EpiStockPage() {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="font-display text-2xl font-semibold text-ink">Controle de EPI</h1>
-          <p className="mt-1 max-w-2xl text-sm text-ink-muted">Estoque de EPIs: item, CA, quantidade e vencimento.</p>
+          <p className="mt-1 max-w-2xl text-sm text-ink-muted">Estoque de EPIs: item, CA, quantidade e vencimento. A relação em PDF sai com a logo da empresa selecionada no topo.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           <button onClick={handleDownloadReport} disabled={downloading} className="btn-secondary flex shrink-0 items-center gap-1.5">

@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Patch, Post, Res } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query, Res } from "@nestjs/common";
 import type { Response } from "express";
 import { CurrentUser } from "../../core/decorators/current-user.decorator";
 import { RequirePermission } from "../../core/decorators/require-permission.decorator";
@@ -24,8 +24,8 @@ export class EpiStockController {
   /** Relação de EPIs em estoque, em PDF — declarada antes das rotas com :id. */
   @Get("report/pdf")
   @RequirePermission(PERMISSIONS.EPI_READ)
-  async report(@CurrentUser() user: HydraRequestUser, @Res() res: Response) {
-    const { buffer, filename } = await this.stockPdf.generate(user.tenantId);
+  async report(@CurrentUser() user: HydraRequestUser, @Res() res: Response, @Query("companyId") companyId?: string) {
+    const { buffer, filename } = await this.stockPdf.generate(user.tenantId, user.assignments, companyId || undefined);
     res.set({
       "Content-Type": "application/pdf",
       "Content-Disposition": `attachment; filename="${filename}"`,

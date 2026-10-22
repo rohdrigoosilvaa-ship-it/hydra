@@ -1,6 +1,9 @@
-import { Injectable } from "@nestjs/common";
+import { Injectable, NotFoundException } from "@nestjs/common";
 import PDFDocument from "pdfkit";
 import { PrismaService } from "../../core/prisma/prisma.service";
+import { PERMISSIONS } from "../../core/permissions/permissions";
+import type { RoleAssignmentClaim } from "../../core/auth/jwt.types";
+import { assertCompanyInScope } from "../org/scope.util";
 import { PROTECSEG_LETTERHEAD_JPEG_BASE64 } from "../../core/pdf/protecseg-letterhead";
 
 const MARGIN = 50;
@@ -48,15 +51,41 @@ function situationOf(expiresAt: Date | null, now: Date): Situation {
 export class EpiStockPdfService {
   constructor(private readonly prisma: PrismaService) {}
 
-  async generate(tenantId: string) {
+  /**
+   * Com `companyId`, o documento sai com a identidade da empresa cliente (logo e nome) no lugar do
+   * timbrado ProtecSeg. Sem empresa, mantém o timbrado ProtecSeg.
+   */
+  async generate(tenantId: string, assignments: RoleAssignmentClaim[], companyId?: string) {
+    let client: { name: string; logo: Buffer | null } | null = null;
+    if (companyId) {
+      assertCompanyInScope(assignments, PERMISSIONS.EPI_READ, companyId);
+      const company = await this.prisma.company.findFirst({ where: { id: companyId, tenantId } });
+      if (!company) throw new NotFoundException("Empresa não encontrada.");
+      client = { name: company.name, logo: await this.fetchLogo(company.logoUrl) };
+    }
     const items = await this.prisma.epiStockItem.findMany({ where: { tenantId }, orderBy: [{ name: "asc" }, { createdAt: "asc" }] });
     const now = new Date();
-    const buffer = await this.render(items, now);
+    const buffer = await this.render(items, now, client);
     const stamp = now.toISOString().slice(0, 10);
     return { buffer, filename: `RELACAO_ESTOQUE_EPI_${stamp}.pdf` };
   }
 
-  private render(items: Awaited<ReturnType<PrismaService["epiStockItem"]["findMany"]>>, now: Date): Promise<Buffer> {
+  private async fetchLogo(logoUrl: string | null): Promise<Buffer | null> {
+    if (!logoUrl) return null;
+    try {
+      const res = await fetch(logoUrl);
+      if (!res.ok) return null;
+      return Buffer.from(await res.arrayBuffer());
+    } catch {
+      return null;
+    }
+  }
+
+  private render(
+    items: Awaited<ReturnType<PrismaService["epiStockItem"]["findMany"]>>,
+    now: Date,
+    client: { name: string; logo: Buffer | null } | null,
+  ): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({
         size: "A4",
@@ -69,7 +98,28 @@ export class EpiStockPdfService {
       doc.on("error", reject);
 
       const drawLetterhead = () => {
-        doc.image(LETTERHEAD_BUFFER, 0, 0, { width: PAGE_WIDTH, height: PAGE_HEIGHT });
+        if (!client) {
+          doc.image(LETTERHEAD_BUFFER, 0, 0, { width: PAGE_WIDTH, height: PAGE_HEIGHT });
+          return;
+        }
+        // Identidade da empresa cliente: logo à esquerda, nome ao lado e uma linha verde sob o cabeçalho.
+        let textX = MARGIN;
+        if (client.logo) {
+          try {
+            doc.image(client.logo, MARGIN, 30, { fit: [110, 50], valign: "center" });
+            textX = MARGIN + 124;
+          } catch {
+            // formato que o pdfkit não lê (ex.: webp/svg) — segue só com o nome
+          }
+        }
+        doc
+          .font("Helvetica-Bold")
+          .fontSize(13)
+          .fillColor(COLOR_INK)
+          .text(client.name.normalize("NFC"), textX, 48, { width: PAGE_WIDTH - MARGIN - textX, lineBreak: false, ellipsis: true });
+        doc.moveTo(MARGIN, 88).lineTo(PAGE_WIDTH - MARGIN, 88).strokeColor("#0e9f4a").lineWidth(1.5).stroke();
+        doc.x = MARGIN;
+        doc.y = MARGIN_TOP;
       };
       drawLetterhead();
       doc.on("pageAdded", drawLetterhead);
