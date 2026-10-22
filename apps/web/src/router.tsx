@@ -37,6 +37,7 @@ import { PsychosocialListPage } from "./pages/PsychosocialListPage";
 import { PsychosocialDetailPage } from "./pages/PsychosocialDetailPage";
 import { PsychosocialResponsePage } from "./pages/PsychosocialResponsePage";
 import { ContractSigningPage } from "./pages/ContractSigningPage";
+import { EpiStockPage } from "./pages/EpiStockPage";
 import { EpiControlPage } from "./pages/EpiControlPage";
 import { EpiDeliveryDetailPage } from "./pages/EpiDeliveryDetailPage";
 import { EpiSigningPage } from "./pages/EpiSigningPage";
@@ -132,6 +133,7 @@ export const router = createBrowserRouter([
       // endereço antigo: mantém links e favoritos funcionando
       { path: "inspecoes", element: <Navigate to="/checkhub/dashboard" replace /> },
       { path: "epi", element: <EpiControlPage /> },
+      { path: "controle-epi", element: <EpiStockPage /> },
       { path: "epi/:id", element: <EpiDeliveryDetailPage /> },
       { path: "ordens-servico", element: <WorkOrdersPage /> },
       { path: "ordens-servico/:id", element: <WorkOrderDetailPage /> },

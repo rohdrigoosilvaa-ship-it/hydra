@@ -1244,3 +1244,14 @@ export interface WorkOrderSigningPublicSummary {
     epiItems: { epiName: string; ca: string | null }[];
   };
 }
+
+export interface EpiStockItem {
+  id: string;
+  name: string;
+  ca: string | null;
+  category: string | null;
+  quantity: number;
+  expiresAt: string | null;
+  notes: string | null;
+  createdAt: string;
+}
