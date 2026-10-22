@@ -2,6 +2,7 @@ import { FormEvent, useState } from "react";
 import { Layers, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
 import { api } from "../../lib/api";
 import {
+  MATRIX_CLASSIFICATION,
   MATRIX_LEVEL_COLOR,
   MATRIX_LEVEL_LABEL,
   PROBABILITY_OPTIONS,
@@ -18,6 +19,7 @@ import type {
   PgrDetail,
   PgrRisk,
   RiskCategory,
+  YesNo,
 } from "../../lib/types";
 
 const RISK_LEVEL_STYLE: Record<string, string> = {
@@ -451,7 +453,7 @@ function RiskCard({ risk, onEdit, onRemove }: { risk: PgrRisk; onEdit: () => voi
           </div>
           <div className="rounded-md bg-paper px-2.5 py-1.5">
             <dt className="font-mono text-[10px] uppercase tracking-wide text-ink-muted">Classificação</dt>
-            <dd className="truncate text-ink">{risk.classification ?? "A definir"}</dd>
+            <dd className="truncate text-ink">{MATRIX_CLASSIFICATION[risk.riskLevel] ?? risk.classification ?? "A definir"}</dd>
           </div>
         </dl>
         <div className="mt-auto flex justify-end gap-3 pt-1">
@@ -487,6 +489,15 @@ function RiskForm({
   const [hazardList, setHazardList] = useState(hazards);
   const [gheId, setGheId] = useState(risk?.gheId ?? ghes[0]?.id ?? "");
   const [hazardId, setHazardId] = useState(risk?.hazardId ?? "");
+  const [description, setDescription] = useState(risk?.description ?? "");
+  const [legalBasis, setLegalBasis] = useState(risk?.legalBasis ?? "");
+  const [exposureTime, setExposureTime] = useState(risk?.exposureTime ?? "");
+  const [usesEpc, setUsesEpc] = useState<YesNo | "">(risk?.usesEpc ?? "");
+  const [epcEffective, setEpcEffective] = useState<YesNo | "">(risk?.epcEffective ?? "");
+  const [usesEpi, setUsesEpi] = useState<YesNo | "">(risk?.usesEpi ?? "");
+  const [epiEffective, setEpiEffective] = useState<YesNo | "">(risk?.epiEffective ?? "");
+  const [requiredActions, setRequiredActions] = useState(risk?.requiredActions ?? "");
+  const [guidance, setGuidance] = useState(risk?.guidance ?? "");
   const [typicalInjuries, setTypicalInjuries] = useState(risk?.typicalInjuries ?? "");
   const [sourceCircumstances, setSourceCircumstances] = useState(risk?.sourceCircumstances ?? "");
   const [propagationMeans, setPropagationMeans] = useState(risk?.propagationMeans ?? "");
@@ -513,40 +524,58 @@ function RiskForm({
     setSaving(true);
     setError(null);
     try {
+      // Campo vazio vira null: assim, apagar um texto no formulário também apaga no risco já salvo.
+      const t = (v: string) => v.trim() || null;
       const payload = isAbsence
         ? {
             gheId,
             hazardId,
-            typicalInjuries: "",
-            sourceCircumstances: "",
-            propagationMeans: "",
-            exposureProfile: "",
+            description: null,
+            legalBasis: null,
+            typicalInjuries: null,
+            sourceCircumstances: null,
+            propagationMeans: null,
+            exposureTime: null,
+            exposureProfile: null,
             probability: 1,
             severity: 1,
-            classification: MATRIX_LEVEL_LABEL[riskLevelOf(1, 1)],
-            conclusion: "",
-            adminControls: "",
-            engineeringControls: "",
-            epcMeasures: "",
-            epiMeasures: "",
+            conclusion: null,
+            adminControls: null,
+            engineeringControls: null,
+            epcMeasures: null,
+            epiMeasures: null,
+            usesEpc: null,
+            epcEffective: null,
+            usesEpi: null,
+            epiEffective: null,
+            requiredActions: null,
+            guidance: null,
           }
         : {
             gheId,
             hazardId,
-            typicalInjuries: typicalInjuries || undefined,
-            sourceCircumstances: sourceCircumstances || undefined,
-            propagationMeans: propagationMeans || undefined,
-            exposureType: exposureType || undefined,
-            evaluationCriteria: evaluationCriteria || undefined,
-            exposureProfile: exposureProfile || undefined,
+            description: t(description),
+            legalBasis: t(legalBasis),
+            typicalInjuries: t(typicalInjuries),
+            sourceCircumstances: t(sourceCircumstances),
+            propagationMeans: t(propagationMeans),
+            exposureTime: t(exposureTime),
+            exposureType: exposureType || null,
+            evaluationCriteria: evaluationCriteria || null,
+            exposureProfile: t(exposureProfile),
             probability,
             severity,
-            classification: MATRIX_LEVEL_LABEL[level],
-            conclusion: conclusion || undefined,
-            adminControls: adminControls || undefined,
-            engineeringControls: engineeringControls || undefined,
-            epcMeasures: epcMeasures || undefined,
-            epiMeasures: epiMeasures || undefined,
+            conclusion: t(conclusion),
+            adminControls: t(adminControls),
+            engineeringControls: t(engineeringControls),
+            epcMeasures: t(epcMeasures),
+            epiMeasures: t(epiMeasures),
+            usesEpc: usesEpc || null,
+            epcEffective: epcEffective || null,
+            usesEpi: usesEpi || null,
+            epiEffective: epiEffective || null,
+            requiredActions: t(requiredActions),
+            guidance: t(guidance),
           };
       if (risk) {
         await api.patch(`/pgr/risks/${risk.id}`, payload);
@@ -619,9 +648,27 @@ function RiskForm({
           />
           {!isAbsence && (
             <>
-          <label className="flex flex-col gap-1 text-sm">
+          <label className="flex flex-col gap-1 text-sm sm:col-span-2">
+            <span className="text-ink-muted">Descrição</span>
+            <textarea
+              className="input min-h-[64px] resize-y"
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder={hazardList.find((h) => h.id === hazardId)?.description ?? "Descreva o perigo neste GHE"}
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm sm:col-span-2">
+            <span className="text-ink-muted">Fundamentação legal</span>
+            <textarea
+              className="input min-h-[64px] resize-y"
+              value={legalBasis}
+              onChange={(e) => setLegalBasis(e.target.value)}
+              placeholder='ex.: NR17 "Ergonomia" item 17.5 — levantamento, transporte e descarga individual de cargas'
+            />
+          </label>
+          <label className="flex flex-col gap-1 text-sm sm:col-span-2">
             <span className="text-ink-muted">Possíveis lesões ou agravos à saúde</span>
-            <input className="input" value={typicalInjuries} onChange={(e) => setTypicalInjuries(e.target.value)} />
+            <textarea className="input min-h-[56px] resize-y" value={typicalInjuries} onChange={(e) => setTypicalInjuries(e.target.value)} />
           </label>
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-ink-muted">Fontes ou circunstâncias</span>
@@ -640,6 +687,10 @@ function RiskForm({
       <div className="border-t border-line pt-4">
         <p className="mb-3 font-mono text-[10px] uppercase tracking-wide text-ink-muted">Avaliação</p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-ink-muted">Tempo de exposição</span>
+            <input type="time" className="input" value={exposureTime} onChange={(e) => setExposureTime(e.target.value)} aria-label="Tempo de exposição" />
+          </label>
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-ink-muted">Tipo de exposição</span>
             <select className="input" value={exposureType} onChange={(e) => setExposureType(e.target.value as ExposureType)}>
@@ -704,13 +755,15 @@ function RiskForm({
               </select>
             </label>
             <div className="flex flex-col gap-1 text-sm sm:col-span-2">
-              <span className="text-ink-muted">Classificação (calculada)</span>
+              <span className="text-ink-muted">Nível de risco e classificação (calculados)</span>
               <div
                 className="flex items-center justify-between rounded-md border border-line px-3 py-2.5 font-display font-semibold text-black"
                 style={{ background: MATRIX_LEVEL_COLOR[level] }}
                 aria-live="polite"
               >
-                <span>{MATRIX_LEVEL_LABEL[level]}</span>
+                <span>
+                  Risco {MATRIX_LEVEL_LABEL[level]} · {MATRIX_CLASSIFICATION[level]}
+                </span>
                 <span className="text-sm font-medium">{clampScale(probability)} × {clampScale(severity)} = {clampScale(probability) * clampScale(severity)}</span>
               </div>
               <p className="text-xs text-ink-muted">O nível de risco e a classificação são calculados pela matriz ao lado a partir da probabilidade e da severidade.</p>
@@ -730,6 +783,25 @@ function RiskForm({
         <div className="mb-3 flex items-center justify-between">
           <p className="font-mono text-[10px] uppercase tracking-wide text-ink-muted">Prevenção e controle</p>
         </div>
+        <div className="mb-3 grid grid-cols-2 gap-3 lg:grid-cols-4">
+          {(
+            [
+              ["Utiliza EPC", usesEpc, setUsesEpc],
+              ["EPC eficaz", epcEffective, setEpcEffective],
+              ["Utiliza EPI", usesEpi, setUsesEpi],
+              ["EPI eficaz", epiEffective, setEpiEffective],
+            ] as const
+          ).map(([label, value, set]) => (
+            <label key={label} className="flex flex-col gap-1 text-sm">
+              <span className="text-ink-muted">{label}</span>
+              <select className="input" value={value} onChange={(e) => set(e.target.value as YesNo | "")}>
+                <option value="">Não se aplica</option>
+                <option value="SIM">Sim</option>
+                <option value="NAO">Não</option>
+              </select>
+            </label>
+          ))}
+        </div>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-ink-muted">Medidas administrativas</span>
@@ -746,6 +818,14 @@ function RiskForm({
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-ink-muted">EPI</span>
             <textarea className="input min-h-[60px] resize-y" value={epiMeasures} onChange={(e) => setEpiMeasures(e.target.value)} />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-ink-muted">Ações necessárias</span>
+            <textarea className="input min-h-[60px] resize-y" value={requiredActions} onChange={(e) => setRequiredActions(e.target.value)} placeholder="ex.: Treinamento de NR17 - Ergonomia" />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-ink-muted">Orientação</span>
+            <textarea className="input min-h-[60px] resize-y" value={guidance} onChange={(e) => setGuidance(e.target.value)} placeholder="ex.: Campanha de conscientização; capacitação antes do início das atividades" />
           </label>
         </div>
       </div>

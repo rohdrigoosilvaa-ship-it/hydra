@@ -3,7 +3,7 @@ import { PrismaService } from "../../core/prisma/prisma.service";
 import type { RoleAssignmentClaim } from "../../core/auth/jwt.types";
 import type { RiskCategory } from "@hydra/db";
 import { GheService } from "./ghe.service";
-import { computeRiskLevel, riskLevelLabel } from "./risk-level.util";
+import { computeRiskLevel, riskClassification } from "./risk-level.util";
 import { parseRiskImportWorkbook, type ParsedRiskImportRow } from "./pgr-risks-import.util";
 
 export type RiskImportRowStatus = "new" | "update" | "error";
@@ -337,7 +337,7 @@ export class PgrRisksImportService {
         exposureType: row.exposureType === "__invalid__" ? undefined : row.exposureType,
         evaluationCriteria: row.evaluationCriteria === "__invalid__" ? undefined : row.evaluationCriteria,
         exposureProfile: row.exposureProfile,
-        classification: row.classification ?? riskLevelLabel(computeRiskLevel(probability, severity)),
+        classification: riskClassification(computeRiskLevel(probability, severity)),
         conclusion: row.conclusion,
         adminControls: row.adminControls,
         engineeringControls: row.engineeringControls,

@@ -281,7 +281,45 @@ export class UpdateGheFunctionDto {
 
 /** Campos de um risco (seções 16-20 do escopo) — Identificação / Avaliação /
  * Prevenção e controle, espelhando exatamente o PGR de referência. */
+const YES_NO: string[] = ["SIM", "NAO", "NAO_SE_APLICA"];
+
 class PgrRiskFields {
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  legalBasis?: string;
+
+  @IsOptional()
+  @IsString()
+  exposureTime?: string;
+
+  @IsOptional()
+  @IsIn(YES_NO)
+  usesEpc?: string;
+
+  @IsOptional()
+  @IsIn(YES_NO)
+  epcEffective?: string;
+
+  @IsOptional()
+  @IsIn(YES_NO)
+  usesEpi?: string;
+
+  @IsOptional()
+  @IsIn(YES_NO)
+  epiEffective?: string;
+
+  @IsOptional()
+  @IsString()
+  requiredActions?: string;
+
+  @IsOptional()
+  @IsString()
+  guidance?: string;
+
   @IsOptional()
   @IsString()
   typicalInjuries?: string;
