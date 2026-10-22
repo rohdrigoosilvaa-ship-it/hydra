@@ -755,6 +755,10 @@ model PgrRisk {
   hazardId String
 
   // Identificação
+  /// Descrição do risco neste GHE (se vazia, vale a descrição do perigo).
+  description         String? @db.Text
+  /// Fundamentação legal (ex.: NR-17 item 17.5).
+  legalBasis          String? @db.Text
   /// Possíveis lesões ou agravos à saúde.
   typicalInjuries     String? @db.Text
   /// Fontes ou circunstâncias geradoras do perigo.
@@ -763,6 +767,8 @@ model PgrRisk {
   propagationMeans    String?
 
   // Avaliação
+  /// Tempo de exposição (ex.: "04:00").
+  exposureTime       String?
   exposureType       ExposureType?
   evaluationCriteria EvaluationCriteria?
   /// Perfil de exposição em texto livre (ex.: "Habitual e permanente").
@@ -782,6 +788,15 @@ model PgrRisk {
   engineeringControls String? @db.Text
   epcMeasures         String? @db.Text
   epiMeasures         String? @db.Text
+  /// Utiliza EPC / EPC eficaz / Utiliza EPI / EPI eficaz: "SIM", "NAO" ou "NAO_SE_APLICA".
+  usesEpc             String?
+  epcEffective        String?
+  usesEpi             String?
+  epiEffective        String?
+  /// Ações necessárias (ex.: "Treinamento de NR17 - Ergonomia").
+  requiredActions     String? @db.Text
+  /// Orientação aos trabalhadores.
+  guidance            String? @db.Text
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt

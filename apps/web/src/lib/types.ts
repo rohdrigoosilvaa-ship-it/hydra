@@ -515,11 +515,22 @@ export interface Ghe {
   employeesCount?: number;
 }
 
+export type YesNo = "SIM" | "NAO" | "NAO_SE_APLICA";
+
 export interface PgrRisk {
   id: string;
   pgrId: string;
   gheId: string;
   hazardId: string;
+  description: string | null;
+  legalBasis: string | null;
+  exposureTime: string | null;
+  usesEpc: YesNo | null;
+  epcEffective: YesNo | null;
+  usesEpi: YesNo | null;
+  epiEffective: YesNo | null;
+  requiredActions: string | null;
+  guidance: string | null;
   typicalInjuries: string | null;
   sourceCircumstances: string | null;
   propagationMeans: string | null;

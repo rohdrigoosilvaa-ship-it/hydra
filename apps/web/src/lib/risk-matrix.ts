@@ -44,3 +44,12 @@ export const SEVERITY_OPTIONS = [
   { value: 3, label: "3 — Sério" },
   { value: 4, label: "4 — Severo" },
 ];
+
+/** Classificação do risco (Aceitável … Intolerável), calculada junto com o nível. */
+export const MATRIX_CLASSIFICATION: Record<RiskLevel, string> = {
+  IRRELEVANT: "Aceitável",
+  LOW: "Tolerável",
+  MEDIUM: "Moderado",
+  HIGH: "Substancial",
+  CRITICAL: "Intolerável",
+};

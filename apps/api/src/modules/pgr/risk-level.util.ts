@@ -20,5 +20,16 @@ export function computeRiskLevel(probability: number, severity: number): RiskLev
 
 const LABEL: Record<RiskLevel, string> = { IRRELEVANT: "Irrelevante", LOW: "Baixo", MEDIUM: "Médio", HIGH: "Alto", CRITICAL: "Crítico" };
 
-/** Texto da classificação do risco (igual ao nível calculado pela matriz). */
+/** Nível de risco por extenso (Irrelevante, Baixo, Médio, Alto, Crítico). */
 export const riskLevelLabel = (level: RiskLevel) => LABEL[level];
+
+const CLASSIFICATION: Record<RiskLevel, string> = {
+  IRRELEVANT: "Aceitável",
+  LOW: "Tolerável",
+  MEDIUM: "Moderado",
+  HIGH: "Substancial",
+  CRITICAL: "Intolerável",
+};
+
+/** Classificação do risco (Aceitável … Intolerável), calculada junto com o nível. */
+export const riskClassification = (level: RiskLevel) => CLASSIFICATION[level];

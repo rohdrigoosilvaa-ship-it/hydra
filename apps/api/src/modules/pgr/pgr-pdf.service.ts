@@ -30,6 +30,14 @@ const RISK_LEVEL_LABEL: Record<string, string> = {
   CRITICAL: "Risco Crítico",
   IRRELEVANT: "Risco Irrelevante",
 };
+const YES_NO_LABEL: Record<string, string> = { SIM: "Sim", NAO: "Não", NAO_SE_APLICA: "Não se aplica" };
+const RISK_CLASSIFICATION: Record<string, string> = {
+  IRRELEVANT: "Aceitável",
+  LOW: "Tolerável",
+  MEDIUM: "Moderado",
+  HIGH: "Substancial",
+  CRITICAL: "Intolerável",
+};
 // Escalas do modelo (4 níveis) — o cadastro aceita 1-4 (valores antigos de 5 são exibidos como o nível máximo).
 const PROBABILITY_LABEL: Record<number, string> = { 1: "Ocasional", 2: "Intermitente", 3: "Habitual", 4: "Permanente", 5: "Permanente" };
 const SEVERITY_LABEL: Record<number, string> = { 1: "Leve", 2: "Moderado", 3: "Sério", 4: "Severo", 5: "Severo" };
@@ -1006,8 +1014,11 @@ export class PgrPdfService {
         const catColor = CATEGORY_COLOR[cat] ?? C_GREEN;
         const headColor = cat === "ERGONOMICO" ? "#3a3000" : "#ffffff";
 
+        // "Ausência de agentes…" é só a declaração de inexistência: mostra o grupo e o perigo, nada mais.
+        const isAbsence = /^aus.{1,2}ncia/i.test(nfc(hazard.name).trim());
+
         // Mantém o quadro de um risco junto, quando cabe numa página.
-        ensureSpace(260);
+        ensureSpace(isAbsence ? 100 : 260);
 
         bar("Identificação");
         const hasCode = !!hazard.esocialCode;
@@ -1023,53 +1034,66 @@ export class PgrPdfService {
         drawRow(headCells, { minH: 26, borderColor: catColor });
         drawRow(valCells, { minH: 28 });
 
-        if (hazard.description) labelRow("Descrição", hazard.description);
+        if (isAbsence) {
+          gap(12);
+          return;
+        }
+
+        const description = risk.description ?? hazard.description;
+        if (description) labelRow("Descrição", description);
+        if (risk.legalBasis) labelRow("Fundamentação legal", risk.legalBasis);
         const injuries = risk.typicalInjuries ?? hazard.damagePotential;
         if (injuries) labelRow("Possíveis lesões ou agravos à saúde", injuries);
         if (risk.sourceCircumstances) labelRow("Fontes ou circunstâncias", risk.sourceCircumstances);
         if (risk.propagationMeans) labelRow("Meio de propagação", risk.propagationMeans);
 
+        const th = (t: string, w: number) => ({ text: t, w, font: "Helvetica-Bold", fill: C_GRAY_ROW, color: C_INK, align: "center" as const }) as Cell;
         bar("Avaliação");
-        const half = [frac(0.5), frac(0.5)];
+        const t3 = [frac(0.32), frac(0.34), frac(0.34)];
+        drawRow([th("Tempo de exposição", t3[0]!), th("Tipo de exposição", t3[1]!), th("Critério", t3[2]!)], { minH: 24 });
         drawRow(
           [
-            { text: "Tipo de exposição", w: half[0]!, font: "Helvetica-Bold", fill: C_GRAY_ROW, color: C_INK, align: "center" },
-            { text: "Critério", w: half[1]!, font: "Helvetica-Bold", fill: C_GRAY_ROW, color: C_INK, align: "center" },
-          ],
-          { minH: 24 },
-        );
-        drawRow(
-          [
-            { text: risk.exposureType ? EXPOSURE_TYPE_LABEL[risk.exposureType]! : "Não informado", w: half[0]!, align: "center" },
-            { text: risk.evaluationCriteria ? EVALUATION_CRITERIA_LABEL[risk.evaluationCriteria]! : "Não informado", w: half[1]!, align: "center" },
+            { text: risk.exposureTime || "Não informado", w: t3[0]!, align: "center" },
+            { text: risk.exposureType ? EXPOSURE_TYPE_LABEL[risk.exposureType]! : "Não informado", w: t3[1]!, align: "center" },
+            { text: risk.evaluationCriteria ? EVALUATION_CRITERIA_LABEL[risk.evaluationCriteria]! : "Não informado", w: t3[2]!, align: "center" },
           ],
           { minH: 24 },
         );
         if (risk.exposureProfile) labelRow("Perfil de exposição", risk.exposureProfile);
         const q = [frac(0.25), frac(0.25), frac(0.25), frac(0.25)];
-        const qh = (t: string, i: number) => ({ text: t, w: q[i]!, font: "Helvetica-Bold", fill: C_GRAY_ROW, color: C_INK, align: "center" as const }) as Cell;
-        drawRow([qh("Classificação do Efeito", 0), qh("Frequência", 1), qh("Nível de Risco", 2), qh("Classificação", 3)], { minH: 24 });
+        drawRow([th("Classificação do Efeito", q[0]!), th("Frequência", q[1]!), th("Nível de Risco", q[2]!), th("Classificação", q[3]!)], { minH: 24 });
         drawRow(
           [
             { text: SEVERITY_LABEL[risk.severity] ?? String(risk.severity), w: q[0]!, align: "center" },
             { text: PROBABILITY_LABEL[risk.probability] ?? String(risk.probability), w: q[1]!, align: "center" },
             { text: RISK_LEVEL_LABEL[risk.riskLevel] ?? "", w: q[2]!, align: "center", font: "Helvetica-Bold", color: RISK_LEVEL_TEXT_COLOR[risk.riskLevel] ?? C_BODY },
-            { text: risk.classification ?? "A definir", w: q[3]!, align: "center" },
+            { text: RISK_CLASSIFICATION[risk.riskLevel] ?? risk.classification ?? "A definir", w: q[3]!, align: "center" },
           ],
           { minH: 24 },
         );
 
+        bar("Prevenção e controle");
+        const yn = (v: string | null | undefined) => YES_NO_LABEL[v ?? ""] ?? "Não se aplica";
+        drawRow([th("Utiliza EPC", q[0]!), th("EPC eficaz", q[1]!), th("Utiliza EPI", q[2]!), th("EPI eficaz", q[3]!)], { minH: 24 });
+        drawRow(
+          [
+            { text: yn(risk.usesEpc), w: q[0]!, align: "center" },
+            { text: yn(risk.epcEffective), w: q[1]!, align: "center" },
+            { text: yn(risk.usesEpi), w: q[2]!, align: "center" },
+            { text: yn(risk.epiEffective), w: q[3]!, align: "center" },
+          ],
+          { minH: 24 },
+        );
         const controls: [string, string | null][] = [
           ["Medidas administrativas", risk.adminControls],
           ["Medidas de engenharia", risk.engineeringControls],
           ["EPC", risk.epcMeasures],
           ["EPI", risk.epiMeasures],
+          ["Ações necessárias", risk.requiredActions],
+          ["Orientação", risk.guidance],
           ["Conclusão", risk.conclusion],
         ];
-        if (controls.some(([, v]) => v)) {
-          bar("Prevenção e controle");
-          for (const [label, value] of controls) if (value) labelRow(label, listText(value));
-        }
+        for (const [label, value] of controls) if (value) labelRow(label, listText(value));
         gap(12);
       }
 
