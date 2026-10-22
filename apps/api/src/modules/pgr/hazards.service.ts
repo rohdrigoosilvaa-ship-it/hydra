@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../core/prisma/prisma.service";
 import type { CreateHazardDto, UpdateHazardDto } from "./dto/pgr.dto";
 
@@ -26,5 +26,18 @@ export class HazardsService {
   async update(tenantId: string, id: string, dto: UpdateHazardDto) {
     await this.get(tenantId, id);
     return this.prisma.hazard.update({ where: { id }, data: dto });
+  }
+
+  /** Exclusão lógica. Perigo em uso no inventário de algum PGR não pode ser excluído. */
+  async remove(tenantId: string, id: string) {
+    await this.get(tenantId, id);
+    const inUse = await this.prisma.pgrRisk.count({ where: { tenantId, hazardId: id } });
+    if (inUse > 0) {
+      throw new BadRequestException(
+        `Este perigo está em uso em ${inUse} risco(s) do inventário. Remova ou troque esses riscos antes de excluí-lo.`,
+      );
+    }
+    await this.prisma.hazard.update({ where: { id }, data: { deletedAt: new Date() } });
+    return { success: true };
   }
 }

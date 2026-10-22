@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post } from "@nestjs/common";
 import { CurrentUser } from "../../core/decorators/current-user.decorator";
 import { RequirePermission } from "../../core/decorators/require-permission.decorator";
 import { PERMISSIONS } from "../../core/permissions/permissions";
@@ -32,5 +32,11 @@ export class HazardsController {
   @RequirePermission(PERMISSIONS.PGR_WRITE)
   update(@CurrentUser() user: HydraRequestUser, @Param("id") id: string, @Body() dto: UpdateHazardDto) {
     return this.hazards.update(user.tenantId, id, dto);
+  }
+
+  @Delete(":id")
+  @RequirePermission(PERMISSIONS.PGR_WRITE)
+  remove(@CurrentUser() user: HydraRequestUser, @Param("id") id: string) {
+    return this.hazards.remove(user.tenantId, id);
   }
 }

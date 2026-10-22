@@ -92,6 +92,7 @@ export function PgrInventarioTab({
           pgrId={pgr.id}
           ghes={pgr.ghes}
           hazards={hazards}
+          onHazardsChanged={onChanged}
           onClose={() => setShowRiskForm(false)}
           onSaved={() => {
             setShowRiskForm(false);
@@ -105,6 +106,7 @@ export function PgrInventarioTab({
           ghes={pgr.ghes}
           hazards={hazards}
           risk={editingRisk}
+          onHazardsChanged={onChanged}
           onClose={() => setEditingRisk(null)}
           onSaved={() => {
             setEditingRisk(null);
@@ -154,46 +156,91 @@ function HazardPicker({
   value,
   onChange,
   onCreated,
+  onUpdated,
+  onDeleted,
 }: {
   hazards: Hazard[];
   value: string;
   onChange: (id: string) => void;
   onCreated: (hazard: Hazard) => void;
+  onUpdated: (hazard: Hazard) => void;
+  onDeleted: (id: string) => void;
 }) {
-  const [creating, setCreating] = useState(false);
+  const [mode, setMode] = useState<"select" | "create" | "edit">("select");
   const [category, setCategory] = useState<RiskCategory>("FISICO");
   const [name, setName] = useState("");
   const [esocialCode, setEsocialCode] = useState("");
   const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const selected = hazards.find((h) => h.id === value);
 
   const grouped = (Object.keys(RISK_CATEGORY_LABEL) as RiskCategory[]).map((cat) => ({
     cat,
     items: hazards.filter((h) => h.category === cat),
   }));
 
-  async function handleCreate() {
-    if (!name.trim() || saving) return;
+  function startCreate() {
+    setCategory("FISICO");
+    setName("");
+    setEsocialCode("");
+    setError(null);
+    setMode("create");
+  }
+  function startEdit() {
+    if (!selected) return;
+    setCategory(selected.category);
+    setName(selected.name);
+    setEsocialCode(selected.esocialCode ?? "");
+    setError(null);
+    setMode("edit");
+  }
+
+  async function handleSave() {
+    if (name.trim().length < 2 || saving) return;
     setSaving(true);
+    setError(null);
     try {
-      const created = await api.post<Hazard>("/pgr/hazards", {
-        category,
-        name: name.trim(),
-        esocialCode: esocialCode || undefined,
-      });
-      onCreated(created);
-      onChange(created.id);
-      setName("");
-      setEsocialCode("");
-      setCreating(false);
+      if (mode === "edit" && selected) {
+        const updated = await api.patch<Hazard>(`/pgr/hazards/${selected.id}`, {
+          category,
+          name: name.trim(),
+          esocialCode: esocialCode.trim() || undefined,
+        });
+        onUpdated(updated);
+      } else {
+        const created = await api.post<Hazard>("/pgr/hazards", {
+          category,
+          name: name.trim(),
+          esocialCode: esocialCode || undefined,
+        });
+        onCreated(created);
+        onChange(created.id);
+      }
+      setMode("select");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao salvar o perigo.");
     } finally {
       setSaving(false);
     }
   }
 
-  if (creating) {
+  async function handleDelete() {
+    if (!selected) return;
+    if (!window.confirm(`Excluir o perigo "${selected.name}" da lista?`)) return;
+    setError(null);
+    try {
+      await api.del(`/pgr/hazards/${selected.id}`);
+      onDeleted(selected.id);
+      onChange("");
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao excluir o perigo.");
+    }
+  }
+
+  if (mode !== "select") {
     return (
       <div className="flex flex-col gap-1 text-sm">
-        <span className="text-ink-muted">Novo perigo/fator de risco</span>
+        <span className="text-ink-muted">{mode === "edit" ? "Editar perigo/fator de risco" : "Novo perigo/fator de risco"}</span>
         <div className="flex flex-wrap gap-1.5">
           <select className="input w-40" value={category} onChange={(e) => setCategory(e.target.value as RiskCategory)}>
             {(Object.keys(RISK_CATEGORY_LABEL) as RiskCategory[]).map((c) => (
@@ -202,45 +249,70 @@ function HazardPicker({
           </select>
           <input className="input min-w-[160px] flex-1" placeholder="Nome do perigo" value={name} onChange={(e) => setName(e.target.value)} />
           <input className="input w-32" placeholder="Cód. eSocial" value={esocialCode} onChange={(e) => setEsocialCode(e.target.value)} />
-          <button type="button" disabled={saving} onClick={handleCreate} className="btn-primary shrink-0 px-3 text-xs">
-            {saving ? "…" : "Criar"}
+          <button type="button" disabled={saving} onClick={handleSave} className="btn-primary shrink-0 px-3 text-xs">
+            {saving ? "…" : mode === "edit" ? "Salvar" : "Criar"}
           </button>
-          <button type="button" className="btn-secondary shrink-0 px-3 text-xs" onClick={() => setCreating(false)}>
+          <button type="button" className="btn-secondary shrink-0 px-3 text-xs" onClick={() => setMode("select")}>
             X
           </button>
         </div>
+        {error && <p className="text-xs text-amber" role="alert">{error}</p>}
       </div>
     );
   }
 
   return (
-    <label className="flex flex-col gap-1 text-sm">
-      <span className="text-ink-muted">Perigo/Fator de Risco</span>
-      <select
-        className="input"
-        value={value}
-        onChange={(e) => {
-          if (e.target.value === "__new__") {
-            setCreating(true);
-            return;
-          }
-          onChange(e.target.value);
-        }}
-        required
-      >
-        <option value="">Selecione…</option>
-        {grouped.map(({ cat, items }) =>
-          items.length > 0 ? (
-            <optgroup key={cat} label={RISK_CATEGORY_LABEL[cat]}>
-              {items.map((h) => (
-                <option key={h.id} value={h.id}>{h.name}</option>
-              ))}
-            </optgroup>
-          ) : null,
-        )}
-        <option value="__new__">+ Novo perigo…</option>
-      </select>
-    </label>
+    <div className="flex flex-col gap-1 text-sm">
+      <label htmlFor="hazard-select" className="text-ink-muted">Perigo/Fator de Risco</label>
+      <div className="flex items-center gap-1.5">
+        <select
+          id="hazard-select"
+          className="input min-w-0 flex-1"
+          value={value}
+          onChange={(e) => {
+            if (e.target.value === "__new__") {
+              startCreate();
+              return;
+            }
+            onChange(e.target.value);
+          }}
+          required
+        >
+          <option value="">Selecione…</option>
+          {grouped.map(({ cat, items }) =>
+            items.length > 0 ? (
+              <optgroup key={cat} label={RISK_CATEGORY_LABEL[cat]}>
+                {items.map((h) => (
+                  <option key={h.id} value={h.id}>{h.name}</option>
+                ))}
+              </optgroup>
+            ) : null,
+          )}
+          <option value="__new__">+ Novo perigo…</option>
+        </select>
+        <button
+          type="button"
+          onClick={startEdit}
+          disabled={!selected}
+          title="Editar o perigo selecionado"
+          aria-label="Editar perigo selecionado"
+          className="rounded-md border border-line p-2 text-ink-muted hover:bg-teal-tint hover:text-ink disabled:opacity-40"
+        >
+          <Pencil size={15} />
+        </button>
+        <button
+          type="button"
+          onClick={handleDelete}
+          disabled={!selected}
+          title="Excluir o perigo selecionado"
+          aria-label="Excluir perigo selecionado"
+          className="rounded-md border border-line p-2 text-ink-muted hover:bg-danger-tint hover:text-danger disabled:opacity-40"
+        >
+          <Trash2 size={15} />
+        </button>
+      </div>
+      {error && <p className="text-xs text-amber" role="alert">{error}</p>}
+    </div>
   );
 }
 
@@ -331,6 +403,7 @@ function RiskForm({
   risk,
   onClose,
   onSaved,
+  onHazardsChanged,
 }: {
   pgrId: string;
   ghes: Ghe[];
@@ -338,6 +411,7 @@ function RiskForm({
   risk?: PgrRisk;
   onClose: () => void;
   onSaved: () => void;
+  onHazardsChanged: () => void;
 }) {
   const [hazardList, setHazardList] = useState(hazards);
   const [gheId, setGheId] = useState(risk?.gheId ?? ghes[0]?.id ?? "");
@@ -408,6 +482,11 @@ function RiskForm({
             value={hazardId}
             onChange={setHazardId}
             onCreated={(h) => setHazardList((prev) => [...prev, h])}
+            onUpdated={(h) => {
+              setHazardList((prev) => prev.map((x) => (x.id === h.id ? h : x)));
+              onHazardsChanged();
+            }}
+            onDeleted={(id) => setHazardList((prev) => prev.filter((x) => x.id !== id))}
           />
         </div>
       </div>
@@ -441,6 +520,11 @@ function RiskForm({
             value={hazardId}
             onChange={setHazardId}
             onCreated={(h) => setHazardList((prev) => [...prev, h])}
+            onUpdated={(h) => {
+              setHazardList((prev) => prev.map((x) => (x.id === h.id ? h : x)));
+              onHazardsChanged();
+            }}
+            onDeleted={(id) => setHazardList((prev) => prev.filter((x) => x.id !== id))}
           />
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-ink-muted">Possíveis lesões ou agravos à saúde</span>
