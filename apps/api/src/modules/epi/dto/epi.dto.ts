@@ -89,3 +89,59 @@ export class SignEpiDeliveryDto {
   @IsIn(["DRAWN", "TYPED"])
   signatureMethod!: "DRAWN" | "TYPED";
 }
+
+export class CreateEpiStockItemDto {
+  @IsString()
+  @IsNotEmpty()
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  ca?: string;
+
+  @IsOptional()
+  @IsString()
+  category?: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  quantity?: number;
+
+  @IsOptional()
+  @IsDateString()
+  expiresAt?: string;
+
+  @IsOptional()
+  @IsString()
+  notes?: string;
+}
+
+export class UpdateEpiStockItemDto {
+  @IsOptional()
+  @IsString()
+  @IsNotEmpty()
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  ca?: string | null;
+
+  @IsOptional()
+  @IsString()
+  category?: string | null;
+
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  quantity?: number;
+
+  /** null remove a validade. */
+  @IsOptional()
+  @IsDateString()
+  expiresAt?: string | null;
+
+  @IsOptional()
+  @IsString()
+  notes?: string | null;
+}

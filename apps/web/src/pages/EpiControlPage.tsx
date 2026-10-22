@@ -85,7 +85,7 @@ export function EpiControlPage() {
     <div>
       <div className="flex items-start justify-between gap-4">
         <div>
-          <h1 className="font-display text-2xl font-semibold text-ink">Controle de EPI</h1>
+          <h1 className="font-display text-2xl font-semibold text-ink">EPI</h1>
           <p className="mt-1 max-w-2xl text-sm text-ink-muted">
             Fichas de entrega de Equipamento de Proteção Individual — assinatura eletrônica via QR code.
           </p>

@@ -2270,6 +2270,24 @@ model EpiCatalogItem {
   @@map("epi_catalog_items")
 }
 
+/// Estoque de EPIs (controle de EPI): item, CA, quantidade e validade.
+model EpiStockItem {
+  id          String    @id @default(cuid())
+  tenantId    String
+  name        String
+  ca          String?
+  category    String?
+  quantity    Int       @default(0)
+  expiresAt   DateTime?
+  notes       String?   @db.Text
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+  createdById String?
+
+  @@index([tenantId])
+  @@map("epi_stock_items")
+}
+
 enum EpiDeliveryStatus {
   ATIVA
   CANCELADA
