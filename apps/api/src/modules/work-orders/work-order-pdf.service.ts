@@ -104,9 +104,25 @@ export class WorkOrderPdfService {
 
   async generate(tenantId: string, id: string, assignments: RoleAssignmentClaim[] | null) {
     const { workOrder, company, employee, creator } = await this.loadContext(tenantId, id, assignments);
-    const buffer = await this.render(workOrder, company, employee, creator);
+    const logoBuffer = await this.fetchLogo(company?.logoUrl ?? null);
+    const buffer = await this.render(workOrder, company, employee, creator, logoBuffer);
     const filename = `ORDEM_SERVICO_${sanitizeForFilename(workOrder.employeeName)}.pdf`;
     return { buffer, filename };
+  }
+
+  /** Logo da empresa cliente — se o download falhar ou o formato não for PNG/JPEG, o PDF sai sem ela. */
+  private async fetchLogo(logoUrl: string | null): Promise<Buffer | null> {
+    if (!logoUrl) return null;
+    try {
+      const res = await fetch(logoUrl);
+      if (!res.ok) return null;
+      const buf = Buffer.from(await res.arrayBuffer());
+      const isPng = buf.length > 8 && buf[0] === 0x89 && buf[1] === 0x50;
+      const isJpeg = buf.length > 3 && buf[0] === 0xff && buf[1] === 0xd8;
+      return isPng || isJpeg ? buf : null;
+    } catch {
+      return null;
+    }
   }
 
   private render(
@@ -114,6 +130,7 @@ export class WorkOrderPdfService {
     company: Awaited<ReturnType<typeof this.loadContext>>["company"],
     employee: Awaited<ReturnType<typeof this.loadContext>>["employee"],
     creator: Awaited<ReturnType<typeof this.loadContext>>["creator"],
+    logoBuffer: Buffer | null,
   ): Promise<Buffer> {
     return new Promise((resolve, reject) => {
       const doc = new PDFDocument({
@@ -128,6 +145,17 @@ export class WorkOrderPdfService {
 
       function drawLetterhead() {
         doc.image(LETTERHEAD_BUFFER, 0, 0, { width: PAGE_WIDTH, height: PAGE_HEIGHT });
+        if (logoBuffer) {
+          // Logo da empresa cliente no canto esquerdo do cabeçalho, sobre um quadro branco (a logo da ProtecSeg fica à direita).
+          try {
+            doc.save();
+            doc.roundedRect(MARGIN - 6, 10, 130, 48, 6).fill("#ffffff");
+            doc.restore();
+            doc.image(logoBuffer, MARGIN, 14, { fit: [118, 40], align: "center", valign: "center" });
+          } catch {
+            // imagem que o pdfkit não consegue ler — segue sem a logo
+          }
+        }
       }
       drawLetterhead();
       doc.on("pageAdded", drawLetterhead);
