@@ -9,12 +9,14 @@ const RISK_LEVEL_LABEL: Record<string, string> = {
   MEDIUM: "Moderado",
   HIGH: "Elevado",
   CRITICAL: "Crítico",
+  IRRELEVANT: "Irrelevante",
 };
 const RISK_LEVEL_BAR: Record<string, string> = {
   LOW: "bg-teal-deep",
   MEDIUM: "bg-amber",
   HIGH: "bg-amber",
   CRITICAL: "bg-[color-mix(in_srgb,var(--amber)_70%,black)]",
+  IRRELEVANT: "bg-teal",
 };
 const ALERT_STYLE: Record<string, string> = {
   error: "border-amber bg-amber-tint text-amber",
@@ -77,7 +79,7 @@ export function Nr01OverviewPage() {
             Distribuição dos riscos identificados por nível. Critérios de classificação configuráveis (em breve).
           </p>
           <div className="mt-4 flex flex-col gap-2.5">
-            {(["LOW", "MEDIUM", "HIGH", "CRITICAL"] as const).map((level) => {
+            {(["IRRELEVANT", "LOW", "MEDIUM", "HIGH", "CRITICAL"] as const).map((level) => {
               const count = totalByLevel[level];
               const pct = Math.round((count / riskTotal) * 100);
               return (

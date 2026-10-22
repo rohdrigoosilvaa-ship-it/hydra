@@ -1,6 +1,14 @@
 import { FormEvent, useState } from "react";
 import { Layers, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
 import { api } from "../../lib/api";
+import {
+  MATRIX_LEVEL_COLOR,
+  MATRIX_LEVEL_LABEL,
+  PROBABILITY_OPTIONS,
+  SEVERITY_OPTIONS,
+  clampScale,
+  riskLevelOf,
+} from "../../lib/risk-matrix";
 import { ImportPgrRisksWizard } from "../ImportPgrRisksWizard";
 import type {
   EvaluationCriteria,
@@ -17,12 +25,14 @@ const RISK_LEVEL_STYLE: Record<string, string> = {
   MEDIUM: "bg-amber-tint text-amber",
   HIGH: "bg-amber-tint text-amber",
   CRITICAL: "bg-[color-mix(in_srgb,var(--amber)_18%,transparent)] text-amber",
+  IRRELEVANT: "bg-teal-tint text-teal-deep",
 };
 const RISK_LEVEL_LABEL: Record<string, string> = {
   LOW: "Baixo",
   MEDIUM: "Médio",
   HIGH: "Alto",
   CRITICAL: "Crítico",
+  IRRELEVANT: "Irrelevante",
 };
 const RISK_CATEGORY_LABEL: Record<RiskCategory, string> = {
   FISICO: "Físico",
@@ -32,10 +42,26 @@ const RISK_CATEGORY_LABEL: Record<RiskCategory, string> = {
   ACIDENTE: "Acidente",
 };
 const EXPOSURE_TYPE_LABEL: Record<ExposureType, string> = {
+  HABITUAL: "Habitual",
   EVENTUAL: "Eventual",
   INTERMITENTE: "Intermitente",
   PERMANENTE: "Permanente",
 };
+const EXPOSURE_TYPE_HELP: Record<ExposureType, string> = {
+  HABITUAL: "faz parte da rotina.",
+  EVENTUAL: "acontece ocasionalmente.",
+  INTERMITENTE: "ocorre com frequência, mas alterna com períodos sem exposição.",
+  PERMANENTE: "exposição contínua durante a atividade.",
+};
+const EXPOSURE_PROFILE_TEMPLATE = [
+  "Agente: ",
+  "Atividade e local: ",
+  "Frequência: ",
+  "Duração: ",
+  "Intensidade ou concentração: ",
+  "Via de contato: ",
+  "Controles existentes: ",
+].join("\n");
 const EVALUATION_CRITERIA_LABEL: Record<EvaluationCriteria, string> = {
   QUALITATIVO: "Qualitativo",
   QUANTITATIVO: "Quantitativo",
@@ -316,18 +342,20 @@ function HazardPicker({
   );
 }
 
-const LEVEL_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW"];
+const LEVEL_ORDER = ["CRITICAL", "HIGH", "MEDIUM", "LOW", "IRRELEVANT"];
 const LEVEL_BAR: Record<string, string> = {
   CRITICAL: "bg-danger",
   HIGH: "bg-amber",
   MEDIUM: "bg-[color-mix(in_srgb,var(--amber)_45%,transparent)]",
   LOW: "bg-teal",
+  IRRELEVANT: "bg-teal-deep",
 };
 const LEVEL_BADGE: Record<string, string> = {
   CRITICAL: "bg-danger text-white",
   HIGH: "bg-amber-tint text-amber",
   MEDIUM: "bg-amber-tint text-amber",
   LOW: "bg-teal-tint text-teal-deep",
+  IRRELEVANT: "bg-teal-tint text-teal-deep",
 };
 const CATEGORY_CHIP: Record<RiskCategory, string> = {
   FISICO: "bg-teal-tint text-teal-deep",
@@ -337,10 +365,53 @@ const CATEGORY_CHIP: Record<RiskCategory, string> = {
   ACIDENTE: "bg-danger-tint text-danger",
 };
 
-/** Contagem de riscos por nível, em quatro quadros coloridos. */
+/** Tabela de referência (4x4) com a célula escolhida em destaque. */
+function RiskMatrix({ probability, severity }: { probability: number; severity: number }) {
+  const rows = [1, 2, 3, 4];
+  return (
+    <div className="text-center text-xs" aria-label="Matriz de classificação do risco">
+      <p className="mb-1 font-display text-[11px] font-bold uppercase tracking-wide text-ink-muted">Severidade / potencial de dano</p>
+      <div className="inline-flex gap-1.5">
+        <div className="flex items-center">
+          <span className="font-display text-[11px] font-bold uppercase tracking-wide text-ink-muted [writing-mode:vertical-rl] rotate-180">
+            Frequência / probabilidade
+          </span>
+        </div>
+        <div>
+          <div className="mb-1 flex gap-0.5 pl-0">
+            {rows.map((c) => (
+              <span key={c} className="w-16 py-0.5 font-semibold text-ink-muted">{c}</span>
+            ))}
+          </div>
+          {rows.map((p) => (
+            <div key={p} className="mb-0.5 flex items-center gap-0.5">
+              {rows.map((c) => {
+                const lvl = riskLevelOf(p, c);
+                const on = p === probability && c === severity;
+                return (
+                  <div
+                    key={c}
+                    className={`flex h-14 w-16 flex-col items-center justify-center rounded-sm font-medium leading-tight text-black ${on ? "ring-2 ring-ink ring-offset-1" : "opacity-70"}`}
+                    style={{ background: MATRIX_LEVEL_COLOR[lvl] }}
+                  >
+                    <span className="text-sm">{p * c}</span>
+                    <span>{MATRIX_LEVEL_LABEL[lvl]}</span>
+                  </div>
+                );
+              })}
+              <span className="w-4 pl-1 font-semibold text-ink-muted">{p}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/** Contagem de riscos por nível, em cinco quadros coloridos. */
 function RiskSummary({ risks }: { risks: PgrRisk[] }) {
   return (
-    <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
+    <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
       {LEVEL_ORDER.map((level) => {
         const count = risks.filter((r) => r.riskLevel === level).length;
         return (
@@ -422,9 +493,9 @@ function RiskForm({
   const [exposureType, setExposureType] = useState<ExposureType | "">(risk?.exposureType ?? "");
   const [evaluationCriteria, setEvaluationCriteria] = useState<EvaluationCriteria | "">(risk?.evaluationCriteria ?? "QUALITATIVO");
   const [exposureProfile, setExposureProfile] = useState(risk?.exposureProfile ?? "");
-  const [probability, setProbability] = useState(risk?.probability ?? 3);
-  const [severity, setSeverity] = useState(risk?.severity ?? 3);
-  const [classification, setClassification] = useState(risk?.classification ?? "");
+  const [probability, setProbability] = useState(clampScale(risk?.probability ?? 2));
+  const [severity, setSeverity] = useState(clampScale(risk?.severity ?? 2));
+  const level = riskLevelOf(probability, severity);
   const [conclusion, setConclusion] = useState(risk?.conclusion ?? "");
   const [adminControls, setAdminControls] = useState(risk?.adminControls ?? "");
   const [engineeringControls, setEngineeringControls] = useState(risk?.engineeringControls ?? "");
@@ -450,7 +521,7 @@ function RiskForm({
         exposureProfile: exposureProfile || undefined,
         probability,
         severity,
-        classification: classification || undefined,
+        classification: MATRIX_LEVEL_LABEL[level],
         conclusion: conclusion || undefined,
         adminControls: adminControls || undefined,
         engineeringControls: engineeringControls || undefined,
@@ -549,7 +620,7 @@ function RiskForm({
             <select className="input" value={exposureType} onChange={(e) => setExposureType(e.target.value as ExposureType)}>
               <option value="">Não informado</option>
               {(Object.keys(EXPOSURE_TYPE_LABEL) as ExposureType[]).map((t) => (
-                <option key={t} value={t}>{EXPOSURE_TYPE_LABEL[t]}</option>
+                <option key={t} value={t}>{EXPOSURE_TYPE_LABEL[t]} — {EXPOSURE_TYPE_HELP[t]}</option>
               ))}
             </select>
           </label>
@@ -561,26 +632,67 @@ function RiskForm({
               ))}
             </select>
           </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-ink-muted">Perfil de exposição</span>
-            <input className="input" value={exposureProfile} onChange={(e) => setExposureProfile(e.target.value)} placeholder="ex.: Habitual e permanente" />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-ink-muted">Probabilidade (1-5)</span>
-            <input type="number" min={1} max={5} className="input" value={probability} onChange={(e) => setProbability(Number(e.target.value))} />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-ink-muted">Severidade (1-5)</span>
-            <input type="number" min={1} max={5} className="input" value={severity} onChange={(e) => setSeverity(Number(e.target.value))} />
-          </label>
-          <label className="flex flex-col gap-1 text-sm">
-            <span className="text-ink-muted">Classificação</span>
-            <input className="input" value={classification} onChange={(e) => setClassification(e.target.value)} placeholder="ex.: Aceitável, Tolerável" />
-          </label>
         </div>
-        <p className="mt-2 text-xs text-ink-muted">
-          O Nível de Risco é calculado automaticamente a partir de Probabilidade × Severidade.
-        </p>
+
+        <div className="mt-3 flex flex-col gap-1 text-sm">
+          <div className="flex items-center justify-between gap-2">
+            <label htmlFor="exposure-profile" className="text-ink-muted">Perfil de exposição</label>
+            <button
+              type="button"
+              className="text-xs font-medium text-teal-deep hover:underline"
+              onClick={() => setExposureProfile((cur) => (cur.trim() ? `${cur.trimEnd()}\n${EXPOSURE_PROFILE_TEMPLATE}` : EXPOSURE_PROFILE_TEMPLATE))}
+            >
+              Inserir roteiro
+            </button>
+          </div>
+          <textarea
+            id="exposure-profile"
+            className="input min-h-[160px] resize-y"
+            value={exposureProfile}
+            onChange={(e) => setExposureProfile(e.target.value)}
+            placeholder="Descreva a exposição — use “Inserir roteiro” para ver os tópicos."
+          />
+          <p className="text-xs text-ink-muted">
+            Pode incluir: <strong>agente</strong> (ruído, poeira, produto químico, calor, risco biológico etc.), <strong>atividade e local</strong> (onde e durante qual tarefa ocorre),{" "}
+            <strong>frequência</strong> (habitual, intermitente ou eventual), <strong>duração</strong> (quanto dura cada contato e por quanto tempo se repete),{" "}
+            <strong>intensidade ou concentração</strong> (nível medido ou estimado), <strong>via de contato</strong> (inalação, pele, ingestão ou outra) e{" "}
+            <strong>controles existentes</strong> (ventilação, equipamento de proteção, isolamento ou procedimentos).
+          </p>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
+          <div className="grid grid-cols-1 content-start gap-3 sm:grid-cols-2">
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-ink-muted">Probabilidade / frequência (1-4)</span>
+              <select className="input" value={clampScale(probability)} onChange={(e) => setProbability(Number(e.target.value))}>
+                {PROBABILITY_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </label>
+            <label className="flex flex-col gap-1 text-sm">
+              <span className="text-ink-muted">Severidade / potencial de dano (1-4)</span>
+              <select className="input" value={clampScale(severity)} onChange={(e) => setSeverity(Number(e.target.value))}>
+                {SEVERITY_OPTIONS.map((o) => (
+                  <option key={o.value} value={o.value}>{o.label}</option>
+                ))}
+              </select>
+            </label>
+            <div className="flex flex-col gap-1 text-sm sm:col-span-2">
+              <span className="text-ink-muted">Classificação (calculada)</span>
+              <div
+                className="flex items-center justify-between rounded-md border border-line px-3 py-2.5 font-display font-semibold text-black"
+                style={{ background: MATRIX_LEVEL_COLOR[level] }}
+                aria-live="polite"
+              >
+                <span>{MATRIX_LEVEL_LABEL[level]}</span>
+                <span className="text-sm font-medium">{clampScale(probability)} × {clampScale(severity)} = {clampScale(probability) * clampScale(severity)}</span>
+              </div>
+              <p className="text-xs text-ink-muted">O nível de risco e a classificação são calculados pela matriz ao lado a partir da probabilidade e da severidade.</p>
+            </div>
+          </div>
+          <RiskMatrix probability={clampScale(probability)} severity={clampScale(severity)} />
+        </div>
         <label className="mt-3 flex flex-col gap-1 text-sm">
           <span className="text-ink-muted">Conclusão</span>
           <textarea className="input min-h-[70px] resize-y" value={conclusion} onChange={(e) => setConclusion(e.target.value)} />

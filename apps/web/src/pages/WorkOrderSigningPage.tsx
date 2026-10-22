@@ -17,6 +17,7 @@ const RISK_LEVEL_LABEL: Record<RiskLevel, string> = {
   MEDIUM: "Médio",
   HIGH: "Alto",
   CRITICAL: "Crítico",
+  IRRELEVANT: "Irrelevante",
 };
 
 function formatDate(iso: string): string {

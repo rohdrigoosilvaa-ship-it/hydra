@@ -421,10 +421,10 @@ export interface Unit {
 }
 
 export type RiskCategory = "FISICO" | "QUIMICO" | "BIOLOGICO" | "ERGONOMICO" | "ACIDENTE";
-export type RiskLevel = "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
+export type RiskLevel = "IRRELEVANT" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 export type PgrStatus = "DRAFT" | "IN_REVIEW" | "APPROVED" | "ARCHIVED";
 export type ActionStatus = "OPEN" | "IN_PROGRESS" | "LATE" | "VALIDATING" | "DONE" | "CANCELED";
-export type ExposureType = "EVENTUAL" | "INTERMITENTE" | "PERMANENTE";
+export type ExposureType = "HABITUAL" | "EVENTUAL" | "INTERMITENTE" | "PERMANENTE";
 export type EvaluationCriteria = "QUALITATIVO" | "QUANTITATIVO";
 
 export interface Hazard {

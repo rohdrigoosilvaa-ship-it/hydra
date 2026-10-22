@@ -727,6 +727,7 @@ enum RiskLevel {
   MEDIUM
   HIGH
   CRITICAL
+  IRRELEVANT
 }
 
 /// Tipo de exposição ao perigo (seção 17 do PGR de referência).
@@ -734,6 +735,7 @@ enum ExposureType {
   EVENTUAL
   INTERMITENTE
   PERMANENTE
+  HABITUAL
 }
 
 /// Critério de avaliação do risco.
