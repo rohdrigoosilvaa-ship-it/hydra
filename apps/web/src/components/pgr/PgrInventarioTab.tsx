@@ -496,6 +496,9 @@ function RiskForm({
   const [probability, setProbability] = useState(clampScale(risk?.probability ?? 2));
   const [severity, setSeverity] = useState(clampScale(risk?.severity ?? 2));
   const level = riskLevelOf(probability, severity);
+  // "Ausência de agentes…" é uma declaração de inexistência: não pede detalhes, avaliação nem medidas.
+  const hazardName = hazardList.find((h) => h.id === hazardId)?.name ?? "";
+  const isAbsence = /^aus.{1,2}ncia/i.test(hazardName.normalize("NFC").trim());
   const [conclusion, setConclusion] = useState(risk?.conclusion ?? "");
   const [adminControls, setAdminControls] = useState(risk?.adminControls ?? "");
   const [engineeringControls, setEngineeringControls] = useState(risk?.engineeringControls ?? "");
@@ -510,24 +513,41 @@ function RiskForm({
     setSaving(true);
     setError(null);
     try {
-      const payload = {
-        gheId,
-        hazardId,
-        typicalInjuries: typicalInjuries || undefined,
-        sourceCircumstances: sourceCircumstances || undefined,
-        propagationMeans: propagationMeans || undefined,
-        exposureType: exposureType || undefined,
-        evaluationCriteria: evaluationCriteria || undefined,
-        exposureProfile: exposureProfile || undefined,
-        probability,
-        severity,
-        classification: MATRIX_LEVEL_LABEL[level],
-        conclusion: conclusion || undefined,
-        adminControls: adminControls || undefined,
-        engineeringControls: engineeringControls || undefined,
-        epcMeasures: epcMeasures || undefined,
-        epiMeasures: epiMeasures || undefined,
-      };
+      const payload = isAbsence
+        ? {
+            gheId,
+            hazardId,
+            typicalInjuries: "",
+            sourceCircumstances: "",
+            propagationMeans: "",
+            exposureProfile: "",
+            probability: 1,
+            severity: 1,
+            classification: MATRIX_LEVEL_LABEL[riskLevelOf(1, 1)],
+            conclusion: "",
+            adminControls: "",
+            engineeringControls: "",
+            epcMeasures: "",
+            epiMeasures: "",
+          }
+        : {
+            gheId,
+            hazardId,
+            typicalInjuries: typicalInjuries || undefined,
+            sourceCircumstances: sourceCircumstances || undefined,
+            propagationMeans: propagationMeans || undefined,
+            exposureType: exposureType || undefined,
+            evaluationCriteria: evaluationCriteria || undefined,
+            exposureProfile: exposureProfile || undefined,
+            probability,
+            severity,
+            classification: MATRIX_LEVEL_LABEL[level],
+            conclusion: conclusion || undefined,
+            adminControls: adminControls || undefined,
+            engineeringControls: engineeringControls || undefined,
+            epcMeasures: epcMeasures || undefined,
+            epiMeasures: epiMeasures || undefined,
+          };
       if (risk) {
         await api.patch(`/pgr/risks/${risk.id}`, payload);
       } else {
@@ -597,6 +617,8 @@ function RiskForm({
             }}
             onDeleted={(id) => setHazardList((prev) => prev.filter((x) => x.id !== id))}
           />
+          {!isAbsence && (
+            <>
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-ink-muted">Possíveis lesões ou agravos à saúde</span>
             <input className="input" value={typicalInjuries} onChange={(e) => setTypicalInjuries(e.target.value)} />
@@ -609,9 +631,12 @@ function RiskForm({
             <span className="text-ink-muted">Meio de propagação</span>
             <input className="input" value={propagationMeans} onChange={(e) => setPropagationMeans(e.target.value)} placeholder="ex.: Pelo ar, Contato" />
           </label>
+            </>
+          )}
         </div>
       </div>
 
+      {!isAbsence && (
       <div className="border-t border-line pt-4">
         <p className="mb-3 font-mono text-[10px] uppercase tracking-wide text-ink-muted">Avaliação</p>
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
@@ -698,7 +723,9 @@ function RiskForm({
           <textarea className="input min-h-[70px] resize-y" value={conclusion} onChange={(e) => setConclusion(e.target.value)} />
         </label>
       </div>
+      )}
 
+      {!isAbsence && (
       <div className="border-t border-line pt-4">
         <div className="mb-3 flex items-center justify-between">
           <p className="font-mono text-[10px] uppercase tracking-wide text-ink-muted">Prevenção e controle</p>
@@ -722,6 +749,7 @@ function RiskForm({
           </label>
         </div>
       </div>
+      )}
 
       <div className="flex items-center gap-3 border-t border-line pt-4">
         <button type="submit" disabled={saving || !hazardId} className="btn-primary">
