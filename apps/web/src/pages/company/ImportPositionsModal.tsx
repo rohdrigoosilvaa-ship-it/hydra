@@ -36,6 +36,10 @@ export function ImportPositionsModal({
   const [names, setNames] = useState<Record<string, string>>({});
   const [envMode, setEnvMode] = useState<Record<string, "ALL" | "NONE">>({});
   const [excluded, setExcluded] = useState<Record<string, string[]>>({});
+  const [riskMode, setRiskMode] = useState<Record<string, "ALL" | "NONE">>({});
+  const [examMode, setExamMode] = useState<Record<string, "ALL" | "NONE">>({});
+  const [exclHazards, setExclHazards] = useState<Record<string, string[]>>({});
+  const [exclExams, setExclExams] = useState<Record<string, string[]>>({});
   const [tab, setTab] = useState<Tab>("novos");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -76,6 +80,13 @@ export function ImportPositionsModal({
     setMarkRight([]);
   }
 
+  function toggleIn(setter: typeof setExcluded, key: string, id: string) {
+    setter((cur) => {
+      const list = cur[key] ?? [];
+      return { ...cur, [key]: list.includes(id) ? list.filter((x) => x !== id) : [...list, id] };
+    });
+  }
+
   const envName = (id: string) => sourceEnvs.find((e) => e.id === id)?.name ?? "";
   const nameOf = (p: Position) => names[p.id] ?? p.name;
 
@@ -96,6 +107,10 @@ export function ImportPositionsModal({
           newName: nameOf(p).trim(),
           copyEnvironments: (envMode[p.id] ?? "ALL") === "ALL",
           excludeEnvironmentIds: excluded[p.id] ?? [],
+          copyRisks: (riskMode[p.id] ?? "ALL") === "ALL",
+          excludeHazardIds: exclHazards[p.id] ?? [],
+          copyExams: (examMode[p.id] ?? "ALL") === "ALL",
+          excludeExamIds: exclExams[p.id] ?? [],
         })),
       });
       onImported();
@@ -173,8 +188,8 @@ export function ImportPositionsModal({
           <div className="mt-4 flex flex-col gap-4">
             {tab === "novos" &&
               pickedPositions.map((p) => (
-                <div key={p.id} className="grid grid-cols-1 gap-3 rounded-md border border-line p-3 md:grid-cols-2">
-                  <div className="md:col-span-2">
+                <div key={p.id} className="grid grid-cols-1 gap-3 rounded-md border border-line p-3 md:grid-cols-3">
+                  <div className="md:col-span-3">
                     <ModalField label="Novo nome do cargo" required>
                       <input className={field} value={nameOf(p)} onChange={(e) => setNames((cur) => ({ ...cur, [p.id]: e.target.value }))} />
                     </ModalField>
@@ -185,9 +200,16 @@ export function ImportPositionsModal({
                       <option value="NONE">Nenhum ambiente</option>
                     </select>
                   </ModalField>
-                  <ModalField label="Riscos e exames">
-                    <select className={field} disabled>
-                      <option>Ainda não vinculados ao cargo</option>
+                  <ModalField label="Riscos">
+                    <select className={field} value={riskMode[p.id] ?? "ALL"} onChange={(e) => setRiskMode((cur) => ({ ...cur, [p.id]: e.target.value as "ALL" | "NONE" }))}>
+                      <option value="ALL">Todos os riscos do cargo</option>
+                      <option value="NONE">Nenhum risco</option>
+                    </select>
+                  </ModalField>
+                  <ModalField label="Exames">
+                    <select className={field} value={examMode[p.id] ?? "ALL"} onChange={(e) => setExamMode((cur) => ({ ...cur, [p.id]: e.target.value as "ALL" | "NONE" }))}>
+                      <option value="ALL">Todos os exames do cargo</option>
+                      <option value="NONE">Nenhum exame</option>
                     </select>
                   </ModalField>
                 </div>
@@ -221,11 +243,37 @@ export function ImportPositionsModal({
                 );
               })}
 
-            {(tab === "riscos" || tab === "exames") && (
-              <p className="rounded-md border border-line p-4 text-sm text-ink-muted">
-                Os {tab === "riscos" ? "riscos" : "exames"} ainda não ficam vinculados direto ao cargo, por isso nada é copiado aqui — não há o que excluir.
-              </p>
-            )}
+            {tab === "riscos" &&
+              pickedPositions.map((p) => (
+                <div key={p.id} className="rounded-md border border-line p-3">
+                  <p className="text-sm font-medium text-ink">{nameOf(p)}</p>
+                  {(p.risks ?? []).length === 0 && <p className="mt-1 text-xs text-ink-muted">Este cargo não tem riscos.</p>}
+                  <div className="mt-2 flex flex-wrap gap-3">
+                    {(p.risks ?? []).map((r) => (
+                      <label key={r.hazardId} className="flex items-center gap-1.5 text-sm text-ink">
+                        <input type="checkbox" checked={(exclHazards[p.id] ?? []).includes(r.hazardId)} onChange={() => toggleIn(setExclHazards, p.id, r.hazardId)} />
+                        Não copiar {r.hazard.name}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
+
+            {tab === "exames" &&
+              pickedPositions.map((p) => (
+                <div key={p.id} className="rounded-md border border-line p-3">
+                  <p className="text-sm font-medium text-ink">{nameOf(p)}</p>
+                  {(p.exams ?? []).length === 0 && <p className="mt-1 text-xs text-ink-muted">Este cargo não tem exames.</p>}
+                  <div className="mt-2 flex flex-wrap gap-3">
+                    {(p.exams ?? []).map((x) => (
+                      <label key={x.id} className="flex items-center gap-1.5 text-sm text-ink">
+                        <input type="checkbox" checked={(exclExams[p.id] ?? []).includes(x.id)} onChange={() => toggleIn(setExclExams, p.id, x.id)} />
+                        Não copiar {x.name}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              ))}
           </div>
         </div>
       )}

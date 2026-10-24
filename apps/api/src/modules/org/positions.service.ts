@@ -1,8 +1,8 @@
-import { Injectable, NotFoundException } from "@nestjs/common";
+import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../core/prisma/prisma.service";
 import { PERMISSIONS } from "../../core/permissions/permissions";
 import type { RoleAssignmentClaim } from "../../core/auth/jwt.types";
-import type { CreatePositionDto, ImportPositionsDto } from "./dto/org.dto";
+import type { CreatePositionDto, ImportPositionsDto, LinkPositionRisksDto } from "./dto/org.dto";
 import { assertCompanyInScope, companyScopeWhere } from "./scope.util";
 
 const UPDATABLE_FIELDS = [
@@ -13,6 +13,15 @@ const UPDATABLE_FIELDS = [
   "hazardPayOpinionConclusion", "unhealthinessOpinionNotes", "unhealthinessOpinionConclusion",
 ];
 
+const POSITION_INCLUDE = {
+  environments: { select: { environmentId: true } },
+  risks: {
+    select: { hazardId: true, exposureType: true, sendEsocial: true, hazard: { select: { name: true, category: true } } },
+    orderBy: { hazard: { name: "asc" } },
+  },
+  exams: { select: { id: true, name: true }, orderBy: { name: "asc" } },
+} as const;
+
 @Injectable()
 export class PositionsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -22,7 +31,7 @@ export class PositionsService {
     return this.prisma.position.findMany({
       where: { ...where, deletedAt: null, ...(companyId ? { companyId } : {}) },
       orderBy: { name: "asc" },
-      include: { environments: { select: { environmentId: true } } },
+      include: POSITION_INCLUDE,
     });
   }
 
@@ -30,7 +39,7 @@ export class PositionsService {
     const where = companyScopeWhere(assignments, PERMISSIONS.ORG_POSITION_READ, tenantId);
     const position = await this.prisma.position.findFirst({
       where: { ...where, id, deletedAt: null },
-      include: { environments: { select: { environmentId: true } } },
+      include: POSITION_INCLUDE,
     });
     if (!position) throw new NotFoundException("Cargo não encontrado.");
     return position;
@@ -47,7 +56,7 @@ export class PositionsService {
         esocialStartDate: esocialStartDate ? new Date(esocialStartDate) : undefined,
         environments: envIds.length ? { create: envIds.map((environmentId) => ({ environmentId })) } : undefined,
       },
-      include: { environments: { select: { environmentId: true } } },
+      include: POSITION_INCLUDE,
     });
   }
 
@@ -73,7 +82,7 @@ export class PositionsService {
           ...rest,
           esocialStartDate: esocialStartDate === undefined ? undefined : esocialStartDate ? new Date(esocialStartDate) : null,
         },
-        include: { environments: { select: { environmentId: true } } },
+        include: POSITION_INCLUDE,
       });
     });
   }
@@ -87,7 +96,11 @@ export class PositionsService {
     const readWhere = companyScopeWhere(assignments, PERMISSIONS.ORG_POSITION_READ, tenantId);
     const sources = await this.prisma.position.findMany({
       where: { ...readWhere, deletedAt: null, id: { in: dto.items.map((i) => i.sourcePositionId) } },
-      include: { environments: { select: { environmentId: true, environment: { select: { name: true } } } } },
+      include: {
+        environments: { select: { environmentId: true, environment: { select: { name: true } } } },
+        risks: true,
+        exams: true,
+      },
     });
     if (sources.length !== new Set(dto.items.map((i) => i.sourcePositionId)).size) {
       throw new NotFoundException("Cargo de origem não encontrado.");
@@ -113,9 +126,13 @@ export class PositionsService {
             if (id) envIds.add(id);
           }
         }
+        const exclHazards = new Set(item.excludeHazardIds ?? []);
+        const exclExams = new Set(item.excludeExamIds ?? []);
+        const riskRows = item.copyRisks === false ? [] : src.risks.filter((r) => !exclHazards.has(r.hazardId));
+        const examRows = item.copyExams === false ? [] : src.exams.filter((x) => !exclExams.has(x.id));
         const {
           id: _id, tenantId: _t, companyId: _c, name: _n, code: _code, createdAt: _ca, updatedAt: _ua, deletedAt: _d,
-          environments: _e, ...data
+          environments: _e, risks: _r, exams: _x, ...data
         } = src;
         out.push(
           await tx.position.create({
@@ -125,6 +142,8 @@ export class PositionsService {
               companyId: dto.targetCompanyId,
               name: item.newName.trim(),
               environments: envIds.size ? { create: [...envIds].map((environmentId) => ({ environmentId })) } : undefined,
+              risks: { create: riskRows.map((r) => ({ hazardId: r.hazardId, exposureType: r.exposureType, sendEsocial: r.sendEsocial })) },
+              exams: { create: examRows.map((x) => ({ tenantId, name: x.name })) },
             },
             select: { id: true },
           }),
@@ -155,5 +174,68 @@ export class PositionsService {
     const position = await this.prisma.position.findFirst({ where: { ...where, id, deletedAt: null } });
     if (!position) throw new NotFoundException("Cargo não encontrado.");
     return position;
+  }
+
+  /** Vincula riscos do catálogo a um ou mais cargos (ignora o que já está vinculado). */
+  async linkRisks(tenantId: string, dto: LinkPositionRisksDto, assignments: RoleAssignmentClaim[]) {
+    for (const id of dto.positionIds) await this.assertWritable(tenantId, id, assignments);
+    const hazards = await this.prisma.hazard.findMany({
+      where: { id: { in: dto.hazardIds }, tenantId, deletedAt: null },
+      select: { id: true },
+    });
+    if (hazards.length !== new Set(dto.hazardIds).size) throw new BadRequestException("Risco não encontrado.");
+    const data = dto.positionIds.flatMap((positionId) =>
+      hazards.map((h) => ({ positionId, hazardId: h.id, exposureType: dto.exposureType ?? null, sendEsocial: dto.sendEsocial ?? true })),
+    );
+    const res = await this.prisma.positionRisk.createMany({ data, skipDuplicates: true });
+    return { linked: res.count };
+  }
+
+  async clearRisks(tenantId: string, id: string, assignments: RoleAssignmentClaim[]) {
+    await this.assertWritable(tenantId, id, assignments);
+    const res = await this.prisma.positionRisk.deleteMany({ where: { positionId: id } });
+    return { removed: res.count };
+  }
+
+  async removeRisk(tenantId: string, id: string, hazardId: string, assignments: RoleAssignmentClaim[]) {
+    await this.assertWritable(tenantId, id, assignments);
+    await this.prisma.positionRisk.deleteMany({ where: { positionId: id, hazardId } });
+    return { success: true };
+  }
+
+  async importRisks(tenantId: string, id: string, sourceId: string, assignments: RoleAssignmentClaim[]) {
+    await this.assertWritable(tenantId, id, assignments);
+    const source = await this.get(tenantId, sourceId, assignments);
+    const res = await this.prisma.positionRisk.createMany({
+      data: source.risks.map((r) => ({ positionId: id, hazardId: r.hazardId, exposureType: r.exposureType, sendEsocial: r.sendEsocial })),
+      skipDuplicates: true,
+    });
+    return { linked: res.count };
+  }
+
+  async addExams(tenantId: string, id: string, names: string[], assignments: RoleAssignmentClaim[]) {
+    await this.assertWritable(tenantId, id, assignments);
+    const existing = await this.prisma.positionExam.findMany({ where: { positionId: id }, select: { name: true } });
+    const have = new Set(existing.map((e) => e.name.toLowerCase()));
+    const fresh = [...new Set(names.map((n) => n.trim()).filter(Boolean))].filter((n) => !have.has(n.toLowerCase()));
+    const res = await this.prisma.positionExam.createMany({ data: fresh.map((name) => ({ tenantId, positionId: id, name })) });
+    return { added: res.count };
+  }
+
+  async clearExams(tenantId: string, id: string, assignments: RoleAssignmentClaim[]) {
+    await this.assertWritable(tenantId, id, assignments);
+    const res = await this.prisma.positionExam.deleteMany({ where: { positionId: id } });
+    return { removed: res.count };
+  }
+
+  async removeExam(tenantId: string, id: string, examId: string, assignments: RoleAssignmentClaim[]) {
+    await this.assertWritable(tenantId, id, assignments);
+    await this.prisma.positionExam.deleteMany({ where: { id: examId, positionId: id } });
+    return { success: true };
+  }
+
+  async importExams(tenantId: string, id: string, sourceId: string, assignments: RoleAssignmentClaim[]) {
+    const source = await this.get(tenantId, sourceId, assignments);
+    return this.addExams(tenantId, id, source.exams.map((e) => e.name), assignments);
   }
 }

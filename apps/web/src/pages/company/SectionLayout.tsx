@@ -48,6 +48,7 @@ export const SECTION_TABS: Record<"mapeamento" | "funcionarios" | "seguranca" | 
   seguranca: [
     { to: "ghe", label: "GHE", icon: Network },
     { to: "inventario", label: "Inventário de Riscos", icon: TriangleAlert },
+    { to: "riscos", label: "Riscos", icon: TriangleAlert },
     { to: "incidentes", label: "Incidentes", icon: Siren },
     { to: "ordens-servico", label: "Ordem de Serviço", icon: FileCheck2 },
     { to: "ficha-epi", label: "Ficha de EPI", icon: ClipboardList },
