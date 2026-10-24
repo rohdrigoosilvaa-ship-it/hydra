@@ -9,6 +9,36 @@ import { FormModal } from "../../components/ui/modal";
 import type { Position, WorkEnvironment } from "../../lib/types";
 import type { CompanyWorkspaceContext } from "./CompanyWorkspacePage";
 
+const COMPLEMENTARY_FIELDS = ["safetyRecommendations", "gfipCode", "ergonomicMethodology", "generalNotes"] as const;
+const OPINIONS = [
+  { title: "Parecer técnico sobre o LTCAT", notes: "ltcatOpinionNotes", conclusion: "ltcatOpinionConclusion" },
+  { title: "Parecer técnico sobre a periculosidade", notes: "hazardPayOpinionNotes", conclusion: "hazardPayOpinionConclusion" },
+  { title: "Parecer técnico sobre a insalubridade", notes: "unhealthinessOpinionNotes", conclusion: "unhealthinessOpinionConclusion" },
+] as const;
+const EXTRA_FIELDS = [
+  ...COMPLEMENTARY_FIELDS,
+  ...OPINIONS.flatMap((o) => [o.notes, o.conclusion]),
+] as const;
+type ExtraField = (typeof EXTRA_FIELDS)[number];
+
+/** Botão liga/desliga: desligado, o bloco não aparece. */
+function Switch({ label, checked, onChange }: { label: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <button
+      type="button"
+      role="switch"
+      aria-checked={checked}
+      onClick={() => onChange(!checked)}
+      className="flex w-fit items-center gap-3 text-sm font-semibold text-ink"
+    >
+      <span className={`relative h-6 w-11 rounded-full transition-colors ${checked ? "bg-teal" : "bg-line"}`} aria-hidden>
+        <span className={`absolute top-0.5 h-5 w-5 rounded-full bg-white shadow transition-all ${checked ? "left-[22px]" : "left-0.5"}`} />
+      </span>
+      {label}
+    </button>
+  );
+}
+
 /** GHE / Cargos da empresa. */
 export function GheTab() {
   const { company, search } = useOutletContext<CompanyWorkspaceContext>();
@@ -144,8 +174,12 @@ function PositionForm({
   const [sectorInfo, setSectorInfo] = useState(position?.sectorInfo ?? "");
   const [description, setDescription] = useState(position?.description ?? "");
   const [workSchedule, setWorkSchedule] = useState(position?.workSchedule ?? "");
-  const [additionalInfo, setAdditionalInfo] = useState(position?.additionalInfo ?? "");
-  const [technicalOpinion, setTechnicalOpinion] = useState(position?.technicalOpinion ?? "");
+  const [compEnabled, setCompEnabled] = useState(position?.complementaryInfoEnabled ?? false);
+  const [opinionEnabled, setOpinionEnabled] = useState(position?.technicalOpinionEnabled ?? false);
+  const [extra, setExtra] = useState<Record<ExtraField, string>>(() =>
+    Object.fromEntries(EXTRA_FIELDS.map((f) => [f, (position?.[f] as string | null | undefined) ?? ""])) as Record<ExtraField, string>,
+  );
+  const setX = (field: ExtraField) => (value: string) => setExtra((cur) => ({ ...cur, [field]: value }));
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -167,8 +201,12 @@ function PositionForm({
       sectorInfo: sectorInfo.trim(),
       description: description.trim(),
       workSchedule: workSchedule.trim(),
-      additionalInfo: additionalInfo.trim(),
-      technicalOpinion: technicalOpinion.trim(),
+      complementaryInfoEnabled: compEnabled,
+      technicalOpinionEnabled: opinionEnabled,
+      // seção desligada não guarda nada: o que estava escondido não vai para os documentos
+      ...Object.fromEntries(
+        EXTRA_FIELDS.map((f) => [f, ((COMPLEMENTARY_FIELDS as readonly string[]).includes(f) ? compEnabled : opinionEnabled) ? extra[f].trim() || null : null]),
+      ),
     };
     try {
       if (position) await api.patch(`/positions/${position.id}`, { ...body, esocialStartDate: esocialStartDate || null });
@@ -250,8 +288,31 @@ function PositionForm({
         <span className="text-ink-muted">Jornada de trabalho / horário do cargo</span>
         <input className="input" value={workSchedule} onChange={(e) => setWorkSchedule(e.target.value)} placeholder="ex.: Segunda a sexta, 08:00 às 17:00" />
       </label>
-      {area("Informações complementares", additionalInfo, setAdditionalInfo)}
-      {area("Parecer técnico", technicalOpinion, setTechnicalOpinion)}
+      <Switch label="Informações complementares" checked={compEnabled} onChange={setCompEnabled} />
+      {compEnabled && (
+        <div className="flex flex-col gap-4 rounded-lg border border-line bg-paper p-4">
+          {area("Recomendações gerais de segurança para o cargo (PGR, PCMSO, LTCAT, Ordem de Serviço)", extra.safetyRecommendations, setX("safetyRecommendations"))}
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-ink-muted">Código GFIP (LTCAT)</span>
+            <input className="input sm:w-64" value={extra.gfipCode} onChange={(e) => setX("gfipCode")(e.target.value)} />
+          </label>
+          {area("Metodologia utilizada no levantamento dos riscos ergonômicos", extra.ergonomicMethodology, setX("ergonomicMethodology"))}
+          {area("Observações gerais", extra.generalNotes, setX("generalNotes"))}
+        </div>
+      )}
+
+      <Switch label="Parecer técnico" checked={opinionEnabled} onChange={setOpinionEnabled} />
+      {opinionEnabled && (
+        <div className="flex flex-col gap-5 rounded-lg border border-line bg-paper p-4">
+          {OPINIONS.map(({ title, notes, conclusion }) => (
+            <fieldset key={title} className="flex flex-col gap-3">
+              <legend className="font-display text-sm font-semibold text-ink">{title}</legend>
+              {area("Observações", extra[notes], setX(notes))}
+              {area("Conclusão", extra[conclusion], setX(conclusion))}
+            </fieldset>
+          ))}
+        </div>
+      )}
 
     </FormModal>
   );

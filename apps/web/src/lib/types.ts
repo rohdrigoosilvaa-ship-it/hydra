@@ -591,6 +591,18 @@ export interface Position {
   workSchedule?: string | null;
   additionalInfo?: string | null;
   technicalOpinion?: string | null;
+  safetyRecommendations?: string | null;
+  gfipCode?: string | null;
+  ergonomicMethodology?: string | null;
+  generalNotes?: string | null;
+  ltcatOpinionNotes?: string | null;
+  ltcatOpinionConclusion?: string | null;
+  hazardPayOpinionNotes?: string | null;
+  hazardPayOpinionConclusion?: string | null;
+  unhealthinessOpinionNotes?: string | null;
+  unhealthinessOpinionConclusion?: string | null;
+  complementaryInfoEnabled?: boolean;
+  technicalOpinionEnabled?: boolean;
   /** Ambientes pelos quais o cargo transita. */
   environments?: { environmentId: string }[];
 }
