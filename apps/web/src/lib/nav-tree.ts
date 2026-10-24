@@ -100,7 +100,6 @@ export interface NavSection {
 
 export const topItems: NavLinkItem[] = [
   { kind: "link", to: "/", label: "Início", icon: House, end: true },
-  { kind: "link", to: "/dashboard", label: "Dashboard", icon: LayoutDashboard },
 ];
 
 export const navSections: NavSection[] = [
@@ -179,24 +178,6 @@ export const navSections: NavSection[] = [
       { kind: "link", to: "/ppp", label: "PPP", icon: FileBadge, permission: PERMISSIONS.PPP_READ },
       { kind: "link", to: "/esocial", label: "eSocial", icon: LinkIcon, permission: PERMISSIONS.ESOCIAL_READ },
       { kind: "link", to: "/esocial/auditoria", label: "Auditoria eSocial", icon: ShieldQuestion, permission: PERMISSIONS.ESOCIAL_READ },
-    ],
-  },
-  {
-    id: "gestao-controle",
-    label: "Gestão e Controle",
-    items: [
-      { kind: "link", to: "/auditorias", label: "Auditorias", icon: Gavel, permission: PERMISSIONS.PGR_READ },
-      { kind: "link", to: "/compliance", label: "Compliance", icon: ScrollText, permission: PERMISSIONS.PGR_READ },
-    ],
-  },
-  {
-    id: "integracoes",
-    label: "Integrações",
-    items: [
-      { kind: "link", to: "/hydranet", label: "HydraNET", icon: PlugZap, permission: PERMISSIONS.PROVIDER_READ },
-      { kind: "link", to: "/integracoes/sincronizacoes", label: "Sincronizações", icon: RefreshCw, permission: PERMISSIONS.PROVIDER_READ },
-      { kind: "link", to: "/integracoes/apis", label: "APIs", icon: Webhook, permission: PERMISSIONS.PROVIDER_READ },
-      { kind: "action", id: "atualizar-dados", label: "Atualizar dados", icon: RefreshCw },
     ],
   },
   {

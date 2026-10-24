@@ -5,7 +5,6 @@ import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
 import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 import { UsersPage } from "./pages/UsersPage";
 import { InicioPage } from "./pages/InicioPage";
-import { DashboardPage } from "./pages/DashboardPage";
 import { CompanyPage } from "./pages/CompanyPage";
 import { BranchesPage } from "./pages/BranchesPage";
 import { DepartmentsPage } from "./pages/DepartmentsPage";
@@ -66,7 +65,7 @@ export const router = createBrowserRouter([
     element: <AppShell />,
     children: [
       { index: true, element: <InicioPage /> },
-      { path: "dashboard", element: <DashboardPage /> },
+      { path: "dashboard", element: <Navigate to="/" replace /> },
       { path: "minha-empresa", element: <CompanyPage /> },
 
       { path: "cadastros/estrutura/unidades", element: <BranchesPage /> },

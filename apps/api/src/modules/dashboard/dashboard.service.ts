@@ -13,6 +13,10 @@ export interface CompanySummary {
 }
 
 export interface ExecutiveSummary {
+  activeCompanies: number;
+  activeEmployees: number;
+  ghes: number;
+  positions: number;
   employees: number;
   complianceRate: number | null;
   incidentsThisMonth: number;
@@ -91,7 +95,16 @@ export class DashboardService {
       ? { tenantId }
       : { tenantId, companyId: { in: allowedCompanyIds(assignments, PERMISSIONS.OCCURRENCE_READ) } };
 
+    const companyWhere = hasTenantWideAccess(assignments, PERMISSIONS.ORG_COMPANY_READ)
+      ? { tenantId, deletedAt: null, status: "ACTIVE" as const }
+      : { tenantId, deletedAt: null, status: "ACTIVE" as const, id: { in: allowedCompanyIds(assignments, PERMISSIONS.ORG_COMPANY_READ) } };
+    const positionWhere = companyScopeWhere(assignments, PERMISSIONS.ORG_POSITION_READ, tenantId);
+
     const [
+      activeCompanies,
+      activeEmployees,
+      ghes,
+      positions,
       employees,
       pendingActions,
       incidentsThisMonth,
@@ -101,6 +114,10 @@ export class DashboardService {
       trainingsExpiringSoon,
       documentsNeedingAttention,
     ] = await Promise.all([
+      this.prisma.company.count({ where: companyWhere }),
+      this.prisma.employee.count({ where: { ...employeeScope, status: "ACTIVE" } }),
+      this.prisma.ghe.count({ where: { ...riskWhere, pgrId: { not: null } } }),
+      this.prisma.position.count({ where: { ...positionWhere, deletedAt: null, status: "ACTIVE" } }),
       this.prisma.employee.count({ where: employeeScope }),
       this.prisma.pgrAction.count({ where: { ...actionWhere, status: { notIn: ["DONE", "CANCELED"] } } }),
       this.prisma.occurrence.count({
@@ -118,6 +135,10 @@ export class DashboardService {
     const complianceRate = docsWithExpiry > 0 ? Math.round(((docsWithExpiry - docsExpired) / docsWithExpiry) * 100) : null;
 
     return {
+      activeCompanies,
+      activeEmployees,
+      ghes,
+      positions,
       employees,
       complianceRate,
       incidentsThisMonth,
