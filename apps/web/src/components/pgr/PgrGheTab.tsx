@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import { ModalFrame } from "../ui/modal";
 import { Layers, Pencil, Plus, Trash2, Users } from "lucide-react";
 import { api } from "../../lib/api";
 import type { Department, Ghe, GheFunction, Nr01GheListItem, PgrDetail, Position } from "../../lib/types";
@@ -126,7 +127,8 @@ function NewGheForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card mt-3 flex flex-col gap-3">
+    <ModalFrame title={"Novo GHE"} onClose={onClose}>
+<form onSubmit={handleSubmit} className="p-6 flex flex-col gap-3">
       {summary.length > 0 && (
         <DepartmentPicker
           summary={summary}
@@ -180,6 +182,7 @@ function NewGheForm({
         {error && <p className="text-sm text-amber">{error}</p>}
       </div>
     </form>
+</ModalFrame>
   );
 }
 
@@ -224,26 +227,23 @@ function GheCard({
         </div>
         <button
           type="button"
-          onClick={() => setEditing((v) => !v)}
+          onClick={() => setEditing(true)}
           className="flex shrink-0 items-center gap-1 rounded-md border border-line px-2.5 py-1.5 text-xs font-medium text-teal-deep hover:bg-teal-tint"
         >
-          <Pencil size={12} /> {editing ? "Fechar" : "Editar"}
+          <Pencil size={12} /> Editar
         </button>
       </header>
 
       <div className="flex flex-1 flex-col gap-4 px-5 pb-5 pt-4">
-        {editing ? (
-          <EditGheForm ghe={ghe} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); onChanged(); }} />
-        ) : (
-          <div className="grid grid-cols-1 gap-3 text-sm">
-            <div className="rounded-lg bg-paper p-3">
-              <Field label="Descrição do local" value={ghe.localDescription} />
-            </div>
-            <div className="rounded-lg bg-paper p-3">
-              <Field label="Descrição da atividade" value={ghe.activityDescription} />
-            </div>
+        {editing && <EditGheForm ghe={ghe} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); onChanged(); }} />}
+        <div className="grid grid-cols-1 gap-3 text-sm">
+          <div className="rounded-lg bg-paper p-3">
+            <Field label="Descrição do local" value={ghe.localDescription} />
           </div>
-        )}
+          <div className="rounded-lg bg-paper p-3">
+            <Field label="Descrição da atividade" value={ghe.activityDescription} />
+          </div>
+        </div>
 
         <div>
           <div className="flex items-center justify-between">
@@ -310,7 +310,8 @@ function EditGheForm({ ghe, onClose, onSaved }: { ghe: Ghe; onClose: () => void;
   }
 
   return (
-    <form onSubmit={handleSubmit} className="flex flex-col gap-3">
+    <ModalFrame title={"Editar GHE"} onClose={onClose}>
+    <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-3">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-ink-muted">Nome do GHE</span>
@@ -339,6 +340,7 @@ function EditGheForm({ ghe, onClose, onSaved }: { ghe: Ghe; onClose: () => void;
         {error && <p className="text-sm text-amber">{error}</p>}
       </div>
     </form>
+    </ModalFrame>
   );
 }
 
@@ -383,7 +385,8 @@ function GheFunctionForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="mt-2 flex flex-col gap-3 rounded-md border border-line p-3">
+    <ModalFrame title={"Vincular setor e cargo ao GHE"} onClose={onClose}>
+    <form onSubmit={handleSubmit} className="p-6 flex flex-col gap-3">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-ink-muted">Setor</span>
@@ -424,6 +427,7 @@ function GheFunctionForm({
         {error && <p className="text-sm text-amber">{error}</p>}
       </div>
     </form>
+    </ModalFrame>
   );
 }
 

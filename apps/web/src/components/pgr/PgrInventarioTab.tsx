@@ -1,6 +1,7 @@
 import { FormEvent, useState } from "react";
 import { Layers, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
 import { api } from "../../lib/api";
+import { ModalFrame } from "../ui/modal";
 import {
   MATRIX_CLASSIFICATION,
   MATRIX_LEVEL_COLOR,
@@ -614,15 +615,8 @@ function RiskForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card mt-3 flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h3 className="font-display text-sm font-semibold text-ink-muted">
-          {risk ? "Editar risco" : "Novo risco"}
-        </h3>
-        <button type="button" onClick={onClose} className="text-ink-muted hover:text-ink">
-          <X size={16} />
-        </button>
-      </div>
+    <ModalFrame title={risk ? "Editar risco" : "Novo risco"} onClose={onClose} size="max-w-5xl">
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-6">
 
       <div>
         <p className="mb-3 font-mono text-[10px] uppercase tracking-wide text-ink-muted">Identificação</p>
@@ -841,5 +835,6 @@ function RiskForm({
         {error && <p className="text-sm text-amber">{error}</p>}
       </div>
     </form>
+    </ModalFrame>
   );
 }
