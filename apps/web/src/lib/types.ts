@@ -341,6 +341,7 @@ export interface TechnicalReport {
 
 export interface Company {
   id: string;
+  contractedLives?: number | null;
   /** Só vem em `/companies?withCounts=true`. */
   counts?: { employees: number; positions: number; ghes: number };
   name: string;
@@ -580,6 +581,43 @@ export interface Position {
   cbo: string | null;
   description: string | null;
   status: RecordStatus;
+  color?: string | null;
+  icon?: string | null;
+  esocialStartDate?: string | null;
+  requiresEntryAptitude?: boolean;
+  sectorInfo?: string | null;
+  workSchedule?: string | null;
+  additionalInfo?: string | null;
+  technicalOpinion?: string | null;
+  /** Ambientes pelos quais o cargo transita. */
+  environments?: { environmentId: string }[];
+}
+
+export type EnvironmentUnitType = "MATRIZ" | "FILIAL";
+
+export interface WorkEnvironment {
+  id: string;
+  companyId: string;
+  name: string;
+  color: string | null;
+  icon: string | null;
+  description: string | null;
+  location: string | null;
+  unitType: EnvironmentUnitType;
+  _count?: { positions: number };
+}
+
+export interface CompanySummary {
+  positions: number;
+  ghes: number;
+  lives: number;
+  contractedLives: number | null;
+  excessLives: number | null;
+  esocialEvents: number;
+  asos: number;
+  cats: number;
+  absentEmployees: number;
+  draftDocuments: number;
 }
 
 export interface PositionRequiredEpi {

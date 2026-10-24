@@ -5,6 +5,12 @@ import { ForgotPasswordPage } from "./pages/ForgotPasswordPage";
 import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 import { UsersPage } from "./pages/UsersPage";
 import { InicioPage } from "./pages/InicioPage";
+import { CompanyWorkspacePage } from "./pages/company/CompanyWorkspacePage";
+import { MappingLayout } from "./pages/company/MappingLayout";
+import { CompanyDashboardTab } from "./pages/company/CompanyDashboardTab";
+import { EnvironmentsTab } from "./pages/company/EnvironmentsTab";
+import { GheTab } from "./pages/company/GheTab";
+import { ShortcutsTab } from "./pages/company/ShortcutsTab";
 import { CompanyPage } from "./pages/CompanyPage";
 import { BranchesPage } from "./pages/BranchesPage";
 import { DepartmentsPage } from "./pages/DepartmentsPage";
@@ -67,6 +73,28 @@ export const router = createBrowserRouter([
       { index: true, element: <InicioPage /> },
       { path: "dashboard", element: <Navigate to="/" replace /> },
       { path: "empresas", element: <CompanyPage /> },
+      {
+        path: "empresas/:companyId",
+        element: <CompanyWorkspacePage />,
+        children: [
+          { index: true, element: <Navigate to="mapeamento/dashboard" replace /> },
+          {
+            path: "mapeamento",
+            element: <MappingLayout />,
+            children: [
+              { index: true, element: <Navigate to="dashboard" replace /> },
+              { path: "dashboard", element: <CompanyDashboardTab /> },
+              { path: "ambientes", element: <EnvironmentsTab /> },
+              { path: "ghe", element: <GheTab /> },
+              { path: "cbo", element: <CboSearchPage /> },
+            ],
+          },
+          { path: "funcionarios", element: <ShortcutsTab group="funcionarios" /> },
+          { path: "seguranca", element: <ShortcutsTab group="seguranca" /> },
+          { path: "laudos", element: <ShortcutsTab group="laudos" /> },
+          { path: "saude", element: <ShortcutsTab group="saude" /> },
+        ],
+      },
       { path: "minha-empresa", element: <Navigate to="/empresas" replace /> },
 
       { path: "cadastros/estrutura/unidades", element: <BranchesPage /> },

@@ -34,6 +34,36 @@ export class CompaniesService {
     );
   }
 
+  /** Números do painel da empresa (aba Dashboard). */
+  async summary(tenantId: string, id: string, assignments: RoleAssignmentClaim[]) {
+    const company = await this.get(tenantId, id, assignments);
+    const employeeScope = employeeScopeWhere(assignments, PERMISSIONS.ORG_EMPLOYEE_READ, tenantId);
+    const [positions, ghes, lives, esocialEvents, asos, cats, absent, draftPgr, draftLtcat] = await Promise.all([
+      this.prisma.position.count({ where: { tenantId, companyId: id, deletedAt: null, status: "ACTIVE" } }),
+      this.prisma.ghe.count({ where: { tenantId, pgr: { companyId: id } } }),
+      this.prisma.employee.count({ where: { ...employeeScope, companyId: id, status: "ACTIVE" } }),
+      this.prisma.esocialEvent.count({ where: { tenantId, companyId: id } }),
+      this.prisma.aso.count({ where: { tenantId, exam: { employee: { companyId: id } } } }),
+      this.prisma.cat.count({ where: { tenantId, occurrence: { companyId: id } } }),
+      this.prisma.employee.count({ where: { ...employeeScope, companyId: id, status: "ON_LEAVE" } }),
+      this.prisma.pgr.count({ where: { tenantId, companyId: id, deletedAt: null, status: "DRAFT" } }),
+      this.prisma.ltcat.count({ where: { tenantId, companyId: id, deletedAt: null, status: "DRAFT" } }),
+    ]);
+    const contracted = company.contractedLives ?? null;
+    return {
+      positions,
+      ghes,
+      lives,
+      contractedLives: contracted,
+      excessLives: contracted === null ? null : Math.max(0, lives - contracted),
+      esocialEvents,
+      asos,
+      cats,
+      absentEmployees: absent,
+      draftDocuments: draftPgr + draftLtcat,
+    };
+  }
+
   async get(tenantId: string, id: string, assignments: RoleAssignmentClaim[]) {
     if (!isCompanyInScope(assignments, PERMISSIONS.ORG_COMPANY_READ, id)) {
       throw new NotFoundException("Empresa não encontrada.");
