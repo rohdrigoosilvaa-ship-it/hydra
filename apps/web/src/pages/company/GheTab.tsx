@@ -11,13 +11,13 @@ import type { CompanyWorkspaceContext } from "./CompanyWorkspacePage";
 
 const COMPLEMENTARY_FIELDS = ["safetyRecommendations", "gfipCode", "ergonomicMethodology", "generalNotes"] as const;
 const OPINIONS = [
-  { title: "Parecer técnico sobre o LTCAT", notes: "ltcatOpinionNotes", conclusion: "ltcatOpinionConclusion" },
-  { title: "Parecer técnico sobre a periculosidade", notes: "hazardPayOpinionNotes", conclusion: "hazardPayOpinionConclusion" },
-  { title: "Parecer técnico sobre a insalubridade", notes: "unhealthinessOpinionNotes", conclusion: "unhealthinessOpinionConclusion" },
+  { title: "Parecer técnico sobre o LTCAT", field: "ltcatOpinionNotes" },
+  { title: "Parecer técnico sobre a periculosidade", field: "hazardPayOpinionNotes" },
+  { title: "Parecer técnico sobre a insalubridade", field: "unhealthinessOpinionNotes" },
 ] as const;
 const EXTRA_FIELDS = [
   ...COMPLEMENTARY_FIELDS,
-  ...OPINIONS.flatMap((o) => [o.notes, o.conclusion]),
+  ...OPINIONS.map((o) => o.field),
 ] as const;
 type ExtraField = (typeof EXTRA_FIELDS)[number];
 
@@ -304,12 +304,8 @@ function PositionForm({
       <Switch label="Parecer técnico" checked={opinionEnabled} onChange={setOpinionEnabled} />
       {opinionEnabled && (
         <div className="flex flex-col gap-5 rounded-lg border border-line bg-paper p-4">
-          {OPINIONS.map(({ title, notes, conclusion }) => (
-            <fieldset key={title} className="flex flex-col gap-3">
-              <legend className="font-display text-sm font-semibold text-ink">{title}</legend>
-              {area("Observações", extra[notes], setX(notes))}
-              {area("Conclusão", extra[conclusion], setX(conclusion))}
-            </fieldset>
+          {OPINIONS.map(({ title, field }) => (
+            <div key={title}>{area(`${title} — observações e conclusão`, extra[field], setX(field))}</div>
           ))}
         </div>
       )}
