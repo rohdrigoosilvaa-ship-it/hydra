@@ -1,4 +1,4 @@
-import { IsBoolean, IsDateString, IsIn, IsInt, IsNumber, IsOptional, IsString, Max, Min, MinLength } from "class-validator";
+import { IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsNumber, IsOptional, IsString, Max, Min, MinLength } from "class-validator";
 
 export class CreateCompanyDto {
   @IsString()
@@ -153,6 +153,12 @@ export class CreateCompanyDto {
   @Min(0)
   @Max(100)
   percentualBrigada?: number;
+
+  /** Vidas contratadas (base do faturamento). */
+  @IsOptional()
+  @IsInt()
+  @Min(0)
+  contractedLives?: number;
 }
 
 export class CreateBranchDto {
@@ -257,6 +263,100 @@ export class CreatePositionDto {
   @IsOptional()
   @IsIn(["ACTIVE", "INACTIVE"])
   status?: "ACTIVE" | "INACTIVE";
+
+  @IsOptional()
+  @IsString()
+  color?: string;
+
+  @IsOptional()
+  @IsString()
+  icon?: string;
+
+  @IsOptional()
+  @IsDateString()
+  esocialStartDate?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  requiresEntryAptitude?: boolean;
+
+  @IsOptional()
+  @IsString()
+  sectorInfo?: string;
+
+  @IsOptional()
+  @IsString()
+  workSchedule?: string;
+
+  @IsOptional()
+  @IsString()
+  additionalInfo?: string;
+
+  @IsOptional()
+  @IsString()
+  technicalOpinion?: string;
+
+  /** Ambientes pelos quais o cargo transita. */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  environmentIds?: string[];
+}
+
+export class CreateWorkEnvironmentDto {
+  @IsString()
+  companyId!: string;
+
+  @IsString()
+  @MinLength(2)
+  name!: string;
+
+  @IsOptional()
+  @IsString()
+  color?: string;
+
+  @IsOptional()
+  @IsString()
+  icon?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  location?: string;
+
+  @IsOptional()
+  @IsIn(["MATRIZ", "FILIAL"])
+  unitType?: "MATRIZ" | "FILIAL";
+}
+
+export class UpdateWorkEnvironmentDto {
+  @IsOptional()
+  @IsString()
+  @MinLength(2)
+  name?: string;
+
+  @IsOptional()
+  @IsString()
+  color?: string;
+
+  @IsOptional()
+  @IsString()
+  icon?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsString()
+  location?: string;
+
+  @IsOptional()
+  @IsIn(["MATRIZ", "FILIAL"])
+  unitType?: "MATRIZ" | "FILIAL";
 }
 
 export class CreateEmployeeDto {

@@ -95,6 +95,8 @@ model Company {
   observacaoPPP     String?   @map("observacao_ppp") @db.Text
   observacaoASO     String?   @map("observacao_aso") @db.Text
   percentualBrigada Float?    @map("percentual_brigada") // % de colaboradores considerados no cálculo da brigada
+  /// Vidas contratadas (base do faturamento) — o que passar disso aparece como "vidas excedentes".
+  contractedLives   Int?      @map("contracted_lives")
 
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
@@ -105,6 +107,7 @@ model Company {
   tenant      Tenant       @relation(fields: [tenantId], references: [id])
   branches    Branch[]
   positions   Position[]
+  environments WorkEnvironment[]
   departments Department[]
   employees   Employee[]
 
@@ -201,12 +204,25 @@ model Position {
   /// Atividades / descrição do cargo (conforme CBO) — reaproveitada por todo
   /// colaborador com esse cargo, exibida (somente leitura) na ficha dele.
   description String?      @db.Text
+  /// Cor e ícone de identificação do cargo na tela da empresa.
+  color       String?
+  icon        String?
+  /// Início da validade dos dados para o eSocial.
+  esocialStartDate DateTime?
+  /// Exige ASO com aptidão para entrar no cargo (admissão).
+  requiresEntryAptitude Boolean @default(false)
+  sectorInfo  String?      @db.Text
+  /// Jornada de trabalho / horário do cargo.
+  workSchedule String?
+  additionalInfo String?   @db.Text
+  technicalOpinion String? @db.Text
   status      RecordStatus @default(ACTIVE)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
   deletedAt   DateTime?
 
   company      Company               @relation(fields: [companyId], references: [id])
+  environments PositionEnvironment[]
   employees    Employee[]
   gheFunctions GheFunction[]
   requiredEpis PositionRequiredEpi[]
@@ -219,6 +235,47 @@ model Position {
 /// EPIs que um Cargo exige — cadastrado manualmente uma vez por cargo, usado
 /// pela Ordem de Serviço pra puxar automaticamente os EPIs da função do
 /// colaborador (sem isso, não existe nenhum vínculo entre Cargo e EPI).
+enum EnvironmentUnitType {
+  MATRIZ
+  FILIAL
+}
+
+/// Ambiente de trabalho da empresa (vinculado à empresa; os cargos transitam por ele e os riscos se ligam ao cargo).
+model WorkEnvironment {
+  id          String                  @id @default(cuid())
+  tenantId    String
+  companyId   String
+  name        String
+  color       String?
+  icon        String?
+  description String?                 @db.Text
+  location    String?
+  unitType    EnvironmentUnitType     @default(MATRIZ)
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+  deletedAt   DateTime?
+
+  company   Company               @relation(fields: [companyId], references: [id])
+  positions PositionEnvironment[]
+
+  @@index([tenantId])
+  @@index([companyId])
+  @@map("work_environments")
+}
+
+/// Ambientes pelos quais um cargo transita.
+model PositionEnvironment {
+  positionId    String
+  environmentId String
+
+  position    Position        @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  environment WorkEnvironment @relation(fields: [environmentId], references: [id], onDelete: Cascade)
+
+  @@id([positionId, environmentId])
+  @@index([environmentId])
+  @@map("position_environments")
+}
+
 model PositionRequiredEpi {
   id                String   @id @default(cuid())
   tenantId          String

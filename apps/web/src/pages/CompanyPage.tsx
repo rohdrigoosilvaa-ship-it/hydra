@@ -59,7 +59,7 @@ export function CompanyPage() {
 
   function handleManage(company: Company) {
     setSelectedCompanyId(company.id);
-    navigate("/");
+    navigate(`/empresas/${company.id}`);
   }
 
   const visibleCompanies = selectedCompanyId
@@ -250,6 +250,7 @@ interface FormState {
   observacaoPPP: string;
   observacaoASO: string;
   percentualBrigada: string;
+  contractedLives: string;
 }
 
 function toFormState(c?: Company): FormState {
@@ -290,10 +291,11 @@ function toFormState(c?: Company): FormState {
     observacaoPPP: c?.observacaoPPP ?? "",
     observacaoASO: c?.observacaoASO ?? "",
     percentualBrigada: c?.percentualBrigada != null ? String(c.percentualBrigada) : "",
+    contractedLives: c?.contractedLives != null ? String(c.contractedLives) : "",
   };
 }
 
-function CompanyForm({
+export function CompanyForm({
   company,
   template,
   onClose,
@@ -363,6 +365,7 @@ function CompanyForm({
         observacaoPPP: f.observacaoPPP || undefined,
         observacaoASO: f.observacaoASO || undefined,
         percentualBrigada: f.percentualBrigada ? Number(f.percentualBrigada) : undefined,
+        contractedLives: f.contractedLives ? Math.max(0, Math.round(Number(f.contractedLives))) : undefined,
       };
       if (company) {
         await api.patch(`/companies/${company.id}`, payload);
@@ -462,6 +465,10 @@ function CompanyForm({
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-ink-muted">% considerado no cálculo da brigada</span>
             <input type="number" step="0.01" min="0" max="100" className="input" value={f.percentualBrigada} onChange={(e) => set("percentualBrigada", e.target.value)} />
+          </label>
+          <label className="flex flex-col gap-1 text-sm">
+            <span className="text-ink-muted">Vidas contratadas <span className="font-normal opacity-70">(base para as vidas excedentes)</span></span>
+            <input type="number" min="0" step="1" className="input" value={f.contractedLives} onChange={(e) => set("contractedLives", e.target.value)} />
           </label>
         </FieldGrid>
         <TextAreaField label="Observação — PPP" value={f.observacaoPPP} onChange={(v) => set("observacaoPPP", v)} />

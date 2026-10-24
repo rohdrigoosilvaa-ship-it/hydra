@@ -19,6 +19,12 @@ export class CompaniesController {
       : this.companies.list(user.tenantId, user.assignments);
   }
 
+  @Get(":id/summary")
+  @RequirePermission(PERMISSIONS.ORG_COMPANY_READ)
+  summary(@CurrentUser() user: HydraRequestUser, @Param("id") id: string) {
+    return this.companies.summary(user.tenantId, id, user.assignments);
+  }
+
   @Get(":id")
   @RequirePermission(PERMISSIONS.ORG_COMPANY_READ)
   get(@CurrentUser() user: HydraRequestUser, @Param("id") id: string) {

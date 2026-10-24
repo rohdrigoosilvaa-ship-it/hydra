@@ -7,6 +7,8 @@ import { UnitsController } from "./units.controller";
 import { UnitsService } from "./units.service";
 import { DepartmentsController } from "./departments.controller";
 import { DepartmentsService } from "./departments.service";
+import { WorkEnvironmentsController } from "./work-environments.controller";
+import { WorkEnvironmentsService } from "./work-environments.service";
 import { PositionsController } from "./positions.controller";
 import { PositionsService } from "./positions.service";
 import { PositionRequiredEpisController } from "./position-required-epis.controller";
@@ -29,6 +31,7 @@ import { EmployeeDocumentsService } from "./employee-documents.service";
     UnitsController,
     DepartmentsController,
     PositionsController,
+    WorkEnvironmentsController,
     PositionRequiredEpisController,
     EmployeesController,
     UsersController,
@@ -38,6 +41,7 @@ import { EmployeeDocumentsService } from "./employee-documents.service";
   ],
   providers: [
     CompaniesService,
+    WorkEnvironmentsService,
     BranchesService,
     UnitsService,
     DepartmentsService,
