@@ -16,7 +16,7 @@
  * propaga a nova marca pro produto inteiro sem tocar em cada página.
  */
 :root {
-  --paper: #f5f6f6;
+  --paper: #eceeee;
   --paper-raised: #ffffff;
   --ink: #1c2321;
   --ink-muted: #5b6663;
