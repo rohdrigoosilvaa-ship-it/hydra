@@ -93,6 +93,8 @@ export interface NavExternalLink {
 export interface NavSection {
   id: string;
   label: string;
+  /** Ícone da seção — é o que aparece no menu recolhido. */
+  icon?: LucideIcon;
   items: NavNode[];
   /** Quando presente, a seção é só este link externo (sem cabeçalho nem itens). */
   external?: NavExternalLink;
@@ -106,6 +108,7 @@ export const navSections: NavSection[] = [
   {
     id: "gestao",
     label: "Gestão",
+    icon: Building2,
     items: [
       { kind: "link", to: "/minha-empresa", label: "Minha Empresa", icon: Building2, permission: PERMISSIONS.ORG_COMPANY_READ },
       {
@@ -137,6 +140,7 @@ export const navSections: NavSection[] = [
   {
     id: "seguranca",
     label: "Segurança do Trabalho",
+    icon: ShieldCheck,
     items: [
       { kind: "link", to: "/pgr", label: "PGR", icon: ShieldCheck, permission: PERMISSIONS.PGR_READ },
       { kind: "link", to: "/nr01/ghe", label: "GHE", icon: Boxes, permission: PERMISSIONS.PGR_READ },
@@ -164,6 +168,7 @@ export const navSections: NavSection[] = [
   {
     id: "saude",
     label: "Saúde Ocupacional",
+    icon: HeartPulse,
     items: [
       { kind: "link", to: "/saude", label: "Saúde Ocupacional", icon: HeartPulse, permission: PERMISSIONS.HEALTH_READ },
       { kind: "link", to: "/previdenciario", label: "Afastamentos", icon: Scale, permission: PERMISSIONS.PREV_READ },
@@ -173,6 +178,7 @@ export const navSections: NavSection[] = [
   {
     id: "conformidade",
     label: "Conformidade",
+    icon: Scale,
     items: [
       { kind: "link", to: "/previdenciario", label: "Previdenciário", icon: Scale, permission: PERMISSIONS.PREV_READ },
       { kind: "link", to: "/ppp", label: "PPP", icon: FileBadge, permission: PERMISSIONS.PPP_READ },
@@ -183,6 +189,7 @@ export const navSections: NavSection[] = [
   {
     id: "administrativo",
     label: "Administrativo",
+    icon: WalletCards,
     items: [
       { kind: "link", to: "/financeiro", label: "Financeiro", icon: WalletCards, permission: PERMISSIONS.FINANCE_READ },
       { kind: "link", to: "/crm", label: "CRM", icon: Handshake, permission: PERMISSIONS.CRM_READ },
@@ -193,6 +200,7 @@ export const navSections: NavSection[] = [
   {
     id: "sistema",
     label: "Sistema",
+    icon: Settings,
     items: [
       { kind: "link", to: "/configuracoes", label: "Configurações", icon: Settings },
       { kind: "link", to: "/perfis-permissoes", label: "Perfis e Permissões", icon: KeyRound, permission: PERMISSIONS.ORG_USER_MANAGE },
