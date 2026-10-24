@@ -618,8 +618,15 @@ export class LinkPositionRisksDto extends PositionRiskFieldsDto {
   @IsString({ each: true })
   positionIds!: string[];
 
+  @IsOptional()
   @IsString()
-  hazardId!: string;
+  hazardId?: string;
+
+  /** Formato antigo (site ainda não atualizado): vários riscos de uma vez, sem edição dos dados. */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  hazardIds?: string[];
 }
 
 export class UpdatePositionRiskDto extends PositionRiskFieldsDto {}

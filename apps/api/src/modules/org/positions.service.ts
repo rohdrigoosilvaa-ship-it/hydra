@@ -195,9 +195,23 @@ export class PositionsService {
 
   /** Vincula um risco do catálogo a um ou mais cargos, já com os dados do cadastro (o que vier no corpo substitui). */
   async linkRisks(tenantId: string, dto: LinkPositionRisksDto, assignments: RoleAssignmentClaim[]) {
+    const ids = dto.hazardId ? [dto.hazardId] : (dto.hazardIds ?? []);
+    if (ids.length === 0) throw new BadRequestException("Escolha o risco.");
+    if (ids.length > 1) {
+      let linked = 0;
+      for (const hazardId of ids) {
+        const res = await this.linkRisks(tenantId, { ...dto, hazardId, hazardIds: undefined }, assignments).catch(() => ({ linked: 0 }));
+        linked += res.linked;
+      }
+      return { linked };
+    }
+    return this.linkOne(tenantId, ids[0]!, dto, assignments);
+  }
+
+  private async linkOne(tenantId: string, hazardId: string, dto: LinkPositionRisksDto, assignments: RoleAssignmentClaim[]) {
     for (const id of dto.positionIds) await this.assertWritable(tenantId, id, assignments);
     const hazard = await this.prisma.hazard.findFirst({
-      where: { id: dto.hazardId, tenantId, deletedAt: null },
+      where: { id: hazardId, tenantId, deletedAt: null },
       include: { protections: { select: { equipmentId: true } } },
     });
     if (!hazard) throw new BadRequestException("Risco não encontrado.");
