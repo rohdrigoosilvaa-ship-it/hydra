@@ -5,7 +5,7 @@ import { api } from "../../lib/api";
 import { COLOR_CHOICES, iconByName } from "../../lib/appearance";
 import { AppearancePicker } from "../../components/company/AppearancePicker";
 import { CboPicker } from "../../components/CboPicker";
-import { ModalFrame } from "../../components/ui/modal";
+import { FormModal } from "../../components/ui/modal";
 import type { Position, WorkEnvironment } from "../../lib/types";
 import type { CompanyWorkspaceContext } from "./CompanyWorkspacePage";
 
@@ -189,8 +189,7 @@ function PositionForm({
   );
 
   return (
-    <ModalFrame title={position ? "Editar cargo" : "Novo cargo"} onClose={onClose}>
-    <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-6">
+    <FormModal title={position ? "Editar cargo" : "Novo cargo"} onClose={onClose} onSubmit={handleSubmit} saving={saving} canSave={name.trim().length >= 2} error={error}>
       <label className="flex flex-col gap-1 text-sm">
         <span className="text-ink-muted">Nome do cargo</span>
         <input className="input" value={name} onChange={(e) => setName(e.target.value)} required minLength={2} autoFocus />
@@ -254,12 +253,6 @@ function PositionForm({
       {area("Informações complementares", additionalInfo, setAdditionalInfo)}
       {area("Parecer técnico", technicalOpinion, setTechnicalOpinion)}
 
-      {error && <p className="text-sm text-amber" role="alert">{error}</p>}
-      <div className="flex gap-2 border-t border-line pt-4">
-        <button type="submit" disabled={saving || name.trim().length < 2} className="btn-primary">{saving ? "Salvando…" : "Salvar"}</button>
-        <button type="button" className="btn-secondary" onClick={onClose}>Cancelar</button>
-      </div>
-    </form>
-    </ModalFrame>
+    </FormModal>
   );
 }
