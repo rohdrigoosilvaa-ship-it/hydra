@@ -6,11 +6,10 @@ import { ResetPasswordPage } from "./pages/ResetPasswordPage";
 import { UsersPage } from "./pages/UsersPage";
 import { InicioPage } from "./pages/InicioPage";
 import { CompanyWorkspacePage } from "./pages/company/CompanyWorkspacePage";
-import { MappingLayout } from "./pages/company/MappingLayout";
+import { SectionLayout } from "./pages/company/SectionLayout";
 import { CompanyDashboardTab } from "./pages/company/CompanyDashboardTab";
 import { EnvironmentsTab } from "./pages/company/EnvironmentsTab";
 import { GheTab } from "./pages/company/GheTab";
-import { ShortcutsTab } from "./pages/company/ShortcutsTab";
 import { CompanyPage } from "./pages/CompanyPage";
 import { BranchesPage } from "./pages/BranchesPage";
 import { DepartmentsPage } from "./pages/DepartmentsPage";
@@ -80,7 +79,7 @@ export const router = createBrowserRouter([
           { index: true, element: <Navigate to="mapeamento/dashboard" replace /> },
           {
             path: "mapeamento",
-            element: <MappingLayout />,
+            element: <SectionLayout section="mapeamento" />,
             children: [
               { index: true, element: <Navigate to="dashboard" replace /> },
               { path: "dashboard", element: <CompanyDashboardTab /> },
@@ -89,10 +88,52 @@ export const router = createBrowserRouter([
               { path: "cbo", element: <CboSearchPage /> },
             ],
           },
-          { path: "funcionarios", element: <ShortcutsTab group="funcionarios" /> },
-          { path: "seguranca", element: <ShortcutsTab group="seguranca" /> },
-          { path: "laudos", element: <ShortcutsTab group="laudos" /> },
-          { path: "saude", element: <ShortcutsTab group="saude" /> },
+          {
+            path: "funcionarios",
+            element: <SectionLayout section="funcionarios" />,
+            children: [
+              { index: true, element: <Navigate to="lista" replace /> },
+              { path: "lista", element: <EmployeesPage /> },
+              { path: "vencimentos", element: <DocumentExpiryPage /> },
+              { path: "epi", element: <EpiControlPage /> },
+              { path: "treinamentos", element: <ComingSoonPage title="Treinamentos" description="Cadastro de treinamentos obrigatórios, vínculo com cargos e controle de vencimento." /> },
+            ],
+          },
+          {
+            path: "seguranca",
+            element: <SectionLayout section="seguranca" />,
+            children: [
+              { index: true, element: <Navigate to="ghe" replace /> },
+              { path: "ghe", element: <Nr01GhePage /> },
+              { path: "inventario", element: <Nr01InventoryPage /> },
+              { path: "incidentes", element: <OccurrencesPage /> },
+              { path: "ordens-servico", element: <WorkOrdersPage /> },
+              { path: "ficha-epi", element: <EpiControlPage /> },
+            ],
+          },
+          {
+            path: "laudos",
+            element: <SectionLayout section="laudos" />,
+            children: [
+              { index: true, element: <Navigate to="pgr" replace /> },
+              { path: "pgr", element: <PgrListPage /> },
+              { path: "pcmso", element: <ComingSoonPage title="PCMSO" description="Programa de Controle Médico de Saúde Ocupacional da empresa." /> },
+              { path: "ltcat", element: <LtcatPage /> },
+              { path: "gro", element: <Nr01GroPage /> },
+              { path: "ergonomico", element: <ComingSoonPage title="Laudo Ergonômico" description="Análise ergonômica do trabalho (AET) e laudo ergonômico da empresa." /> },
+              { path: "ppp", element: <PppPage /> },
+            ],
+          },
+          {
+            path: "saude",
+            element: <SectionLayout section="saude" />,
+            children: [
+              { index: true, element: <Navigate to="ocupacional" replace /> },
+              { path: "ocupacional", element: <HealthPage /> },
+              { path: "afastamento", element: <PrevidenciarioPage /> },
+              { path: "absenteismo", element: <ComingSoonPage title="Absenteísmo" description="Indicadores de ausências, afastamentos e faltas por unidade e período." /> },
+            ],
+          },
         ],
       },
       { path: "minha-empresa", element: <Navigate to="/empresas" replace /> },
