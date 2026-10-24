@@ -19,6 +19,7 @@ import { CrmModule } from "./modules/crm/crm.module";
 import { MedicalBillingModule } from "./modules/medical-billing/medical-billing.module";
 import { DashboardModule } from "./modules/dashboard/dashboard.module";
 import { CboModule } from "./modules/cbo/cbo.module";
+import { CnaeModule } from "./modules/cnae/cnae.module";
 import { PsychosocialModule } from "./modules/psychosocial/psychosocial.module";
 import { Nr01Module } from "./modules/nr01/nr01.module";
 import { PendenciasModule } from "./modules/pendencias/pendencias.module";
@@ -47,6 +48,7 @@ import { WorkOrdersModule } from "./modules/work-orders/work-orders.module";
     MedicalBillingModule,
     DashboardModule,
     CboModule,
+    CnaeModule,
     PsychosocialModule,
     Nr01Module,
     PendenciasModule,

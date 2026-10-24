@@ -424,6 +424,19 @@ model EmployeeDocument {
 /// Catálogo de ocupações CBO (Classificação Brasileira de Ocupações) — dado de
 /// referência público, compartilhado entre todos os tenants (não carrega
 /// tenantId). Seed a partir da lista canônica oficial (ver prisma/cbo-seed.csv).
+/// Tabela de CNAE com o grau de risco da NR-04 (Quadro I) — catálogo público, compartilhado entre tenants.
+model CnaeNr04 {
+  id          String @id @default(cuid())
+  /// Código no formato oficial, ex.: "0111-3/01".
+  code        String @unique
+  description String
+  /// Grau de risco da NR-04 (1 a 4).
+  riskGrade   Int
+
+  @@index([description])
+  @@map("cnae_nr04")
+}
+
 model CboOccupation {
   id          String  @id @default(cuid())
   code        String  @unique

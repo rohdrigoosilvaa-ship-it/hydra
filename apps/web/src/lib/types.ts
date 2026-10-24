@@ -648,6 +648,13 @@ export interface PositionRequiredEpi {
   catalogItem?: EpiCatalogItem | null;
 }
 
+export interface CnaeEntry {
+  id: string;
+  code: string;
+  description: string;
+  riskGrade: number;
+}
+
 export interface CboOccupation {
   id: string;
   code: string;
