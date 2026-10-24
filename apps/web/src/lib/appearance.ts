@@ -22,6 +22,9 @@ import {
 /** Cores e ícones oferecidos ao cadastrar ambientes e cargos. */
 export const COLOR_CHOICES = ["#0e9f4a", "#0a6e34", "#2563eb", "#7c3aed", "#db2777", "#dc2626", "#ea580c", "#ca8a04", "#0891b2", "#475569"];
 
+/** Nome de cada cor (mesma ordem de COLOR_CHOICES), para as listas de escolha. */
+export const COLOR_NAMES = ["Verde Padrão", "Verde Escuro", "Azul", "Roxo", "Rosa", "Vermelho", "Laranja", "Amarelo", "Ciano", "Cinza"];
+
 export const ICON_CHOICES: { name: string; label: string; icon: LucideIcon }[] = [
   { name: "building", label: "Prédio", icon: Building2 },
   { name: "factory", label: "Fábrica", icon: Factory },
