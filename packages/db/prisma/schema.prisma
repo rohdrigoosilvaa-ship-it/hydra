@@ -2585,7 +2585,8 @@ model WorkOrderSignature {
   @@map("work_order_signatures")
 }
 
-/// Risco do catálogo ligado a um cargo.
+/// Risco do catálogo ligado a um cargo. Os campos são uma cópia do cadastro do risco
+/// (editável por empresa) mais a avaliação feita para o cargo.
 model PositionRisk {
   positionId   String
   hazardId     String
@@ -2593,12 +2594,44 @@ model PositionRisk {
   sendEsocial  Boolean       @default(true)
   createdAt    DateTime      @default(now())
 
-  position Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
-  hazard   Hazard   @relation(fields: [hazardId], references: [id])
+  description            String?            @db.Text
+  damagePotential        String?            @db.Text
+  observations           String?            @db.Text
+  sourceCircumstances    String?            @db.Text
+  adminMeasures          String?            @db.Text
+  measurementType        EvaluationCriteria @default(QUALITATIVO)
+  generatesUnhealthiness Boolean            @default(false)
+  generatesHazardPay     Boolean            @default(false)
+  specialRetirement      Boolean            @default(false)
+  insertInAso            Boolean            @default(true)
+  epcStatus              String             @default("NAO_SE_APLICA")
+  epiStatus              String             @default("NAO_SE_APLICA")
+  /// Avaliação: probabilidade e severidade de 1 a 5; certeza da estimativa de 1 (alta) a 3 (baixa).
+  probability            Int?
+  severity               Int?
+  certainty              Int?
+
+  position   Position                 @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  hazard     Hazard                   @relation(fields: [hazardId], references: [id])
+  protection PositionRiskProtection[]
 
   @@id([positionId, hazardId])
   @@index([hazardId])
   @@map("position_risks")
+}
+
+/// EPC/EPI indicado para o risco naquele cargo.
+model PositionRiskProtection {
+  positionId  String
+  hazardId    String
+  equipmentId String
+
+  risk      PositionRisk        @relation(fields: [positionId, hazardId], references: [positionId, hazardId], onDelete: Cascade)
+  equipment ProtectionEquipment @relation(fields: [equipmentId], references: [id])
+
+  @@id([positionId, hazardId, equipmentId])
+  @@index([equipmentId])
+  @@map("position_risk_protections")
 }
 
 /// Exame ocupacional exigido para o cargo.
@@ -2647,8 +2680,9 @@ model ProtectionEquipment {
   createdAt        DateTime       @default(now())
   deletedAt        DateTime?
 
-  category ProtectionCategory? @relation(fields: [categoryId], references: [id])
-  hazards  HazardProtection[]
+  category      ProtectionCategory?      @relation(fields: [categoryId], references: [id])
+  hazards       HazardProtection[]
+  positionRisks PositionRiskProtection[]
 
   @@index([tenantId, kind])
   @@map("protection_equipment")

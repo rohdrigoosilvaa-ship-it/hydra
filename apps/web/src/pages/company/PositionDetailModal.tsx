@@ -2,8 +2,10 @@ import { FormEvent, ReactNode, useEffect, useMemo, useState } from "react";
 import { Download, Plus, Trash2, X } from "lucide-react";
 import { api } from "../../lib/api";
 import { FormModal, ModalField, ModalFrame } from "../../components/ui/modal";
-import { EXPOSURE_LABEL, RISK_CATEGORY_LABEL } from "../RisksCatalogPage";
-import type { ExposureType, Hazard, Position, WorkEnvironment } from "../../lib/types";
+import { EXPOSURE_LABEL, NewProtectionModal, ProtectionBox, RISK_CATEGORY_LABEL, TRI, YesNo } from "../RisksCatalogPage";
+import { RiskAssessment, type Assessment } from "../../components/risk/RiskAssessment";
+import { riskResult } from "../../lib/risk-assessment";
+import type { ExposureType, Hazard, Position, PositionRisk, ProtectionEquipment, WorkEnvironment } from "../../lib/types";
 
 const DASH = "—";
 
@@ -40,6 +42,7 @@ export function PositionDetailModal({
   onChanged: () => Promise<void>;
 }) {
   const [dialog, setDialog] = useState<"risk" | "exam" | "import-risks" | "import-exams" | null>(null);
+  const [editingRisk, setEditingRisk] = useState<PositionRisk | null>(null);
   const [error, setError] = useState<string | null>(null);
   const envNames = (position.environments ?? []).map((e) => environments.find((x) => x.id === e.environmentId)?.name).filter(Boolean) as string[];
   const risks = position.risks ?? [];
@@ -83,17 +86,21 @@ export function PositionDetailModal({
               <p className="mt-3 text-sm text-ink-muted">Este cargo ainda não contém riscos.</p>
             ) : (
               <ul className="mt-3 divide-y divide-line text-sm">
-                {risks.map((r) => (
-                  <li key={r.hazardId} className="flex items-center justify-between gap-3 py-2">
-                    <span className="text-ink">
-                      {r.hazard.name}
-                      <span className="ml-2 text-xs text-ink-muted">
-                        {RISK_CATEGORY_LABEL[r.hazard.category]} · {r.exposureType ? EXPOSURE_LABEL[r.exposureType] : "Exposição não definida"} · {r.sendEsocial ? "eSocial" : "sem eSocial"}
-                      </span>
-                    </span>
-                    <button type="button" aria-label={`Remover ${r.hazard.name}`} className="text-amber hover:opacity-80" onClick={() => run(() => api.del(`/positions/${position.id}/risks/${r.hazardId}`))}><X size={15} /></button>
-                  </li>
-                ))}
+                {risks.map((r) => {
+                  const res = riskResult(r.probability, r.severity, r.certainty);
+                  return (
+                    <li key={r.hazardId} className="flex items-center justify-between gap-3 py-2">
+                      <button type="button" className="min-w-0 text-left" title="Editar risco do cargo" onClick={() => setEditingRisk(r)}>
+                        <span className="text-ink hover:underline">{r.hazard.name}</span>
+                        <span className="ml-2 text-xs text-ink-muted">
+                          {RISK_CATEGORY_LABEL[r.hazard.category]} · {r.exposureType ? EXPOSURE_LABEL[r.exposureType] : "Exposição não definida"} · {r.sendEsocial ? "eSocial" : "sem eSocial"}
+                        </span>
+                        {res && <span className="ml-2 rounded px-2 py-0.5 text-xs text-ink" style={{ background: res.color }}>{res.label} ({res.product})</span>}
+                      </button>
+                      <button type="button" aria-label={`Remover ${r.hazard.name}`} className="text-amber hover:opacity-80" onClick={() => run(() => api.del(`/positions/${position.id}/risks/${r.hazardId}`))}><X size={15} /></button>
+                    </li>
+                  );
+                })}
               </ul>
             )}
           </div>
@@ -127,6 +134,9 @@ export function PositionDetailModal({
       {dialog === "risk" && (
         <LinkRiskModal position={position} positions={positions} onClose={() => setDialog(null)} onSaved={async () => { setDialog(null); await onChanged(); }} />
       )}
+      {editingRisk && (
+        <LinkRiskModal position={position} positions={positions} editing={editingRisk} onClose={() => setEditingRisk(null)} onSaved={async () => { setEditingRisk(null); await onChanged(); }} />
+      )}
       {dialog === "exam" && (
         <AddExamModal position={position} onClose={() => setDialog(null)} onSaved={async () => { setDialog(null); await onChanged(); }} />
       )}
@@ -143,77 +153,107 @@ export function PositionDetailModal({
   );
 }
 
-function LinkRiskModal({ position, positions, onClose, onSaved }: { position: Position; positions: Position[]; onClose: () => void; onSaved: () => void }) {
+const BLANK = {
+  description: "", damagePotential: "", observations: "", sourceCircumstances: "", adminMeasures: "",
+  measurementType: "QUALITATIVO" as "QUALITATIVO" | "QUANTITATIVO",
+  generatesUnhealthiness: false, generatesHazardPay: false, specialRetirement: false, insertInAso: true,
+  epcStatus: "NAO_SE_APLICA", epiStatus: "NAO_SE_APLICA",
+};
+type Fields = typeof BLANK;
+
+/** Vincula (ou edita) um risco do cargo: já vem preenchido com o cadastro do risco e pode ser ajustado para a empresa. */
+function LinkRiskModal({ position, positions, editing, onClose, onSaved }: { position: Position; positions: Position[]; editing?: PositionRisk; onClose: () => void; onSaved: () => void }) {
   const [hazards, setHazards] = useState<Hazard[]>([]);
+  const [bank, setBank] = useState<ProtectionEquipment[]>([]);
   const [positionIds, setPositionIds] = useState<string[]>([position.id]);
-  const [hazardIds, setHazardIds] = useState<string[]>([]);
-  const [search, setSearch] = useState("");
-  const [exposure, setExposure] = useState<ExposureType | "">("");
-  const [esocial, setEsocial] = useState(true);
+  const [hazardId, setHazardId] = useState(editing?.hazardId ?? "");
+  const [exposure, setExposure] = useState<ExposureType | "">(editing?.exposureType ?? "");
+  const [esocial, setEsocial] = useState(editing?.sendEsocial ?? true);
+  const [f, setF] = useState<Fields>(() => (editing ? { ...BLANK, ...Object.fromEntries(Object.keys(BLANK).map((k) => [k, (editing as unknown as Record<string, unknown>)[k] ?? (BLANK as Record<string, unknown>)[k]])) } as Fields : BLANK));
+  const [chosen, setChosen] = useState<string[]>(() => (editing?.protection ?? []).map((p) => p.equipmentId));
+  const [assessment, setAssessment] = useState<Assessment>({ probability: editing?.probability ?? null, severity: editing?.severity ?? null, certainty: editing?.certainty ?? null });
+  const [newKind, setNewKind] = useState<"EPC" | "EPI" | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     api.get<Hazard[]>("/pgr/hazards").then(setHazards).catch(() => setHazards([]));
+    api.get<ProtectionEquipment[]>("/pgr/protection/equipment").then(setBank).catch(() => setBank([]));
   }, []);
 
-  const shown = useMemo(() => hazards.filter((h) => !search.trim() || h.name.toLowerCase().includes(search.trim().toLowerCase())), [hazards, search]);
-  const toggle = (list: string[], set: (v: string[]) => void, id: string) => set(list.includes(id) ? list.filter((x) => x !== id) : [...list, id]);
+  const hazard = hazards.find((h) => h.id === hazardId);
+  const set = <K extends keyof Fields>(k: K, v: Fields[K]) => setF((cur) => ({ ...cur, [k]: v }));
   const allLinked = positionIds.length === positions.length;
+
+  function pickHazard(id: string) {
+    setHazardId(id);
+    const h = hazards.find((x) => x.id === id);
+    if (!h) return;
+    setExposure(h.exposureType ?? "");
+    setEsocial(h.sendEsocial ?? true);
+    setF({
+      description: h.description ?? "", damagePotential: h.damagePotential ?? "", observations: h.observations ?? "",
+      sourceCircumstances: h.sourceCircumstances ?? "", adminMeasures: h.adminMeasures ?? "",
+      measurementType: h.measurementType ?? "QUALITATIVO", generatesUnhealthiness: !!h.generatesUnhealthiness,
+      generatesHazardPay: !!h.generatesHazardPay, specialRetirement: !!h.specialRetirement, insertInAso: h.insertInAso ?? true,
+      epcStatus: h.epcStatus ?? "NAO_SE_APLICA", epiStatus: h.epiStatus ?? "NAO_SE_APLICA",
+    });
+    setChosen((h.protections ?? []).map((p) => p.equipment.id));
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     setSaving(true);
     setError(null);
+    const body = {
+      exposureType: exposure || null,
+      sendEsocial: esocial,
+      ...f,
+      ...assessment,
+      equipmentIds: chosen.filter((id) => {
+        const kind = bank.find((b) => b.id === id)?.kind;
+        return kind === "EPC" ? f.epcStatus === "SIM" : kind === "EPI" ? f.epiStatus === "SIM" : false;
+      }),
+    };
     try {
-      await api.post("/positions/link-risks", {
-        positionIds,
-        hazardIds,
-        exposureType: exposure || undefined,
-        sendEsocial: esocial,
-      });
+      if (editing) await api.patch(`/positions/${position.id}/risks/${editing.hazardId}`, body);
+      else await api.post("/positions/link-risks", { ...body, positionIds, hazardId });
       onSaved();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao vincular.");
+      setError(err instanceof Error ? err.message : "Erro ao salvar.");
       setSaving(false);
     }
   }
 
+  const area = (label: string, k: "description" | "damagePotential" | "observations" | "sourceCircumstances" | "adminMeasures", extra?: ReactNode) => (
+    <label className="flex flex-col gap-1.5">
+      <span className="flex items-center gap-1 font-display text-[11px] font-bold uppercase tracking-wide text-teal-deep">{label}{extra}</span>
+      <textarea className="input min-h-[4.5rem]" aria-label={label} value={f[k]} onChange={(e) => set(k, e.target.value)} />
+    </label>
+  );
+
   return (
-    <FormModal title="Vincular risco ao cargo" onClose={onClose} onSubmit={handleSubmit} saving={saving} canSave={positionIds.length > 0 && hazardIds.length > 0} error={error} size="max-w-4xl">
-      <div className="grid grid-cols-1 gap-4 md:grid-cols-[2fr_1fr]">
-        <div className="flex flex-col gap-4">
+    <>
+      <FormModal title={editing ? "Risco do cargo" : "Vincular risco ao cargo"} onClose={onClose} onSubmit={handleSubmit} saving={saving} canSave={positionIds.length > 0 && !!hazardId} error={error} size="max-w-5xl">
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-[2fr_1fr_1fr]">
           <div>
             <p className="flex items-center gap-2 font-display text-[11px] font-bold uppercase tracking-wide text-teal-deep">
               <span aria-hidden>★</span> Cargo
-              <button type="button" className="hover:underline" onClick={() => setPositionIds(allLinked ? [position.id] : positions.map((p) => p.id))}>
-                [{allLinked ? "apenas este" : "vincular todos"}]
-              </button>
+              {!editing && (
+                <button type="button" className="hover:underline" onClick={() => setPositionIds(allLinked ? [position.id] : positions.map((p) => p.id))}>
+                  [{allLinked ? "apenas este" : "vincular todos"}]
+                </button>
+              )}
             </p>
-            <div className="mt-1.5 flex flex-wrap gap-2 rounded-md border border-line p-2">
+            <div className="mt-1.5 flex min-h-[2.5rem] flex-wrap gap-2 rounded-md border border-line p-2">
               {positions.filter((p) => positionIds.includes(p.id)).map((p) => (
                 <span key={p.id} className="flex items-center gap-1.5 rounded bg-teal-deep px-2 py-1 text-sm text-white">
-                  <button type="button" aria-label={`Tirar ${p.name}`} onClick={() => setPositionIds((cur) => cur.filter((x) => x !== p.id))}><X size={12} /></button>
+                  {!editing && <button type="button" aria-label={`Tirar ${p.name}`} onClick={() => setPositionIds((cur) => cur.filter((x) => x !== p.id))}><X size={12} /></button>}
                   {p.name}
                 </span>
               ))}
             </div>
           </div>
-          <ModalField label="Risco" required>
-            <input className="input" placeholder="Pesquisar risco…" value={search} onChange={(e) => setSearch(e.target.value)} />
-          </ModalField>
-          <div className="max-h-52 overflow-y-auto rounded-md border border-line">
-            {shown.map((h) => (
-              <label key={h.id} className="flex cursor-pointer items-center gap-2 px-3 py-1.5 text-sm text-ink hover:bg-paper">
-                <input type="checkbox" checked={hazardIds.includes(h.id)} onChange={() => toggle(hazardIds, setHazardIds, h.id)} />
-                <span>{h.name}</span>
-                <span className="text-xs text-ink-muted">{RISK_CATEGORY_LABEL[h.category]}</span>
-              </label>
-            ))}
-            {shown.length === 0 && <p className="p-3 text-xs text-ink-muted">Nenhum risco cadastrado. Cadastre em Segurança › Riscos.</p>}
-          </div>
-        </div>
-        <div className="flex flex-col gap-4">
           <ModalField label="Tipo de exposição">
             <select className="input" value={exposure} onChange={(e) => setExposure(e.target.value as ExposureType | "")}>
               <option value="">Não Definida</option>
@@ -227,8 +267,71 @@ function LinkRiskModal({ position, positions, onClose, onSaved }: { position: Po
             </select>
           </ModalField>
         </div>
-      </div>
-    </FormModal>
+
+        <ModalField label="Risco" required>
+          <select className="input" aria-label="Risco" value={hazardId} disabled={!!editing} onChange={(e) => pickHazard(e.target.value)}>
+            <option value="">Escolha o risco…</option>
+            {hazards.map((h) => <option key={h.id} value={h.id}>{h.name} — {RISK_CATEGORY_LABEL[h.category]}</option>)}
+          </select>
+        </ModalField>
+        {hazards.length === 0 && <p className="text-xs text-ink-muted">Nenhum risco cadastrado. Cadastre em Segurança › Riscos.</p>}
+
+        {hazardId && (
+          <>
+            {area("Descrição do fator de risco", "description")}
+            <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+              {area("Possíveis danos à saúde", "damagePotential")}
+              {area("Observações", "observations", hazard && (
+                <button type="button" className="hover:underline" onClick={() => set("observations", hazard.observations ?? "")}>[puxar do risco]</button>
+              ))}
+            </div>
+            {area("Fonte ou situação de exposição", "sourceCircumstances")}
+            {area("Medidas administrativas ou de organização do trabalho", "adminMeasures")}
+
+            <ModalField label="Tipo da medição">
+              <select className="input" value={f.measurementType} onChange={(e) => set("measurementType", e.target.value as Fields["measurementType"])}>
+                <option value="QUALITATIVO">Qualitativo</option>
+                <option value="QUANTITATIVO">Quantitativo</option>
+              </select>
+            </ModalField>
+            <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+              <YesNo label="Gera insalubridade" value={f.generatesUnhealthiness} onChange={(v) => set("generatesUnhealthiness", v)} />
+              <YesNo label="Gera periculosidade" value={f.generatesHazardPay} onChange={(v) => set("generatesHazardPay", v)} />
+              <YesNo label="Aposentadoria especial" value={f.specialRetirement} onChange={(v) => set("specialRetirement", v)} />
+              <YesNo label="Inserir risco no ASO" value={f.insertInAso} onChange={(v) => set("insertInAso", v)} />
+            </div>
+            <ModalField label="EPCs: implementam medidas de proteção coletiva">
+              <select className="input" value={f.epcStatus} onChange={(e) => set("epcStatus", e.target.value)}>
+                {TRI.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+              </select>
+            </ModalField>
+            {f.epcStatus === "SIM" && <ProtectionBox kind="EPC" bank={bank} chosen={chosen} setChosen={setChosen} onNew={() => setNewKind("EPC")} />}
+            <ModalField label="EPIs: implementam medidas de proteção individual">
+              <select className="input" value={f.epiStatus} onChange={(e) => set("epiStatus", e.target.value)}>
+                {TRI.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
+              </select>
+            </ModalField>
+            {f.epiStatus === "SIM" && <ProtectionBox kind="EPI" bank={bank} chosen={chosen} setChosen={setChosen} onNew={() => setNewKind("EPI")} />}
+
+            <div className="border-t border-line pt-4">
+              <p className="mb-3 font-display text-sm font-bold uppercase text-ink">Avaliação do risco</p>
+              <RiskAssessment value={assessment} onChange={setAssessment} />
+            </div>
+          </>
+        )}
+      </FormModal>
+      {newKind && (
+        <NewProtectionModal
+          kind={newKind}
+          onClose={() => setNewKind(null)}
+          onCreated={(eq) => {
+            setBank((cur) => [...cur, eq]);
+            setChosen((cur) => [...cur, eq.id]);
+            setNewKind(null);
+          }}
+        />
+      )}
+    </>
   );
 }
 

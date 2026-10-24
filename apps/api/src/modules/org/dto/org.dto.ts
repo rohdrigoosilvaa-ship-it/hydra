@@ -588,25 +588,41 @@ export class ImportPositionItemDto {
   excludeExamIds?: string[];
 }
 
-export class LinkPositionRisksDto {
+const TRI_STATE = ["SIM", "NAO", "NAO_SE_APLICA"];
+
+/** Dados do risco naquele cargo: cópia do cadastro (editável por empresa) + avaliação. */
+export class PositionRiskFieldsDto {
+  @IsOptional() @IsIn(["HABITUAL", "EVENTUAL", "INTERMITENTE", "PERMANENTE"]) exposureType?: "HABITUAL" | "EVENTUAL" | "INTERMITENTE" | "PERMANENTE" | null;
+  @IsOptional() @IsBoolean() sendEsocial?: boolean;
+  @IsOptional() @IsString() description?: string;
+  @IsOptional() @IsString() damagePotential?: string;
+  @IsOptional() @IsString() observations?: string;
+  @IsOptional() @IsString() sourceCircumstances?: string;
+  @IsOptional() @IsString() adminMeasures?: string;
+  @IsOptional() @IsIn(["QUALITATIVO", "QUANTITATIVO"]) measurementType?: "QUALITATIVO" | "QUANTITATIVO";
+  @IsOptional() @IsBoolean() generatesUnhealthiness?: boolean;
+  @IsOptional() @IsBoolean() generatesHazardPay?: boolean;
+  @IsOptional() @IsBoolean() specialRetirement?: boolean;
+  @IsOptional() @IsBoolean() insertInAso?: boolean;
+  @IsOptional() @IsIn(TRI_STATE) epcStatus?: string;
+  @IsOptional() @IsIn(TRI_STATE) epiStatus?: string;
+  @IsOptional() @IsInt() @Min(1) @Max(5) probability?: number | null;
+  @IsOptional() @IsInt() @Min(1) @Max(5) severity?: number | null;
+  @IsOptional() @IsInt() @Min(1) @Max(3) certainty?: number | null;
+  @IsOptional() @IsArray() @IsString({ each: true }) equipmentIds?: string[];
+}
+
+export class LinkPositionRisksDto extends PositionRiskFieldsDto {
   @IsArray()
   @ArrayMinSize(1)
   @IsString({ each: true })
   positionIds!: string[];
 
-  @IsArray()
-  @ArrayMinSize(1)
-  @IsString({ each: true })
-  hazardIds!: string[];
-
-  @IsOptional()
-  @IsIn(["HABITUAL", "EVENTUAL", "INTERMITENTE", "PERMANENTE"])
-  exposureType?: "HABITUAL" | "EVENTUAL" | "INTERMITENTE" | "PERMANENTE";
-
-  @IsOptional()
-  @IsBoolean()
-  sendEsocial?: boolean;
+  @IsString()
+  hazardId!: string;
 }
+
+export class UpdatePositionRiskDto extends PositionRiskFieldsDto {}
 
 export class AddPositionExamsDto {
   @IsArray()
