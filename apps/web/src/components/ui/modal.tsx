@@ -61,3 +61,26 @@ export function ModalField({ label, required, children }: { label: string; requi
     </label>
   );
 }
+
+/**
+ * Janela por cima da página para formulários que já têm os próprios campos e botões:
+ * só coloca a moldura (faixa de título em degradê, fundo escurecido, Esc para fechar).
+ */
+export function ModalFrame({ title, onClose, children, size = "max-w-4xl" }: { title: string; onClose: () => void; children: ReactNode; size?: string }) {
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-black/50 px-4 py-10" role="dialog" aria-modal="true" aria-label={title}>
+      <div className={`w-full ${size} overflow-hidden rounded-lg bg-paper-raised shadow-2xl`}>
+        <div className="bg-gradient-to-r from-teal-deep via-teal to-teal-deep px-6 py-4 text-center font-display text-sm font-semibold uppercase tracking-[0.2em] text-white">
+          {title}
+        </div>
+        {children}
+      </div>
+    </div>
+  );
+}

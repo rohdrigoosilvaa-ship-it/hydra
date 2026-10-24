@@ -5,6 +5,7 @@ import { api } from "../../lib/api";
 import { COLOR_CHOICES, iconByName } from "../../lib/appearance";
 import { AppearancePicker } from "../../components/company/AppearancePicker";
 import { CboPicker } from "../../components/CboPicker";
+import { ModalFrame } from "../../components/ui/modal";
 import type { Position, WorkEnvironment } from "../../lib/types";
 import type { CompanyWorkspaceContext } from "./CompanyWorkspacePage";
 
@@ -188,8 +189,8 @@ function PositionForm({
   );
 
   return (
-    <form onSubmit={handleSubmit} className="card mt-4 flex flex-col gap-4">
-      <h3 className="font-display text-base font-semibold text-ink">{position ? "Editar cargo" : "Novo cargo"}</h3>
+    <ModalFrame title={position ? "Editar cargo" : "Novo cargo"} onClose={onClose}>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-6">
       <label className="flex flex-col gap-1 text-sm">
         <span className="text-ink-muted">Nome do cargo</span>
         <input className="input" value={name} onChange={(e) => setName(e.target.value)} required minLength={2} autoFocus />
@@ -259,5 +260,6 @@ function PositionForm({
         <button type="button" className="btn-secondary" onClick={onClose}>Cancelar</button>
       </div>
     </form>
+    </ModalFrame>
   );
 }

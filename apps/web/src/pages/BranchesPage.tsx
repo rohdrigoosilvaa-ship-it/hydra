@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import { ModalFrame } from "../components/ui/modal";
 import { Pencil, Plus, Trash2, Upload, X, MapPin, CheckCircle2, CircleOff } from "lucide-react";
 import { api } from "../lib/api";
 import { StatTile } from "../components/ui/cards";
@@ -248,15 +249,8 @@ function BranchForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card mt-4 flex flex-col gap-4">
-      <div className="flex items-center justify-between">
-        <h3 className="font-display text-sm font-semibold text-ink-muted">
-          {branch ? "Editar unidade" : "Nova unidade"}
-        </h3>
-        <button type="button" onClick={onClose} className="text-ink-muted hover:text-ink">
-          <X size={16} />
-        </button>
-      </div>
+    <ModalFrame title={branch ? "Editar unidade" : "Nova unidade"} onClose={onClose}>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-4 p-6">
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
         <label className="flex flex-col gap-1 text-sm">
           <span className="text-ink-muted">Empresa</span>
@@ -328,6 +322,7 @@ function BranchForm({
         {error && <p className="text-sm text-amber">{error}</p>}
       </div>
     </form>
+    </ModalFrame>
   );
 }
 

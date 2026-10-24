@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import { ModalFrame } from "../components/ui/modal";
 import { Plus } from "lucide-react";
 import { api } from "../lib/api";
 import { HYDRA_ROLE_LABELS, type Company, type HydraRole, type HydraUser } from "../lib/types";
@@ -231,7 +232,8 @@ function UserForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card mt-4 flex flex-wrap items-end gap-3">
+    <ModalFrame title={user ? "Editar usuário" : "Novo usuário"} onClose={onClose}>
+    <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3 p-6">
       <label className="flex flex-col gap-1 text-sm">
         <span className="text-ink-muted">Nome</span>
         <input className="input" value={name} onChange={(e) => setName(e.target.value)} required />
@@ -300,5 +302,6 @@ function UserForm({
       </button>
       {error && <p className="w-full text-sm text-amber">{error}</p>}
     </form>
+    </ModalFrame>
   );
 }
