@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { NavLink, useLocation } from "react-router-dom";
-import { Check, ChevronDown, ChevronRight, ChevronsDownUp, ChevronsUpDown, ExternalLink as ExternalLinkIcon, Loader2, type LucideIcon } from "lucide-react";
+import { Check, ChevronDown, Folder, ChevronRight, ChevronsDownUp, ChevronsUpDown, ExternalLink as ExternalLinkIcon, Loader2, type LucideIcon } from "lucide-react";
 import { api } from "../lib/api";
 import { useAuthStore } from "../lib/auth-store";
 import { useSidebarStore } from "../lib/sidebar-store";
@@ -138,6 +138,26 @@ function CollapsedExternal({ link }: { link: NavExternalLink }) {
   );
 }
 
+/** Seção no menu recolhido: só o ícone (com o nome ao passar o mouse); clicar abre o menu com o que tem dentro. */
+function CollapsedSection({ section, active, onOpen }: { section: NavSection; active: boolean; onOpen: () => void }) {
+  const Icon = section.icon ?? Folder;
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      aria-label={`Abrir ${section.label}`}
+      className={`group relative flex items-center justify-center rounded-md py-2.5 transition-colors ${
+        active ? "bg-sidebar-active text-sidebar-active-text" : "text-sidebar-ink-muted hover:bg-sidebar-hover hover:text-sidebar-ink"
+      }`}
+    >
+      <Icon size={18} strokeWidth={2} />
+      <span className="pointer-events-none absolute left-full z-50 ml-2 whitespace-nowrap rounded-md bg-ink px-2 py-1 text-xs font-medium text-paper opacity-0 shadow-md transition-opacity duration-150 group-hover:opacity-100">
+        {section.label}
+      </span>
+    </button>
+  );
+}
+
 function CollapsedLink({ item }: { item: NavLinkItem }) {
   const Icon = item.icon;
   return (
@@ -257,6 +277,7 @@ function NavNodeRenderer({
 export function Sidebar() {
   const assignments = useAuthStore((s) => s.user?.assignments ?? []);
   const user = useAuthStore((s) => s.user);
+  const toggleCollapsed = useSidebarStore((s) => s.toggleCollapsed);
   const collapsed = useSidebarStore((s) => s.collapsed);
   const mobileOpen = useSidebarStore((s) => s.mobileOpen);
   const setMobileOpen = useSidebarStore((s) => s.setMobileOpen);
@@ -381,18 +402,21 @@ export function Sidebar() {
                 <CollapsedLink key={item.to} item={item} />
               ))}
               <div className="my-1 border-t border-sidebar-border" />
-              {visibleSections.map((section) => (
-                <div key={section.id} className="flex flex-col gap-1 border-b border-sidebar-border pb-1 last:border-none">
-                  {section.external && <CollapsedExternal link={section.external} />}
-                  {flattenLinks(section.items).map((item) =>
-                    item.kind === "action" ? (
-                      <NavAction key={item.id} item={item} collapsed />
-                    ) : (
-                      <CollapsedLink key={item.to} item={item} />
-                    ),
-                  )}
-                </div>
-              ))}
+              {visibleSections.map((section) =>
+                section.external ? (
+                  <CollapsedExternal key={section.id} link={section.external} />
+                ) : (
+                  <CollapsedSection
+                    key={section.id}
+                    section={section}
+                    active={section.items.some((i) => nodeMatchesPath(i, location.pathname))}
+                    onOpen={() => {
+                      toggleCollapsed();
+                      if (!isSectionOpen(section)) toggle(section.id);
+                    }}
+                  />
+                ),
+              )}
             </div>
           ) : (
             <>
@@ -450,6 +474,7 @@ export function Sidebar() {
                     aria-expanded={isSectionOpen(section)}
                     className="mb-1.5 flex w-full items-center gap-2 px-3 py-1.5 text-left font-display text-[11px] font-bold uppercase tracking-wider text-sidebar-ink-muted hover:text-sidebar-ink"
                   >
+                    {section.icon && <section.icon size={15} strokeWidth={2} className="shrink-0" />}
                     <span className="flex-1">{section.label}</span>
                     {!isSectionOpen(section) && section.items.some((i) => nodeMatchesPath(i, location.pathname)) && (
                       <span className="h-1.5 w-1.5 rounded-full bg-sidebar-active-text" title="Você está nesta seção" />
