@@ -296,6 +296,54 @@ export class CreatePositionDto {
   @IsString()
   technicalOpinion?: string;
 
+  @IsOptional()
+  @IsString()
+  safetyRecommendations?: string;
+
+  @IsOptional()
+  @IsString()
+  gfipCode?: string;
+
+  @IsOptional()
+  @IsString()
+  ergonomicMethodology?: string;
+
+  @IsOptional()
+  @IsString()
+  generalNotes?: string;
+
+  @IsOptional()
+  @IsString()
+  ltcatOpinionNotes?: string;
+
+  @IsOptional()
+  @IsString()
+  ltcatOpinionConclusion?: string;
+
+  @IsOptional()
+  @IsString()
+  hazardPayOpinionNotes?: string;
+
+  @IsOptional()
+  @IsString()
+  hazardPayOpinionConclusion?: string;
+
+  @IsOptional()
+  @IsString()
+  unhealthinessOpinionNotes?: string;
+
+  @IsOptional()
+  @IsString()
+  unhealthinessOpinionConclusion?: string;
+
+  @IsOptional()
+  @IsBoolean()
+  complementaryInfoEnabled?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  technicalOpinionEnabled?: boolean;
+
   /** Ambientes pelos quais o cargo transita. */
   @IsOptional()
   @IsArray()

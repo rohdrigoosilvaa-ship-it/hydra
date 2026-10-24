@@ -8,6 +8,9 @@ import { assertCompanyInScope, companyScopeWhere } from "./scope.util";
 const UPDATABLE_FIELDS = [
   "code", "name", "cbo", "description", "status", "color", "icon",
   "requiresEntryAptitude", "sectorInfo", "workSchedule", "additionalInfo", "technicalOpinion",
+  "complementaryInfoEnabled", "safetyRecommendations", "gfipCode", "ergonomicMethodology", "generalNotes",
+  "technicalOpinionEnabled", "ltcatOpinionNotes", "ltcatOpinionConclusion", "hazardPayOpinionNotes",
+  "hazardPayOpinionConclusion", "unhealthinessOpinionNotes", "unhealthinessOpinionConclusion",
 ];
 
 @Injectable()

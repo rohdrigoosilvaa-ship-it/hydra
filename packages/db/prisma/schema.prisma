@@ -216,6 +216,20 @@ model Position {
   workSchedule String?
   additionalInfo String?   @db.Text
   technicalOpinion String? @db.Text
+  /// Informações complementares (só valem quando ligadas).
+  complementaryInfoEnabled Boolean @default(false)
+  safetyRecommendations    String? @db.Text
+  gfipCode                 String?
+  ergonomicMethodology     String? @db.Text
+  generalNotes             String? @db.Text
+  /// Pareceres técnicos (só valem quando ligados).
+  technicalOpinionEnabled      Boolean @default(false)
+  ltcatOpinionNotes            String? @db.Text
+  ltcatOpinionConclusion       String? @db.Text
+  hazardPayOpinionNotes        String? @db.Text
+  hazardPayOpinionConclusion   String? @db.Text
+  unhealthinessOpinionNotes    String? @db.Text
+  unhealthinessOpinionConclusion String? @db.Text
   status      RecordStatus @default(ACTIVE)
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
