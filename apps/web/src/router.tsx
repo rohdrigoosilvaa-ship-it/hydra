@@ -51,6 +51,7 @@ import { WorkOrderSigningPage } from "./pages/WorkOrderSigningPage";
 import { Nr01OverviewPage } from "./pages/Nr01OverviewPage";
 import { Nr01GroPage } from "./pages/Nr01GroPage";
 import { Nr01InventoryPage } from "./pages/Nr01InventoryPage";
+import { RisksCatalogPage } from "./pages/RisksCatalogPage";
 import { Nr01GhePage } from "./pages/Nr01GhePage";
 import { Nr01ReevaluationsPage } from "./pages/Nr01ReevaluationsPage";
 import { PendenciasPage } from "./pages/PendenciasPage";
@@ -106,6 +107,7 @@ export const router = createBrowserRouter([
               { index: true, element: <Navigate to="ghe" replace /> },
               { path: "ghe", element: <Nr01GhePage /> },
               { path: "inventario", element: <Nr01InventoryPage /> },
+              { path: "riscos", element: <RisksCatalogPage /> },
               { path: "incidentes", element: <OccurrencesPage /> },
               { path: "ordens-servico", element: <WorkOrdersPage /> },
               { path: "ficha-epi", element: <EpiControlPage /> },
@@ -263,6 +265,7 @@ export const router = createBrowserRouter([
       { path: "nr01", element: <Nr01OverviewPage /> },
       { path: "nr01/gro", element: <Nr01GroPage /> },
       { path: "nr01/inventario", element: <Nr01InventoryPage /> },
+      { path: "nr01/riscos", element: <RisksCatalogPage /> },
       { path: "nr01/ghe", element: <Nr01GhePage /> },
       { path: "nr01/psicossocial", element: <PsychosocialListPage /> },
       { path: "nr01/psicossocial/:id", element: <PsychosocialDetailPage /> },

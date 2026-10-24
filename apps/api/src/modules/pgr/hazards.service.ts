@@ -37,6 +37,10 @@ export class HazardsService {
         `Este perigo está em uso em ${inUse} risco(s) do inventário. Remova ou troque esses riscos antes de excluí-lo.`,
       );
     }
+    const linked = await this.prisma.positionRisk.count({ where: { hazardId: id, position: { tenantId, deletedAt: null } } });
+    if (linked > 0) {
+      throw new BadRequestException(`Este risco está vinculado a ${linked} cargo(s). Desvincule-o dos cargos antes de excluí-lo.`);
+    }
     await this.prisma.hazard.update({ where: { id }, data: { deletedAt: new Date() } });
     return { success: true };
   }

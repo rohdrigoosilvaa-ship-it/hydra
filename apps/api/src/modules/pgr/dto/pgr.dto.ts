@@ -1,11 +1,29 @@
-import { IsArray, IsDateString, IsIn, IsInt, IsOptional, IsString, Max, Min, MinLength } from "class-validator";
+import { IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, Max, Min, MinLength } from "class-validator";
 import type { ActionStatus, EvaluationCriteria, ExposureType, RiskCategory } from "@hydra/db";
 
 const RISK_CATEGORIES: RiskCategory[] = ["FISICO", "QUIMICO", "BIOLOGICO", "ERGONOMICO", "ACIDENTE"];
 const EXPOSURE_TYPES: ExposureType[] = ["HABITUAL", "EVENTUAL", "INTERMITENTE", "PERMANENTE"];
 const EVALUATION_CRITERIA: EvaluationCriteria[] = ["QUALITATIVO", "QUANTITATIVO"];
 
-export class CreateHazardDto {
+const TRI_STATE = ["SIM", "NAO", "NAO_SE_APLICA"];
+
+/** Campos do cadastro de risco (catálogo) além de categoria/nome/código. */
+class HazardExtraFields {
+  @IsOptional() @IsString() sourceCircumstances?: string;
+  @IsOptional() @IsString() observations?: string;
+  @IsOptional() @IsString() adminMeasures?: string;
+  @IsOptional() @IsIn(EXPOSURE_TYPES) exposureType?: ExposureType | null;
+  @IsOptional() @IsBoolean() sendEsocial?: boolean;
+  @IsOptional() @IsIn(EVALUATION_CRITERIA) measurementType?: EvaluationCriteria;
+  @IsOptional() @IsBoolean() generatesUnhealthiness?: boolean;
+  @IsOptional() @IsBoolean() generatesHazardPay?: boolean;
+  @IsOptional() @IsBoolean() specialRetirement?: boolean;
+  @IsOptional() @IsBoolean() insertInAso?: boolean;
+  @IsOptional() @IsIn(TRI_STATE) epcStatus?: string;
+  @IsOptional() @IsIn(TRI_STATE) epiStatus?: string;
+}
+
+export class CreateHazardDto extends HazardExtraFields {
   @IsIn(RISK_CATEGORIES)
   category!: RiskCategory;
 
@@ -26,7 +44,7 @@ export class CreateHazardDto {
   esocialCode?: string;
 }
 
-export class UpdateHazardDto {
+export class UpdateHazardDto extends HazardExtraFields {
   @IsOptional()
   @IsIn(RISK_CATEGORIES)
   category?: RiskCategory;

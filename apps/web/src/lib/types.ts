@@ -439,6 +439,18 @@ export interface Hazard {
   description: string | null;
   damagePotential: string | null;
   esocialCode: string | null;
+  sourceCircumstances?: string | null;
+  observations?: string | null;
+  adminMeasures?: string | null;
+  exposureType?: ExposureType | null;
+  sendEsocial?: boolean;
+  measurementType?: "QUALITATIVO" | "QUANTITATIVO";
+  generatesUnhealthiness?: boolean;
+  generatesHazardPay?: boolean;
+  specialRetirement?: boolean;
+  insertInAso?: boolean;
+  epcStatus?: string;
+  epiStatus?: string;
 }
 
 export interface Pgr {
@@ -605,6 +617,8 @@ export interface Position {
   technicalOpinionEnabled?: boolean;
   /** Ambientes pelos quais o cargo transita. */
   environments?: { environmentId: string }[];
+  risks?: { hazardId: string; exposureType: ExposureType | null; sendEsocial: boolean; hazard: { name: string; category: RiskCategory } }[];
+  exams?: { id: string; name: string }[];
 }
 
 export type EnvironmentUnitType = "MATRIZ" | "FILIAL";

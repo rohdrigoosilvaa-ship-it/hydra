@@ -7,6 +7,7 @@ import { AppearancePicker } from "../../components/company/AppearancePicker";
 import { CboPicker } from "../../components/CboPicker";
 import { FormModal } from "../../components/ui/modal";
 import { ImportPositionsModal } from "./ImportPositionsModal";
+import { PositionDetailModal } from "./PositionDetailModal";
 import type { Position, WorkEnvironment } from "../../lib/types";
 import type { CompanyWorkspaceContext } from "./CompanyWorkspacePage";
 
@@ -47,6 +48,7 @@ export function GheTab() {
   const [environments, setEnvironments] = useState<WorkEnvironment[]>([]);
   const [form, setForm] = useState<Position | "new" | null>(null);
   const [importing, setImporting] = useState(false);
+  const [detailId, setDetailId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   async function load() {
@@ -117,6 +119,15 @@ export function GheTab() {
           }}
         />
       )}
+      {detailId && positions?.find((p) => p.id === detailId) && (
+        <PositionDetailModal
+          position={positions.find((p) => p.id === detailId)!}
+          positions={positions}
+          environments={environments}
+          onClose={() => setDetailId(null)}
+          onChanged={load}
+        />
+      )}
       {error && <p className="mt-3 text-sm text-amber" role="alert">{error}</p>}
 
       {positions && positions.length === 0 && !form && (
@@ -144,10 +155,12 @@ export function GheTab() {
                   <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-white" style={{ background: p.color ?? COLOR_CHOICES[0] }}>
                     <Icon size={18} />
                   </span>
-                  <div className="min-w-0">
-                    <p className="truncate font-medium text-ink">{p.name}</p>
-                    <p className="text-xs text-ink-muted">CBO {p.cbo ?? "—"}</p>
-                  </div>
+                  <button type="button" onClick={() => setDetailId(p.id)} className="min-w-0 text-left" title="Abrir cargo">
+                    <p className="truncate font-medium text-ink hover:underline">{p.name}</p>
+                    <p className="text-xs text-ink-muted">
+                      CBO {p.cbo ?? "—"} · {p.risks?.length ?? 0} risco(s), {p.exams?.length ?? 0} exame(s)
+                    </p>
+                  </button>
                 </div>
                 <p className="mt-2 text-xs text-ink-muted">
                   {names.length ? `Ambientes: ${names.join(", ")}` : "Sem ambientes vinculados"}

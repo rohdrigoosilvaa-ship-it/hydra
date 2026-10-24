@@ -567,6 +567,58 @@ export class ImportPositionItemDto {
   @IsOptional()
   @IsBoolean()
   copyEnvironments?: boolean;
+
+  @IsOptional()
+  @IsBoolean()
+  copyRisks?: boolean;
+
+  /** Riscos (do catálogo) que não devem ir para a cópia. */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  excludeHazardIds?: string[];
+
+  @IsOptional()
+  @IsBoolean()
+  copyExams?: boolean;
+
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  excludeExamIds?: string[];
+}
+
+export class LinkPositionRisksDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsString({ each: true })
+  positionIds!: string[];
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsString({ each: true })
+  hazardIds!: string[];
+
+  @IsOptional()
+  @IsIn(["HABITUAL", "EVENTUAL", "INTERMITENTE", "PERMANENTE"])
+  exposureType?: "HABITUAL" | "EVENTUAL" | "INTERMITENTE" | "PERMANENTE";
+
+  @IsOptional()
+  @IsBoolean()
+  sendEsocial?: boolean;
+}
+
+export class AddPositionExamsDto {
+  @IsArray()
+  @ArrayMinSize(1)
+  @IsString({ each: true })
+  @MinLength(2, { each: true })
+  names!: string[];
+}
+
+export class ImportFromPositionDto {
+  @IsString()
+  sourcePositionId!: string;
 }
 
 export class ImportPositionsDto {

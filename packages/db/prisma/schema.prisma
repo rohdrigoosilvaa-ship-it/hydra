@@ -104,12 +104,12 @@ model Company {
   createdById String?
   updatedById String?
 
-  tenant      Tenant       @relation(fields: [tenantId], references: [id])
-  branches    Branch[]
-  positions   Position[]
+  tenant       Tenant            @relation(fields: [tenantId], references: [id])
+  branches     Branch[]
+  positions    Position[]
   environments WorkEnvironment[]
-  departments Department[]
-  employees   Employee[]
+  departments  Department[]
+  employees    Employee[]
 
   @@index([tenantId])
   @@map("companies")
@@ -195,51 +195,53 @@ model Department {
 
 /// Cargo/função — nível de empresa (reaproveitável entre filiais).
 model Position {
-  id          String       @id @default(cuid())
-  tenantId    String
-  companyId   String
-  code        String?
-  name        String
-  cbo         String?
+  id                             String       @id @default(cuid())
+  tenantId                       String
+  companyId                      String
+  code                           String?
+  name                           String
+  cbo                            String?
   /// Atividades / descrição do cargo (conforme CBO) — reaproveitada por todo
   /// colaborador com esse cargo, exibida (somente leitura) na ficha dele.
-  description String?      @db.Text
+  description                    String?      @db.Text
   /// Cor e ícone de identificação do cargo na tela da empresa.
-  color       String?
-  icon        String?
+  color                          String?
+  icon                           String?
   /// Início da validade dos dados para o eSocial.
-  esocialStartDate DateTime?
+  esocialStartDate               DateTime?
   /// Exige ASO com aptidão para entrar no cargo (admissão).
-  requiresEntryAptitude Boolean @default(false)
-  sectorInfo  String?      @db.Text
+  requiresEntryAptitude          Boolean      @default(false)
+  sectorInfo                     String?      @db.Text
   /// Jornada de trabalho / horário do cargo.
-  workSchedule String?
-  additionalInfo String?   @db.Text
-  technicalOpinion String? @db.Text
+  workSchedule                   String?
+  additionalInfo                 String?      @db.Text
+  technicalOpinion               String?      @db.Text
   /// Informações complementares (só valem quando ligadas).
-  complementaryInfoEnabled Boolean @default(false)
-  safetyRecommendations    String? @db.Text
-  gfipCode                 String?
-  ergonomicMethodology     String? @db.Text
-  generalNotes             String? @db.Text
+  complementaryInfoEnabled       Boolean      @default(false)
+  safetyRecommendations          String?      @db.Text
+  gfipCode                       String?
+  ergonomicMethodology           String?      @db.Text
+  generalNotes                   String?      @db.Text
   /// Pareceres técnicos (só valem quando ligados).
-  technicalOpinionEnabled      Boolean @default(false)
-  ltcatOpinionNotes            String? @db.Text
-  ltcatOpinionConclusion       String? @db.Text
-  hazardPayOpinionNotes        String? @db.Text
-  hazardPayOpinionConclusion   String? @db.Text
-  unhealthinessOpinionNotes    String? @db.Text
-  unhealthinessOpinionConclusion String? @db.Text
-  status      RecordStatus @default(ACTIVE)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
-  deletedAt   DateTime?
+  technicalOpinionEnabled        Boolean      @default(false)
+  ltcatOpinionNotes              String?      @db.Text
+  ltcatOpinionConclusion         String?      @db.Text
+  hazardPayOpinionNotes          String?      @db.Text
+  hazardPayOpinionConclusion     String?      @db.Text
+  unhealthinessOpinionNotes      String?      @db.Text
+  unhealthinessOpinionConclusion String?      @db.Text
+  status                         RecordStatus @default(ACTIVE)
+  createdAt                      DateTime     @default(now())
+  updatedAt                      DateTime     @updatedAt
+  deletedAt                      DateTime?
 
   company      Company               @relation(fields: [companyId], references: [id])
   environments PositionEnvironment[]
   employees    Employee[]
   gheFunctions GheFunction[]
   requiredEpis PositionRequiredEpi[]
+  risks        PositionRisk[]
+  exams        PositionExam[]
 
   @@index([tenantId])
   @@index([companyId])
@@ -256,17 +258,17 @@ enum EnvironmentUnitType {
 
 /// Ambiente de trabalho da empresa (vinculado à empresa; os cargos transitam por ele e os riscos se ligam ao cargo).
 model WorkEnvironment {
-  id          String                  @id @default(cuid())
+  id          String              @id @default(cuid())
   tenantId    String
   companyId   String
   name        String
   color       String?
   icon        String?
-  description String?                 @db.Text
+  description String?             @db.Text
   location    String?
-  unitType    EnvironmentUnitType     @default(MATRIZ)
-  createdAt   DateTime                @default(now())
-  updatedAt   DateTime                @updatedAt
+  unitType    EnvironmentUnitType @default(MATRIZ)
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
   deletedAt   DateTime?
 
   company   Company               @relation(fields: [companyId], references: [id])
@@ -629,19 +631,35 @@ enum RiskCategory {
 
 /// Catálogo de perigos/agentes reutilizável entre PGRs do mesmo tenant.
 model Hazard {
-  id              String       @id @default(cuid())
-  tenantId        String
-  category        RiskCategory
-  name            String
-  description     String?
-  damagePotential String?
+  id                     String             @id @default(cuid())
+  tenantId               String
+  category               RiskCategory
+  name                   String
+  description            String?
+  damagePotential        String?
   /// Código eSocial do agente/perigo (ex.: 09.01.001), quando aplicável — igual ao usado no S-2240.
-  esocialCode     String?
-  createdAt       DateTime     @default(now())
-  updatedAt       DateTime     @updatedAt
-  deletedAt       DateTime?
+  esocialCode            String?
+  /// Fonte ou situação de exposição.
+  sourceCircumstances    String?            @db.Text
+  observations           String?            @db.Text
+  /// Medidas administrativas ou de organização do trabalho (preventivas recomendadas).
+  adminMeasures          String?            @db.Text
+  exposureType           ExposureType?
+  sendEsocial            Boolean            @default(false)
+  measurementType        EvaluationCriteria @default(QUALITATIVO)
+  generatesUnhealthiness Boolean            @default(false)
+  generatesHazardPay     Boolean            @default(false)
+  specialRetirement      Boolean            @default(false)
+  insertInAso            Boolean            @default(true)
+  /// EPCs / EPIs implementam medidas de proteção: "SIM", "NAO" ou "NAO_SE_APLICA".
+  epcStatus              String             @default("NAO_SE_APLICA")
+  epiStatus              String             @default("NAO_SE_APLICA")
+  createdAt              DateTime           @default(now())
+  updatedAt              DateTime           @updatedAt
+  deletedAt              DateTime?
 
-  pgrRisks PgrRisk[]
+  pgrRisks      PgrRisk[]
+  positionRisks PositionRisk[]
 
   @@index([tenantId])
   @@map("hazards")
@@ -1223,11 +1241,11 @@ model InspectionTemplate {
 
 /// Seção de um modelo de checklist (agrupa perguntas).
 model InspectionTemplateSection {
-  id         String @id @default(cuid())
-  tenantId   String
-  templateId String
-  name       String
-  order      Int
+  id          String  @id @default(cuid())
+  tenantId    String
+  templateId  String
+  name        String
+  order       Int
   /// Seção repetível: ao aplicar o checklist, pode ser preenchida várias vezes (ex.: um setor ou risco por vez).
   repeatable  Boolean @default(false)
   repeatLabel String?
@@ -1310,31 +1328,31 @@ model InspectionTemplateItem {
   responseType InspectionItemType @default(CONFORME_NAO_CONFORME)
   category     String?
   options      String[]           @default([]) // opções de escolha quando responseType = SELECAO_MULTIPLA
-  blockLabel   String?            // nome do InspectionBlock de origem, congelado no momento em que foi inserido no roteiro
+  blockLabel   String? // nome do InspectionBlock de origem, congelado no momento em que foi inserido no roteiro
   allowPhoto   Boolean            @default(true) // se falso, não mostra a opção de anexar foto/evidência pra este item
 
-  sectionId       String?
+  sectionId         String?
   /// Orientação mostrada junto da pergunta.
-  instruction     String?  @db.Text
-  required        Boolean  @default(false)
+  instruction       String?  @db.Text
+  required          Boolean  @default(false)
   /// Peso/pontuação (quando aplicável).
-  weight          Int?
-  allowComment    Boolean  @default(true)
-  allowActionPlan Boolean  @default(false)
+  weight            Int?
+  allowComment      Boolean  @default(true)
+  allowActionPlan   Boolean  @default(false)
   /// Escala de avaliação (tipo ESCALA): de scaleMin a scaleMax.
-  scaleMin        Int?
-  scaleMax        Int?
-  scaleMinLabel   String?
-  scaleMaxLabel   String?
+  scaleMin          Int?
+  scaleMax          Int?
+  scaleMinLabel     String?
+  scaleMaxLabel     String?
   /// Linhas da grade (tipo GRADE); as colunas ficam em `options`.
-  rows            String[]  @default([])
+  rows              String[] @default([])
   /// Regra condicional: a pergunta só aparece se a resposta da pergunta `conditionItemId` for/não for `conditionValue`.
   conditionItemId   String?
   conditionOperator String? // "IGUAL" | "DIFERENTE"
   conditionValue    String?
 
   section   InspectionTemplateSection? @relation(fields: [sectionId], references: [id], onDelete: SetNull)
-  template  InspectionTemplate       @relation(fields: [templateId], references: [id], onDelete: Cascade)
+  template  InspectionTemplate         @relation(fields: [templateId], references: [id], onDelete: Cascade)
   responses InspectionItemResponse[]
 
   @@index([tenantId])
@@ -2564,4 +2582,35 @@ model WorkOrderSignature {
 
   @@index([tenantId])
   @@map("work_order_signatures")
+}
+
+/// Risco do catálogo ligado a um cargo.
+model PositionRisk {
+  positionId   String
+  hazardId     String
+  exposureType ExposureType?
+  sendEsocial  Boolean       @default(true)
+  createdAt    DateTime      @default(now())
+
+  position Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+  hazard   Hazard   @relation(fields: [hazardId], references: [id])
+
+  @@id([positionId, hazardId])
+  @@index([hazardId])
+  @@map("position_risks")
+}
+
+/// Exame ocupacional exigido para o cargo.
+model PositionExam {
+  id         String   @id @default(cuid())
+  tenantId   String
+  positionId String
+  name       String
+  createdAt  DateTime @default(now())
+
+  position Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
+
+  @@index([tenantId])
+  @@index([positionId])
+  @@map("position_exams")
 }
