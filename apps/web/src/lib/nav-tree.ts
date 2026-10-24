@@ -144,7 +144,6 @@ export const navSections: NavSection[] = [
     items: [
       { kind: "link", to: "/pgr", label: "PGR", icon: ShieldCheck, permission: PERMISSIONS.PGR_READ },
       { kind: "link", to: "/nr01/ghe", label: "GHE", icon: Boxes, permission: PERMISSIONS.PGR_READ },
-      { kind: "link", to: "/nr01/inventario", label: "Inventário de Riscos", icon: TriangleAlert, permission: PERMISSIONS.PGR_READ },
       { kind: "link", to: "/nr01/riscos", label: "Riscos", icon: TriangleAlert, permission: PERMISSIONS.PGR_READ },
       { kind: "link", to: "/nr01/gro", label: "GRO", icon: SearchCheck, permission: PERMISSIONS.PGR_READ },
       { kind: "link", to: "/incidentes", label: "Incidentes", icon: Siren, permission: PERMISSIONS.OCCURRENCE_READ },

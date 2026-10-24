@@ -1,6 +1,8 @@
 import { Module } from "@nestjs/common";
 import { HazardsController } from "./hazards.controller";
 import { HazardsService } from "./hazards.service";
+import { ProtectionController } from "./protection.controller";
+import { ProtectionService } from "./protection.service";
 import { PgrController } from "./pgr.controller";
 import { PgrService } from "./pgr.service";
 import { PgrPdfService } from "./pgr-pdf.service";
@@ -22,6 +24,7 @@ import { PgrCronogramaService } from "./pgr-cronograma.service";
 @Module({
   controllers: [
     HazardsController,
+    ProtectionController,
     PgrCronogramaController,
     PgrController,
     GheController,
@@ -33,6 +36,7 @@ import { PgrCronogramaService } from "./pgr-cronograma.service";
   ],
   providers: [
     HazardsService,
+    ProtectionService,
     PgrService,
     PgrPdfService,
     GheService,
