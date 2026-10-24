@@ -1,20 +1,24 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
-import { Image as ImageIcon, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { BriefcaseBusiness, Boxes, Copy, Image as ImageIcon, Pencil, Plus, Settings2, Trash2, Upload, Users, X } from "lucide-react";
 import { api } from "../lib/api";
 import { DataLoadWizard } from "../components/DataLoadWizard";
 import { useCompanyFilterStore } from "../lib/company-filter-store";
 import type { Company } from "../lib/types";
 
 export function CompanyPage() {
+  const navigate = useNavigate();
   const [companies, setCompanies] = useState<Company[] | null>(null);
   const [showForm, setShowForm] = useState(false);
+  const [duplicateOpen, setDuplicateOpen] = useState(false);
+  const [template, setTemplate] = useState<Company | null>(null);
   const [showLoad, setShowLoad] = useState(false);
   const [editing, setEditing] = useState<Company | null>(null);
   const [loadingEdit, setLoadingEdit] = useState(false);
   const { selectedCompanyId, setSelectedCompanyId, refreshCompanies } = useCompanyFilterStore();
 
   async function load() {
-    setCompanies(await api.get<Company[]>("/companies"));
+    setCompanies(await api.get<Company[]>("/companies?withCounts=true"));
   }
 
   useEffect(() => {
@@ -43,20 +47,35 @@ export function CompanyPage() {
     }
   }
 
+  /** Duplicar: abre o cadastro de uma nova empresa já com os dados de outra (sem CNPJ, que é único). */
+  async function handleDuplicate(companyId: string) {
+    setDuplicateOpen(false);
+    if (!companyId) return;
+    const full = await api.get<Company>(`/companies/${companyId}`);
+    setShowForm(false);
+    setEditing(null);
+    setTemplate(full);
+  }
+
+  function handleManage(company: Company) {
+    setSelectedCompanyId(company.id);
+    navigate("/");
+  }
+
   const visibleCompanies = selectedCompanyId
     ? companies?.filter((c) => c.id === selectedCompanyId)
     : companies;
 
   return (
     <div>
-      <div className="flex items-center justify-between">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
-          <h1 className="font-display text-2xl font-semibold text-ink">Minha Empresa</h1>
+          <h1 className="font-display text-2xl font-semibold text-ink">Empresas</h1>
           <p className="mt-1 text-sm text-ink-muted">
-            {selectedCompanyId ? "Dados da empresa selecionada no filtro." : "Entidades legais do seu tenant."}
+            {selectedCompanyId ? "Dados da empresa selecionada no filtro." : "Empresas cadastradas no sistema."}
           </p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center gap-2">
           {selectedCompanyId && (
             <button className="btn-secondary flex items-center gap-1.5 text-xs" onClick={() => setSelectedCompanyId(null)}>
               <X size={13} /> Ver todas as empresas
@@ -65,8 +84,38 @@ export function CompanyPage() {
           <button className="btn-secondary flex items-center gap-1.5" onClick={() => setShowLoad(true)}>
             <Upload size={15} /> Carga de dados
           </button>
-          <button className="btn-primary flex items-center gap-1.5" onClick={() => setShowForm(true)}>
-            <Plus size={15} /> Nova empresa
+          <div className="relative">
+            <button
+              className="btn-secondary flex items-center gap-1.5"
+              onClick={() => setDuplicateOpen((o) => !o)}
+              disabled={!companies || companies.length === 0}
+              aria-expanded={duplicateOpen}
+            >
+              <Copy size={15} /> Duplicar
+            </button>
+            {duplicateOpen && (
+              <div className="absolute right-0 z-20 mt-1 w-72 rounded-lg border border-line bg-paper-raised p-3 shadow-lg">
+                <label className="flex flex-col gap-1 text-sm">
+                  <span className="text-ink-muted">Duplicar qual empresa?</span>
+                  <select className="input" defaultValue="" onChange={(e) => handleDuplicate(e.target.value)} aria-label="Empresa a duplicar">
+                    <option value="">Selecione…</option>
+                    {companies?.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </label>
+              </div>
+            )}
+          </div>
+          <button
+            className="btn-primary flex items-center gap-1.5"
+            onClick={() => {
+              setTemplate(null);
+              setEditing(null);
+              setShowForm(true);
+            }}
+          >
+            <Plus size={15} /> Adicionar empresa
           </button>
         </div>
       </div>
@@ -75,6 +124,13 @@ export function CompanyPage() {
         <DataLoadWizard onClose={() => setShowLoad(false)} onImported={() => { refreshCompanies(); load(); }} />
       )}
 
+      {template && (
+        <CompanyForm
+          template={template}
+          onClose={() => setTemplate(null)}
+          onSaved={() => { setTemplate(null); refreshCompanies(); load(); }}
+        />
+      )}
       {showForm && <CompanyForm onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); refreshCompanies(); load(); }} />}
       {editing && (
         <CompanyForm
@@ -110,7 +166,27 @@ export function CompanyPage() {
             {c.grauRisco != null && (
               <p className="mt-1 text-xs text-ink-muted">Grau de risco: <span className="font-medium text-ink">{c.grauRisco}</span></p>
             )}
-            <div className="mt-3 flex gap-3">
+            <dl className="mt-3 grid grid-cols-3 gap-2 text-center">
+              {(
+                [
+                  ["Funcionários", c.counts?.employees, Users],
+                  ["Cargos", c.counts?.positions, BriefcaseBusiness],
+                  ["GHE", c.counts?.ghes, Boxes],
+                ] as const
+              ).map(([label, value, Icon]) => (
+                <div key={label} className="rounded-md bg-paper px-2 py-2">
+                  <dd className="flex items-center justify-center gap-1 font-display text-lg font-semibold tabular-nums text-ink">
+                    <Icon size={13} className="text-teal-deep" aria-hidden />
+                    {value ?? "—"}
+                  </dd>
+                  <dt className="text-[11px] text-ink-muted">{label}</dt>
+                </div>
+              ))}
+            </dl>
+            <div className="mt-3 flex flex-wrap gap-3 border-t border-line pt-3">
+              <button onClick={() => handleManage(c)} className="flex items-center gap-1.5 text-xs font-medium text-ink hover:underline">
+                <Settings2 size={12} /> Gerenciar
+              </button>
               <button
                 onClick={() => handleEdit(c)}
                 disabled={loadingEdit}
@@ -219,18 +295,23 @@ function toFormState(c?: Company): FormState {
 
 function CompanyForm({
   company,
+  template,
   onClose,
   onSaved,
   onLogoChanged,
 }: {
   company?: Company;
+  /** Cadastro de nova empresa a partir de outra (duplicar): copia os dados, sem CNPJ. */
+  template?: Company;
   onClose: () => void;
   onSaved: () => void;
   onLogoChanged?: (updated: Company) => void;
 }) {
-  const [f, setF] = useState<FormState>(() => toFormState(company));
+  const [f, setF] = useState<FormState>(() =>
+    template ? { ...toFormState(template), name: `Cópia de ${template.name}`, cnpj: "" } : toFormState(company),
+  );
   const [cobrancaIgualEndereco, setCobrancaIgualEndereco] = useState(() =>
-    !!company && !company.cepCobranca && !company.enderecoCobranca,
+    !!(company ?? template) && !(company ?? template)!.cepCobranca && !(company ?? template)!.enderecoCobranca,
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -41,7 +41,7 @@ export function PgrDadosGeraisTab({ pgr, onChanged }: { pgr: PgrDetail; onChange
           )}
           <div className="text-sm">
             <p className="font-medium text-ink">{company?.name ?? "Empresa"}</p>
-            <Link to="/minha-empresa" className="text-xs text-teal-deep hover:underline">
+            <Link to="/empresas" className="text-xs text-teal-deep hover:underline">
               {company?.logoUrl ? "Trocar logo" : "Enviar logo"} em Minha Empresa
             </Link>
           </div>

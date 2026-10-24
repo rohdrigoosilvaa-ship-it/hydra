@@ -341,6 +341,8 @@ export interface TechnicalReport {
 
 export interface Company {
   id: string;
+  /** Só vem em `/companies?withCounts=true`. */
+  counts?: { employees: number; positions: number; ghes: number };
   name: string;
   legalName: string | null;
   cnpj: string | null;
