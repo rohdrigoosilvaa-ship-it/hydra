@@ -66,7 +66,8 @@ export const router = createBrowserRouter([
     children: [
       { index: true, element: <InicioPage /> },
       { path: "dashboard", element: <Navigate to="/" replace /> },
-      { path: "minha-empresa", element: <CompanyPage /> },
+      { path: "empresas", element: <CompanyPage /> },
+      { path: "minha-empresa", element: <Navigate to="/empresas" replace /> },
 
       { path: "cadastros/estrutura/unidades", element: <BranchesPage /> },
       { path: "cadastros/estrutura/setores", element: <DepartmentsPage /> },

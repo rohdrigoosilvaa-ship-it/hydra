@@ -1,4 +1,4 @@
-import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, UploadedFile, UseInterceptors } from "@nestjs/common";
+import { BadRequestException, Body, Controller, Delete, Get, Param, Patch, Post, Query, UploadedFile, UseInterceptors } from "@nestjs/common";
 import { FileInterceptor } from "@nestjs/platform-express";
 import { CurrentUser } from "../../core/decorators/current-user.decorator";
 import { RequirePermission } from "../../core/decorators/require-permission.decorator";
@@ -13,8 +13,10 @@ export class CompaniesController {
 
   @Get()
   @RequirePermission(PERMISSIONS.ORG_COMPANY_READ)
-  list(@CurrentUser() user: HydraRequestUser) {
-    return this.companies.list(user.tenantId, user.assignments);
+  list(@CurrentUser() user: HydraRequestUser, @Query("withCounts") withCounts?: string) {
+    return withCounts === "true"
+      ? this.companies.listWithCounts(user.tenantId, user.assignments)
+      : this.companies.list(user.tenantId, user.assignments);
   }
 
   @Get(":id")

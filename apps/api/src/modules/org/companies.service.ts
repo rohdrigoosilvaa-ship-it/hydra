@@ -4,7 +4,7 @@ import { PrismaService } from "../../core/prisma/prisma.service";
 import { PERMISSIONS } from "../../core/permissions/permissions";
 import type { RoleAssignmentClaim } from "../../core/auth/jwt.types";
 import type { CreateCompanyDto } from "./dto/org.dto";
-import { allowedCompanyIds, hasTenantWideAccess, isCompanyInScope } from "./scope.util";
+import { allowedCompanyIds, employeeScopeWhere, hasTenantWideAccess, isCompanyInScope } from "./scope.util";
 
 @Injectable()
 export class CompaniesService {
@@ -16,6 +16,22 @@ export class CompaniesService {
       where,
       orderBy: { name: "asc" },
     });
+  }
+
+  /** Lista com a quantidade de funcionários ativos, cargos ativos e GHEs de cada empresa (para os cards da tela Empresas). */
+  async listWithCounts(tenantId: string, assignments: RoleAssignmentClaim[]) {
+    const companies = await this.list(tenantId, assignments);
+    const employeeScope = employeeScopeWhere(assignments, PERMISSIONS.ORG_EMPLOYEE_READ, tenantId);
+    return Promise.all(
+      companies.map(async (company) => {
+        const [employees, positions, ghes] = await Promise.all([
+          this.prisma.employee.count({ where: { ...employeeScope, companyId: company.id, status: "ACTIVE" } }),
+          this.prisma.position.count({ where: { tenantId, companyId: company.id, deletedAt: null, status: "ACTIVE" } }),
+          this.prisma.ghe.count({ where: { tenantId, pgr: { companyId: company.id } } }),
+        ]);
+        return { ...company, counts: { employees, positions, ghes } };
+      }),
+    );
   }
 
   async get(tenantId: string, id: string, assignments: RoleAssignmentClaim[]) {

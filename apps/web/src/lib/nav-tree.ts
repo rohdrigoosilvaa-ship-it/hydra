@@ -102,6 +102,7 @@ export interface NavSection {
 
 export const topItems: NavLinkItem[] = [
   { kind: "link", to: "/", label: "Início", icon: House, end: true },
+  { kind: "link", to: "/empresas", label: "Empresas", icon: Building2, permission: PERMISSIONS.ORG_COMPANY_READ },
 ];
 
 export const navSections: NavSection[] = [
@@ -110,7 +111,6 @@ export const navSections: NavSection[] = [
     label: "Gestão",
     icon: Building2,
     items: [
-      { kind: "link", to: "/minha-empresa", label: "Minha Empresa", icon: Building2, permission: PERMISSIONS.ORG_COMPANY_READ },
       {
         kind: "group",
         id: "cadastros",
