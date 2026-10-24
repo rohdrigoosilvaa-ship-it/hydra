@@ -153,3 +153,61 @@ export function AreaChart({ data }: { data: MonthPoint[] }) {
     </svg>
   );
 }
+
+const capitalize = (label: string) => (label ? label[0]!.toUpperCase() + label.slice(1).toLowerCase() : label);
+
+/** Linha com marcadores e eixo; sem registros mostra a linha zerada e uma mensagem. */
+export function LineChart({ data, emptyTitle, emptyHint, icon }: { data: MonthPoint[]; emptyTitle: string; emptyHint: string; icon?: ReactNode }) {
+  const W = 520;
+  const H = 210;
+  const padL = 30;
+  const padB = 26;
+  const padT = 14;
+  const padR = 14;
+  const maxValue = Math.max(0, ...data.map((d) => d.value));
+  const niceMax = maxValue <= 4 ? 4 : Math.ceil(maxValue / 4) * 4;
+  const plotH = H - padT - padB;
+  const plotW = W - padL - padR;
+  const pts = data.map((d, i) => ({
+    x: padL + (data.length === 1 ? plotW / 2 : (i * plotW) / (data.length - 1)),
+    y: padT + plotH - (d.value / niceMax) * plotH,
+    d,
+  }));
+  const path = pts.map((p, i) => `${i === 0 ? "M" : "L"} ${p.x} ${p.y}`).join(" ");
+  const ticks = [0, 1, 2, 3, 4].map((i) => (niceMax / 4) * i);
+  const empty = maxValue === 0;
+
+  return (
+    <div className="relative">
+      <svg viewBox={`0 0 ${W} ${H}`} className="h-auto w-full" role="img" aria-label="Evolução por mês">
+        {ticks.map((t) => {
+          const y = padT + plotH - (t / niceMax) * plotH;
+          return (
+            <text key={t} x={padL - 8} y={y + 4} textAnchor="end" fontSize="11" style={{ fill: "var(--ink-muted)" }}>
+              {Number.isInteger(t) ? t : t.toFixed(1)}
+            </text>
+          );
+        })}
+        <line x1={padL} x2={padL} y1={padT} y2={padT + plotH} style={{ stroke: "var(--line)" }} />
+        <path d={path} fill="none" strokeWidth="2.5" strokeLinejoin="round" style={{ stroke: "var(--teal)" }} />
+        {pts.map((p, i) => (
+          <g key={i}>
+            <circle cx={p.x} cy={p.y} r="4" strokeWidth="2" style={{ fill: "var(--paper-raised)", stroke: "var(--teal)" }}>
+              <title>{`${capitalize(p.d.label)}: ${p.d.value}`}</title>
+            </circle>
+            <text x={p.x} y={H - 6} textAnchor="middle" fontSize="11" style={{ fill: "var(--ink-muted)" }}>
+              {capitalize(p.d.label)}
+            </text>
+          </g>
+        ))}
+      </svg>
+      {empty && (
+        <div className="pointer-events-none absolute inset-x-0 top-[14%] flex flex-col items-center text-center">
+          {icon && <span className="mb-1 flex h-9 w-9 items-center justify-center rounded-full bg-paper text-ink-muted">{icon}</span>}
+          <p className="text-sm font-semibold text-ink">{emptyTitle}</p>
+          <p className="mt-0.5 max-w-[16rem] text-xs text-ink-muted">{emptyHint}</p>
+        </div>
+      )}
+    </div>
+  );
+}

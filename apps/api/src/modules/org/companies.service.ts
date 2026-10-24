@@ -30,7 +30,19 @@ export class CompaniesService {
           this.prisma.position.count({ where: { tenantId, companyId: company.id, deletedAt: null, status: "ACTIVE" } }),
           this.prisma.ghe.count({ where: { tenantId, pgr: { companyId: company.id } } }),
         ]);
-        return { ...company, counts: { employees, positions, ghes } };
+        const openStatuses = ["OPEN", "IN_PROGRESS", "LATE", "VALIDATING"] as const;
+        const [pendingActions, priorityRisks, pgr] = await Promise.all([
+          this.prisma.pgrAction.count({ where: { tenantId, companyId: company.id, status: { in: [...openStatuses] } } }),
+          this.prisma.pgrRisk.count({
+            where: { tenantId, riskLevel: { in: ["HIGH", "CRITICAL"] }, pgr: { companyId: company.id, deletedAt: null } },
+          }),
+          this.prisma.pgr.findFirst({
+            where: { tenantId, companyId: company.id, deletedAt: null },
+            orderBy: { updatedAt: "desc" },
+            select: { id: true, title: true, status: true, updatedAt: true },
+          }),
+        ]);
+        return { ...company, counts: { employees, positions, ghes, pendingActions, priorityRisks }, pgr };
       }),
     );
   }
@@ -51,6 +63,19 @@ export class CompaniesService {
       this.prisma.ltcat.count({ where: { tenantId, companyId: id, deletedAt: null, status: "DRAFT" } }),
     ]);
     const months = lastMonths(6);
+    const since = months[0]!.start;
+    const [recentEsocial, openActions, totalActions, environments, pgr] = await Promise.all([
+      this.prisma.esocialEvent.count({ where: { tenantId, companyId: id, createdAt: { gte: since } } }),
+      this.prisma.pgrAction.count({ where: { tenantId, companyId: id, status: { in: ["OPEN", "IN_PROGRESS", "LATE", "VALIDATING"] } } }),
+      this.prisma.pgrAction.count({ where: { tenantId, companyId: id } }),
+      this.prisma.workEnvironment.count({ where: { tenantId, companyId: id, deletedAt: null } }),
+      this.prisma.pgr.findFirst({
+        where: { tenantId, companyId: id, deletedAt: null },
+        orderBy: { updatedAt: "desc" },
+        select: { id: true, title: true, status: true },
+      }),
+    ]);
+    const pgrProgress = pgr ? await this.pgrProgress(tenantId, pgr) : null;
     const asosByMonth = await Promise.all(
       months.map(async (m) => ({
         label: m.label,
@@ -69,6 +94,10 @@ export class CompaniesService {
     );
     const contracted = company.contractedLives ?? null;
     return {
+      esocialEventsRecent: recentEsocial,
+      actions: { open: openActions, total: totalActions },
+      environments,
+      pgr: pgrProgress,
       asosByMonth,
       catsByMonth,
       positions,
@@ -82,6 +111,28 @@ export class CompaniesService {
       absentEmployees: absent,
       draftDocuments: draftPgr + draftLtcat,
     };
+  }
+
+  /** Andamento do PGR em 6 etapas, para o banner "PGR em andamento" do painel da empresa. */
+  private async pgrProgress(tenantId: string, pgr: { id: string; title: string; status: string }) {
+    const [ghes, risks, actions, cronograma] = await Promise.all([
+      this.prisma.ghe.count({ where: { tenantId, pgrId: pgr.id } }),
+      this.prisma.pgrRisk.count({ where: { tenantId, pgrId: pgr.id } }),
+      this.prisma.pgrAction.count({ where: { tenantId, pgrId: pgr.id } }),
+      this.prisma.pgrCronogramaItem.count({ where: { tenantId, pgrId: pgr.id } }),
+    ]);
+    const steps = [
+      { label: "Dados gerais", done: true },
+      { label: "GHE", done: ghes > 0 },
+      { label: "Inventário de riscos", done: risks > 0 },
+      { label: "Plano de ações", done: actions > 0 },
+      { label: "Cronograma", done: cronograma > 0 },
+      { label: "Finalização", done: pgr.status === "APPROVED" },
+    ];
+    const done = steps.filter((s) => s.done).length;
+    const lastDone = [...steps].reverse().find((s) => s.done)?.label ?? null;
+    const next = steps.find((s) => !s.done)?.label ?? null;
+    return { id: pgr.id, title: pgr.title, status: pgr.status, percent: Math.round((done / steps.length) * 100), lastDone, next };
   }
 
   async get(tenantId: string, id: string, assignments: RoleAssignmentClaim[]) {

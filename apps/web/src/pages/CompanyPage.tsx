@@ -1,20 +1,47 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { BriefcaseBusiness, Boxes, Copy, Image as ImageIcon, Pencil, Plus, Settings2, Trash2, Upload, Users, X } from "lucide-react";
+import {
+  AlertTriangle,
+  BriefcaseBusiness,
+  CheckCircle2,
+  ChevronDown,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardList,
+  Copy,
+  Image as ImageIcon,
+  MoreVertical,
+  Network,
+  Pencil,
+  Plus,
+  Search,
+  Trash2,
+  Upload,
+  Users,
+  X,
+} from "lucide-react";
 import { api } from "../lib/api";
 import { DataLoadWizard } from "../components/DataLoadWizard";
 import { useCompanyFilterStore } from "../lib/company-filter-store";
 import type { Company } from "../lib/types";
 
+const PGR_STATUS_LABEL: Record<string, string> = { DRAFT: "Rascunho", IN_REVIEW: "Em revisão", APPROVED: "Aprovado", ARCHIVED: "Arquivado" };
+const PAGE_SIZE = 9;
+
 export function CompanyPage() {
   const navigate = useNavigate();
   const [companies, setCompanies] = useState<Company[] | null>(null);
   const [showForm, setShowForm] = useState(false);
-  const [duplicateOpen, setDuplicateOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
   const [template, setTemplate] = useState<Company | null>(null);
   const [showLoad, setShowLoad] = useState(false);
   const [editing, setEditing] = useState<Company | null>(null);
   const [loadingEdit, setLoadingEdit] = useState(false);
+  const [search, setSearch] = useState("");
+  const [risk, setRisk] = useState("");
+  const [pgrStatus, setPgrStatus] = useState("");
+  const [sort, setSort] = useState("name");
+  const [page, setPage] = useState(1);
   const { selectedCompanyId, setSelectedCompanyId, refreshCompanies } = useCompanyFilterStore();
 
   async function load() {
@@ -49,7 +76,7 @@ export function CompanyPage() {
 
   /** Duplicar: abre o cadastro de uma nova empresa já com os dados de outra (sem CNPJ, que é único). */
   async function handleDuplicate(companyId: string) {
-    setDuplicateOpen(false);
+    setMoreOpen(false);
     if (!companyId) return;
     const full = await api.get<Company>(`/companies/${companyId}`);
     setShowForm(false);
@@ -62,41 +89,41 @@ export function CompanyPage() {
     navigate(`/empresas/${company.id}`);
   }
 
-  const visibleCompanies = selectedCompanyId
-    ? companies?.filter((c) => c.id === selectedCompanyId)
-    : companies;
+  const q = search.trim().toLowerCase();
+  const filtered = (companies ?? [])
+    .filter((c) => !selectedCompanyId || c.id === selectedCompanyId)
+    .filter((c) => !q || [c.name, c.legalName, c.cnpj].some((v) => v?.toLowerCase().includes(q)))
+    .filter((c) => !risk || String(c.grauRisco ?? "") === risk)
+    .filter((c) => !pgrStatus || (pgrStatus === "NONE" ? !c.pgr : c.pgr?.status === pgrStatus))
+    .sort((a, b) => {
+      if (sort === "employees") return (b.counts?.employees ?? 0) - (a.counts?.employees ?? 0);
+      if (sort === "risk") return (b.grauRisco ?? 0) - (a.grauRisco ?? 0);
+      return a.name.localeCompare(b.name, "pt-BR");
+    });
+  const pages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const current = Math.min(page, pages);
+  const visible = filtered.slice((current - 1) * PAGE_SIZE, current * PAGE_SIZE);
+  const select = "input min-w-[150px]";
 
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-3">
+      <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="font-display text-2xl font-semibold text-ink">Empresas</h1>
-          <p className="mt-1 text-sm text-ink-muted">
-            {selectedCompanyId ? "Dados da empresa selecionada no filtro." : "Empresas cadastradas no sistema."}
-          </p>
+          <h1 className="font-display text-3xl font-extrabold text-ink">Empresas</h1>
+          <p className="mt-1 text-sm text-ink-muted">Gerencie empresas, unidades e indicadores de SST.</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          {selectedCompanyId && (
-            <button className="btn-secondary flex items-center gap-1.5 text-xs" onClick={() => setSelectedCompanyId(null)}>
-              <X size={13} /> Ver todas as empresas
-            </button>
-          )}
           <button className="btn-secondary flex items-center gap-1.5" onClick={() => setShowLoad(true)}>
-            <Upload size={15} /> Carga de dados
+            <Upload size={15} /> Importar dados
           </button>
           <div className="relative">
-            <button
-              className="btn-secondary flex items-center gap-1.5"
-              onClick={() => setDuplicateOpen((o) => !o)}
-              disabled={!companies || companies.length === 0}
-              aria-expanded={duplicateOpen}
-            >
-              <Copy size={15} /> Duplicar
+            <button className="btn-secondary flex items-center gap-1.5" onClick={() => setMoreOpen((o) => !o)} aria-expanded={moreOpen}>
+              Mais ações <ChevronDown size={15} />
             </button>
-            {duplicateOpen && (
+            {moreOpen && (
               <div className="absolute right-0 z-20 mt-1 w-72 rounded-lg border border-line bg-paper-raised p-3 shadow-lg">
                 <label className="flex flex-col gap-1 text-sm">
-                  <span className="text-ink-muted">Duplicar qual empresa?</span>
+                  <span className="flex items-center gap-1.5 text-ink-muted"><Copy size={13} /> Duplicar qual empresa?</span>
                   <select className="input" defaultValue="" onChange={(e) => handleDuplicate(e.target.value)} aria-label="Empresa a duplicar">
                     <option value="">Selecione…</option>
                     {companies?.map((c) => (
@@ -104,6 +131,11 @@ export function CompanyPage() {
                     ))}
                   </select>
                 </label>
+                {selectedCompanyId && (
+                  <button className="mt-3 flex items-center gap-1.5 text-xs text-teal-deep hover:underline" onClick={() => { setSelectedCompanyId(null); setMoreOpen(false); }}>
+                    <X size={12} /> Ver todas as empresas
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -123,7 +155,6 @@ export function CompanyPage() {
       {showLoad && (
         <DataLoadWizard onClose={() => setShowLoad(false)} onImported={() => { refreshCompanies(); load(); }} />
       )}
-
       {template && (
         <CompanyForm
           template={template}
@@ -141,68 +172,164 @@ export function CompanyPage() {
         />
       )}
 
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="mt-5 flex flex-wrap items-center gap-3 rounded-2xl border border-line bg-paper-raised p-3 shadow-sm">
+        <label className="relative min-w-[220px] flex-1">
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-muted" />
+          <input
+            className="input w-full pl-9"
+            placeholder="Buscar por empresa ou CNPJ…"
+            aria-label="Buscar empresa"
+            value={search}
+            onChange={(e) => { setSearch(e.target.value); setPage(1); }}
+          />
+        </label>
+        <select className={select} aria-label="Grau de risco" value={risk} onChange={(e) => { setRisk(e.target.value); setPage(1); }}>
+          <option value="">Grau de risco</option>
+          {[1, 2, 3, 4].map((g) => <option key={g} value={g}>Grau de risco {g}</option>)}
+        </select>
+        <select className={select} aria-label="Status do PGR" value={pgrStatus} onChange={(e) => { setPgrStatus(e.target.value); setPage(1); }}>
+          <option value="">Status do PGR</option>
+          <option value="NONE">Sem PGR</option>
+          <option value="DRAFT">Rascunho</option>
+          <option value="IN_REVIEW">Em revisão</option>
+          <option value="APPROVED">Aprovado</option>
+        </select>
+        <select className={select} aria-label="Ordenar" value={sort} onChange={(e) => setSort(e.target.value)}>
+          <option value="name">Ordenar: Nome</option>
+          <option value="employees">Ordenar: Funcionários</option>
+          <option value="risk">Ordenar: Grau de risco</option>
+        </select>
+      </div>
+
+      <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
         {companies === null && <p className="text-sm text-ink-muted">Carregando…</p>}
-        {visibleCompanies?.length === 0 && (
-          <p className="text-sm text-ink-muted">Nenhuma empresa cadastrada ainda.</p>
+        {companies && filtered.length === 0 && (
+          <p className="text-sm text-ink-muted">{companies.length === 0 ? "Nenhuma empresa cadastrada ainda." : "Nenhuma empresa encontrada com esses filtros."}</p>
         )}
-        {visibleCompanies?.map((c) => (
-          <div key={c.id} className="card">
-            <div className="flex items-start justify-between gap-2">
-              <div className="flex items-center gap-2">
-                {c.logoUrl ? (
-                  <img src={c.logoUrl} alt="" className="h-8 w-8 rounded object-contain" />
-                ) : (
-                  <span className="flex h-8 w-8 items-center justify-center rounded bg-paper-raised text-ink-muted">
-                    <ImageIcon size={14} />
-                  </span>
-                )}
-                <p className="font-medium text-ink">{c.name}</p>
-              </div>
-              {c.unidadeContratante && <span className="tag shrink-0">Contratante</span>}
-            </div>
-            {c.legalName && <p className="mt-0.5 text-xs text-ink-muted">{c.legalName}</p>}
-            <p className="mt-1 font-mono text-xs text-ink-muted">{c.cnpj ?? "sem CNPJ"}</p>
-            {c.grauRisco != null && (
-              <p className="mt-1 text-xs text-ink-muted">Grau de risco: <span className="font-medium text-ink">{c.grauRisco}</span></p>
+        {visible.map((c) => (
+          <CompanyCard key={c.id} company={c} disabled={loadingEdit} onManage={() => handleManage(c)} onEdit={() => handleEdit(c)} onDuplicate={() => handleDuplicate(c.id)} onDelete={() => handleDelete(c)} />
+        ))}
+      </div>
+
+      {filtered.length > 0 && (
+        <div className="mt-6 flex items-center justify-center gap-3 text-sm text-ink-muted">
+          <span>
+            Mostrando {(current - 1) * PAGE_SIZE + 1}-{Math.min(current * PAGE_SIZE, filtered.length)} de {filtered.length} {filtered.length === 1 ? "empresa" : "empresas"}
+          </span>
+          <div className="flex items-center gap-1">
+            <button className="rounded-md border border-line bg-paper-raised p-1.5 disabled:opacity-40" disabled={current <= 1} onClick={() => setPage(current - 1)} aria-label="Página anterior">
+              <ChevronLeft size={15} />
+            </button>
+            <span className="min-w-[2rem] rounded-md bg-teal px-2 py-1 text-center font-medium text-white">{current}</span>
+            <button className="rounded-md border border-line bg-paper-raised p-1.5 disabled:opacity-40" disabled={current >= pages} onClick={() => setPage(current + 1)} aria-label="Próxima página">
+              <ChevronRight size={15} />
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function CompanyCard({
+  company: c,
+  disabled,
+  onManage,
+  onEdit,
+  onDuplicate,
+  onDelete,
+}: {
+  company: Company;
+  disabled: boolean;
+  onManage: () => void;
+  onEdit: () => void;
+  onDuplicate: () => void;
+  onDelete: () => void;
+}) {
+  const [menu, setMenu] = useState(false);
+  const stats: [string, number | undefined, typeof Users][] = [
+    ["Funcionários", c.counts?.employees, Users],
+    ["Cargos", c.counts?.positions, BriefcaseBusiness],
+    ["GHE", c.counts?.ghes, Network],
+    ["Ações pendentes", c.counts?.pendingActions, ClipboardList],
+  ];
+  const priority = c.counts?.priorityRisks ?? 0;
+  return (
+    <div className="card flex flex-col">
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            {c.logoUrl ? (
+              <img src={c.logoUrl} alt="" className="h-8 w-8 shrink-0 rounded object-contain" />
+            ) : (
+              <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded bg-paper text-ink-muted"><ImageIcon size={14} /></span>
             )}
-            <dl className="mt-3 grid grid-cols-3 gap-2 text-center">
-              {(
-                [
-                  ["Funcionários", c.counts?.employees, Users],
-                  ["Cargos", c.counts?.positions, BriefcaseBusiness],
-                  ["GHE", c.counts?.ghes, Boxes],
-                ] as const
-              ).map(([label, value, Icon]) => (
-                <div key={label} className="rounded-md bg-paper px-2 py-2">
-                  <dd className="flex items-center justify-center gap-1 font-display text-lg font-semibold tabular-nums text-ink">
-                    <Icon size={13} className="text-teal-deep" aria-hidden />
-                    {value ?? "—"}
-                  </dd>
-                  <dt className="text-[11px] text-ink-muted">{label}</dt>
-                </div>
-              ))}
-            </dl>
-            <div className="mt-3 flex flex-wrap gap-3 border-t border-line pt-3">
-              <button onClick={() => handleManage(c)} className="flex items-center gap-1.5 text-xs font-medium text-ink hover:underline">
-                <Settings2 size={12} /> Gerenciar
-              </button>
-              <button
-                onClick={() => handleEdit(c)}
-                disabled={loadingEdit}
-                className="flex items-center gap-1.5 text-xs text-teal-deep hover:underline"
-              >
-                <Pencil size={12} /> Editar
-              </button>
-              <button
-                onClick={() => handleDelete(c)}
-                className="flex items-center gap-1.5 text-xs text-amber hover:underline"
-              >
-                <Trash2 size={12} /> Excluir
-              </button>
-            </div>
+            <p className="truncate font-display text-xl font-extrabold text-ink">{c.name}</p>
+          </div>
+          {c.legalName && <p className="mt-1 truncate text-sm text-ink-muted">{c.legalName}</p>}
+          <p className="mt-1 font-mono text-xs text-ink-muted">{c.cnpj ?? "sem CNPJ"}</p>
+        </div>
+        {c.unidadeContratante && <span className="tag shrink-0">Contratante</span>}
+      </div>
+      {c.grauRisco != null && (
+        <span className={`mt-3 w-fit rounded-full px-3 py-1 text-xs font-semibold ${c.grauRisco >= 3 ? "bg-danger-tint text-danger" : "bg-teal-tint text-teal-deep"}`}>
+          Grau de risco {c.grauRisco}
+        </span>
+      )}
+
+      <dl className="mt-4 grid grid-cols-4 gap-2 text-center">
+        {stats.map(([label, value, Icon]) => (
+          <div key={label} className="rounded-lg bg-paper px-1 py-2.5">
+            <Icon size={16} className="mx-auto text-teal-deep" aria-hidden />
+            <dd className="mt-1 font-display text-lg font-semibold tabular-nums text-ink">{value ?? "—"}</dd>
+            <dt className="text-[11px] leading-tight text-ink-muted">{label}</dt>
           </div>
         ))}
+      </dl>
+
+      <div className="mt-4 flex flex-col gap-2 border-t border-line pt-3 text-sm">
+        <p className="flex items-center gap-2 text-ink">
+          {c.pgr ? <CheckCircle2 size={17} className="text-teal" /> : <AlertTriangle size={17} className="text-amber" />}
+          {c.pgr
+            ? `PGR atualizado em ${new Date(c.pgr.updatedAt).toLocaleDateString("pt-BR")} · ${PGR_STATUS_LABEL[c.pgr.status] ?? c.pgr.status}`
+            : "Nenhum PGR criado"}
+        </p>
+        <p className={`flex items-center gap-2 ${priority > 0 ? "font-medium text-amber" : "text-ink"}`}>
+          {priority > 0 ? <AlertTriangle size={17} /> : <CheckCircle2 size={17} className="text-teal" />}
+          {priority} {priority === 1 ? "risco prioritário" : "riscos prioritários"}
+        </p>
+      </div>
+
+      <div className="mt-4 flex items-center gap-2">
+        <button
+          onClick={onManage}
+          className="flex-1 rounded-lg border border-teal px-4 py-2.5 text-sm font-semibold text-teal-deep transition-colors hover:bg-teal-tint"
+        >
+          Gerenciar empresa
+        </button>
+        <div className="relative">
+          <button
+            onClick={() => setMenu((m) => !m)}
+            aria-label={`Mais opções de ${c.name}`}
+            aria-expanded={menu}
+            className="rounded-lg border border-line p-2.5 text-ink-muted hover:bg-teal-tint hover:text-ink"
+          >
+            <MoreVertical size={16} />
+          </button>
+          {menu && (
+            <div className="absolute bottom-full right-0 z-20 mb-1 w-40 overflow-hidden rounded-lg border border-line bg-paper-raised py-1 text-sm shadow-lg" onMouseLeave={() => setMenu(false)}>
+              <button disabled={disabled} onClick={() => { setMenu(false); onEdit(); }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-ink hover:bg-teal-tint">
+                <Pencil size={13} /> Editar
+              </button>
+              <button onClick={() => { setMenu(false); onDuplicate(); }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-ink hover:bg-teal-tint">
+                <Copy size={13} /> Duplicar
+              </button>
+              <button onClick={() => { setMenu(false); onDelete(); }} className="flex w-full items-center gap-2 px-3 py-2 text-left text-amber hover:bg-amber-tint">
+                <Trash2 size={13} /> Excluir
+              </button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
