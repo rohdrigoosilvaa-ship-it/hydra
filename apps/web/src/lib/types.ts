@@ -451,6 +451,16 @@ export interface Hazard {
   insertInAso?: boolean;
   epcStatus?: string;
   epiStatus?: string;
+  protections?: { equipment: ProtectionEquipment }[];
+}
+
+export interface ProtectionEquipment {
+  id: string;
+  kind: "EPC" | "EPI";
+  name: string;
+  usefulLifeMonths?: number | null;
+  description?: string;
+  category?: { id: string; name: string } | null;
 }
 
 export interface Pgr {

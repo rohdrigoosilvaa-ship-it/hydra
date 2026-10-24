@@ -1,8 +1,9 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
+import { X } from "lucide-react";
 import { FormModal, ModalField } from "../components/ui/modal";
-import type { ExposureType, Hazard, RiskCategory } from "../lib/types";
+import type { ExposureType, Hazard, ProtectionEquipment, RiskCategory } from "../lib/types";
 
 export const RISK_CATEGORY_LABEL: Record<RiskCategory, string> = {
   FISICO: "Físicos",
@@ -172,10 +173,17 @@ function RiskForm({ hazard, all, onClose, onSaved }: { hazard?: Hazard; all: Haz
       } as Hazard),
   );
   const [copying, setCopying] = useState(false);
+  const [bank, setBank] = useState<ProtectionEquipment[]>([]);
+  const [chosen, setChosen] = useState<string[]>(() => (hazard?.protections ?? []).map((p) => p.equipment.id));
+  const [newKind, setNewKind] = useState<"EPC" | "EPI" | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const set = <K extends keyof Hazard>(k: K, val: Hazard[K]) => setV((cur) => ({ ...cur, [k]: val }));
   const text = (k: "name" | "esocialCode" | "damagePotential" | "observations" | "adminMeasures" | "sourceCircumstances") => v[k] ?? "";
+
+  useEffect(() => {
+    api.get<ProtectionEquipment[]>("/pgr/protection/equipment").then(setBank).catch(() => setBank([]));
+  }, []);
 
   function copyFrom(id: string) {
     const src = all.find((h) => h.id === id);
@@ -204,6 +212,11 @@ function RiskForm({ hazard, all, onClose, onSaved }: { hazard?: Hazard; all: Haz
       insertInAso: v.insertInAso,
       epcStatus: v.epcStatus,
       epiStatus: v.epiStatus,
+      description: v.description ?? "",
+      equipmentIds: chosen.filter((id) => {
+        const kind = bank.find((b) => b.id === id)?.kind;
+        return kind === "EPC" ? v.epcStatus === "SIM" : kind === "EPI" ? v.epiStatus === "SIM" : false;
+      }),
     };
     try {
       if (hazard) await api.patch(`/pgr/hazards/${hazard.id}`, body);
@@ -216,6 +229,7 @@ function RiskForm({ hazard, all, onClose, onSaved }: { hazard?: Hazard; all: Haz
   }
 
   return (
+    <>
     <FormModal title="Risco" onClose={onClose} onSubmit={handleSubmit} saving={saving} canSave={v.name.trim().length >= 2} error={error} size="max-w-5xl">
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
         <div className="md:col-span-1">
@@ -262,6 +276,14 @@ function RiskForm({ hazard, all, onClose, onSaved }: { hazard?: Hazard; all: Haz
         <input className="input" value={text("esocialCode")} onChange={(e) => set("esocialCode", e.target.value)} />
       </ModalField>
 
+      <label className="flex flex-col gap-1.5">
+        <span className="flex items-center gap-1 font-display text-[11px] font-bold uppercase tracking-wide text-teal-deep">
+          Descrição do fator de risco
+          <button type="button" className="hover:underline" onClick={() => set("description", v.name)}>[copiar do nome]</button>
+        </span>
+        <textarea className="input min-h-[5rem]" aria-label="Descrição do fator de risco" value={v.description ?? ""} onChange={(e) => set("description", e.target.value)} />
+      </label>
+
       <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
         <ModalField label="Possíveis danos à saúde">
           <textarea className="input min-h-[5rem]" value={text("damagePotential")} onChange={(e) => set("damagePotential", e.target.value)} />
@@ -295,10 +317,137 @@ function RiskForm({ hazard, all, onClose, onSaved }: { hazard?: Hazard; all: Haz
           {TRI.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
         </select>
       </ModalField>
+      {v.epcStatus === "SIM" && <ProtectionBox kind="EPC" bank={bank} chosen={chosen} setChosen={setChosen} onNew={() => setNewKind("EPC")} />}
       <ModalField label="EPIs: implementam medidas de proteção individual">
         <select className="input" value={v.epiStatus} onChange={(e) => set("epiStatus", e.target.value)}>
           {TRI.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
         </select>
+      </ModalField>
+      {v.epiStatus === "SIM" && <ProtectionBox kind="EPI" bank={bank} chosen={chosen} setChosen={setChosen} onNew={() => setNewKind("EPI")} />}
+    </FormModal>
+    {newKind && (
+      <NewProtectionModal
+        kind={newKind}
+        onClose={() => setNewKind(null)}
+        onCreated={(eq) => {
+          setBank((cur) => [...cur, eq]);
+          setChosen((cur) => [...cur, eq.id]);
+          setNewKind(null);
+        }}
+      />
+    )}
+    </>
+  );
+}
+
+/** Quadro "EPC/EPI para este risco": lista os equipamentos indicados e permite adicionar. */
+function ProtectionBox({ kind, bank, chosen, setChosen, onNew }: { kind: "EPC" | "EPI"; bank: ProtectionEquipment[]; chosen: string[]; setChosen: (v: string[]) => void; onNew: () => void }) {
+  const mine = bank.filter((b) => b.kind === kind);
+  const picked = mine.filter((b) => chosen.includes(b.id));
+  const free = mine.filter((b) => !chosen.includes(b.id));
+  return (
+    <div className="rounded-md border border-line p-4">
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <p className="font-display text-sm font-bold uppercase text-ink">{kind} para este risco</p>
+        <div className="flex flex-wrap items-center gap-2">
+          {free.length > 0 && (
+            <select className="input" value="" aria-label={`Escolher ${kind} do banco`} onChange={(e) => e.target.value && setChosen([...chosen, e.target.value])}>
+              <option value="">Escolher do banco…</option>
+              {free.map((b) => <option key={b.id} value={b.id}>{b.name}</option>)}
+            </select>
+          )}
+          <button type="button" className="btn-primary flex items-center gap-1.5" onClick={onNew}>
+            <Plus size={15} /> Adicionar
+          </button>
+        </div>
+      </div>
+      {picked.length === 0 ? (
+        <p className="mt-3 text-sm text-ink-muted">Nenhum {kind} indicado para este risco.</p>
+      ) : (
+        <ul className="mt-3 divide-y divide-line text-sm">
+          {picked.map((b) => (
+            <li key={b.id} className="flex items-center justify-between gap-3 py-2">
+              <span className="text-ink">
+                {b.name}
+                {b.category && <span className="ml-2 text-xs text-ink-muted">{b.category.name}</span>}
+              </span>
+              <button type="button" aria-label={`Remover ${b.name}`} className="text-amber" onClick={() => setChosen(chosen.filter((x) => x !== b.id))}><X size={15} /></button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+function NewProtectionModal({ kind, onClose, onCreated }: { kind: "EPC" | "EPI"; onClose: () => void; onCreated: (eq: ProtectionEquipment) => void }) {
+  const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
+  const [categoryId, setCategoryId] = useState("");
+  const [name, setName] = useState("");
+  const [life, setLife] = useState("");
+  const [description, setDescription] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    api.get<{ id: string; name: string }[]>(`/pgr/protection/categories?kind=${kind}`).then(setCategories).catch(() => setCategories([]));
+  }, [kind]);
+
+  async function addCategory() {
+    const n = window.prompt("Nome da nova categoria:")?.trim();
+    if (!n) return;
+    try {
+      const cat = await api.post<{ id: string; name: string }>("/pgr/protection/categories", { kind, name: n });
+      setCategories((cur) => (cur.some((c) => c.id === cat.id) ? cur : [...cur, cat]));
+      setCategoryId(cat.id);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao criar categoria.");
+    }
+  }
+
+  async function handleSubmit(e: FormEvent) {
+    e.preventDefault();
+    setSaving(true);
+    setError(null);
+    try {
+      const eq = await api.post<ProtectionEquipment>("/pgr/protection/equipment", {
+        kind,
+        categoryId: categoryId || undefined,
+        name: name.trim(),
+        usefulLifeMonths: life ? Number(life) : undefined,
+        description: description.trim(),
+      });
+      onCreated(eq);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao salvar.");
+      setSaving(false);
+    }
+  }
+
+  return (
+    <FormModal title={`Novo ${kind}`} onClose={onClose} onSubmit={handleSubmit} saving={saving} canSave={name.trim().length >= 2 && description.trim().length >= 2} error={error} size="max-w-2xl">
+      <p className="rounded-md bg-teal-tint px-4 py-3 text-sm text-ink-muted">
+        Os {kind}s criados nesta tela serão adicionados ao seu Banco de Equipamentos de Proteção. Posteriormente eles poderão ser vinculados a qualquer empresa.
+      </p>
+      <label className="flex flex-col gap-1.5">
+        <span className="font-display text-[11px] font-bold uppercase tracking-wide text-teal-deep">
+          Categoria <button type="button" className="hover:underline" onClick={addCategory}>[adicionar]</button>
+        </span>
+        <select className="input" aria-label="Categoria" value={categoryId} onChange={(e) => setCategoryId(e.target.value)}>
+          <option value="">--</option>
+          {categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </select>
+      </label>
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+        <ModalField label="Nome" required>
+          <input className="input" value={name} onChange={(e) => setName(e.target.value)} />
+        </ModalField>
+        <ModalField label="Vida útil em uso (meses)">
+          <input className="input" type="number" min={1} value={life} onChange={(e) => setLife(e.target.value)} />
+        </ModalField>
+      </div>
+      <ModalField label="Descrição" required>
+        <textarea className="input min-h-[5rem]" value={description} onChange={(e) => setDescription(e.target.value)} />
       </ModalField>
     </FormModal>
   );

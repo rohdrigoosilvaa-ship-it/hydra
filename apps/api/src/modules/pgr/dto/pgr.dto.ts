@@ -21,6 +21,21 @@ class HazardExtraFields {
   @IsOptional() @IsBoolean() insertInAso?: boolean;
   @IsOptional() @IsIn(TRI_STATE) epcStatus?: string;
   @IsOptional() @IsIn(TRI_STATE) epiStatus?: string;
+  /** EPCs/EPIs do banco indicados para este risco (substitui a lista). */
+  @IsOptional() @IsArray() @IsString({ each: true }) equipmentIds?: string[];
+}
+
+export class CreateProtectionCategoryDto {
+  @IsIn(["EPC", "EPI"]) kind!: "EPC" | "EPI";
+  @IsString() @MinLength(2) name!: string;
+}
+
+export class CreateProtectionEquipmentDto {
+  @IsIn(["EPC", "EPI"]) kind!: "EPC" | "EPI";
+  @IsOptional() @IsString() categoryId?: string;
+  @IsString() @MinLength(2) name!: string;
+  @IsOptional() @IsInt() @Min(1) @Max(1200) usefulLifeMonths?: number;
+  @IsString() @MinLength(2) description!: string;
 }
 
 export class CreateHazardDto extends HazardExtraFields {

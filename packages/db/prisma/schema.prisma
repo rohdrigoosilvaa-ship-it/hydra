@@ -660,6 +660,7 @@ model Hazard {
 
   pgrRisks      PgrRisk[]
   positionRisks PositionRisk[]
+  protections   HazardProtection[]
 
   @@index([tenantId])
   @@map("hazards")
@@ -2613,4 +2614,55 @@ model PositionExam {
   @@index([tenantId])
   @@index([positionId])
   @@map("position_exams")
+}
+
+enum ProtectionKind {
+  EPC
+  EPI
+}
+
+/// Categoria do Banco de Equipamentos de Proteção (EPC / EPI do cliente).
+model ProtectionCategory {
+  id        String         @id @default(cuid())
+  tenantId  String
+  kind      ProtectionKind
+  name      String
+  createdAt DateTime       @default(now())
+
+  equipment ProtectionEquipment[]
+
+  @@unique([tenantId, kind, name])
+  @@map("protection_categories")
+}
+
+/// Equipamento de proteção (coletiva ou individual) do cliente, reaproveitável em vários riscos e empresas.
+model ProtectionEquipment {
+  id               String         @id @default(cuid())
+  tenantId         String
+  kind             ProtectionKind
+  categoryId       String?
+  name             String
+  usefulLifeMonths Int?
+  description      String         @db.Text
+  createdAt        DateTime       @default(now())
+  deletedAt        DateTime?
+
+  category ProtectionCategory? @relation(fields: [categoryId], references: [id])
+  hazards  HazardProtection[]
+
+  @@index([tenantId, kind])
+  @@map("protection_equipment")
+}
+
+/// EPC/EPI indicado para um risco do catálogo.
+model HazardProtection {
+  hazardId    String
+  equipmentId String
+
+  hazard    Hazard              @relation(fields: [hazardId], references: [id], onDelete: Cascade)
+  equipment ProtectionEquipment @relation(fields: [equipmentId], references: [id])
+
+  @@id([hazardId, equipmentId])
+  @@index([equipmentId])
+  @@map("hazard_protections")
 }
