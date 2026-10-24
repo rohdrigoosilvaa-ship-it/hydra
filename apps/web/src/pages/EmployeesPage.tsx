@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useState } from "react";
+import { ModalFrame } from "../components/ui/modal";
 import { useNavigate } from "react-router-dom";
 import { Plus, Upload, Users, UserCheck, Clock, UserX } from "lucide-react";
 import { api } from "../lib/api";
@@ -227,7 +228,8 @@ function EmployeeForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card mt-4 flex flex-wrap items-end gap-3">
+    <ModalFrame title={"Novo colaborador"} onClose={onClose}>
+    <form onSubmit={handleSubmit} className="flex flex-wrap items-end gap-3 p-6">
       <label className="flex flex-col gap-1 text-sm">
         <span className="text-ink-muted">Nome</span>
         <input className="input" value={name} onChange={(e) => setName(e.target.value)} required />
@@ -277,5 +279,6 @@ function EmployeeForm({
       </button>
       {error && <p className="w-full text-sm text-amber">{error}</p>}
     </form>
+    </ModalFrame>
   );
 }

@@ -1,4 +1,5 @@
 import { FormEvent, useEffect, useRef, useState } from "react";
+import { ModalFrame } from "../components/ui/modal";
 import { useNavigate } from "react-router-dom";
 import {
   AlertTriangle,
@@ -508,7 +509,8 @@ export function CompanyForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card mt-4 flex flex-col gap-6">
+    <ModalFrame title={company ? "Editar empresa" : template ? "Duplicar empresa" : "Nova empresa"} onClose={onClose}>
+    <form onSubmit={handleSubmit} className="flex flex-col gap-6 p-6">
       {company && onLogoChanged && (
         <FormSection title="Logo">
           <CompanyLogoUploader company={company} onChanged={onLogoChanged} />
@@ -625,6 +627,7 @@ export function CompanyForm({
         {error && <p className="text-sm text-amber">{error}</p>}
       </div>
     </form>
+    </ModalFrame>
   );
 }
 
