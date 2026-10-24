@@ -16,13 +16,19 @@ interface SidebarState {
 export const useSidebarStore = create<SidebarState>()(
   persist(
     (set) => ({
-      collapsed: false,
+      collapsed: true,
       toggleCollapsed: () => set((s) => ({ collapsed: !s.collapsed })),
       keepCollapsed: false,
       toggleKeepCollapsed: () => set((s) => ({ keepCollapsed: !s.keepCollapsed })),
       mobileOpen: false,
       setMobileOpen: (open) => set({ mobileOpen: open }),
     }),
-    { name: "hydra-sidebar", partialize: (s) => ({ collapsed: s.collapsed, keepCollapsed: s.keepCollapsed }) },
+    {
+      name: "hydra-sidebar",
+      // v2: o menu passa a começar oculto (só ícones) e abrir ao passar o mouse; zera a preferência antiga.
+      version: 2,
+      migrate: () => ({ collapsed: true, keepCollapsed: false }),
+      partialize: (s) => ({ collapsed: s.collapsed, keepCollapsed: s.keepCollapsed }),
+    },
   ),
 );

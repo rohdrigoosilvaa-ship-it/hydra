@@ -801,6 +801,10 @@ export interface PsychosocialPublicSurvey {
 // ---- Dashboard executivo ----
 
 export interface ExecutiveSummary {
+  activeCompanies: number;
+  activeEmployees: number;
+  ghes: number;
+  positions: number;
   employees: number;
   complianceRate: number | null;
   incidentsThisMonth: number;
