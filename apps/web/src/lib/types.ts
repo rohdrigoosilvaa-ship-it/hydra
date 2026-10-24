@@ -343,7 +343,9 @@ export interface Company {
   id: string;
   contractedLives?: number | null;
   /** Só vem em `/companies?withCounts=true`. */
-  counts?: { employees: number; positions: number; ghes: number };
+  counts?: { employees: number; positions: number; ghes: number; pendingActions: number; priorityRisks: number };
+  /** PGR mais recente da empresa (só vem em `/companies?withCounts=true`). */
+  pgr?: { id: string; title: string; status: "DRAFT" | "IN_REVIEW" | "APPROVED" | "ARCHIVED"; updatedAt: string } | null;
   name: string;
   legalName: string | null;
   cnpj: string | null;
@@ -607,7 +609,20 @@ export interface WorkEnvironment {
   _count?: { positions: number };
 }
 
+export interface CompanyPgrProgress {
+  id: string;
+  title: string;
+  status: string;
+  percent: number;
+  lastDone: string | null;
+  next: string | null;
+}
+
 export interface CompanySummary {
+  esocialEventsRecent: number;
+  actions: { open: number; total: number };
+  environments: number;
+  pgr: CompanyPgrProgress | null;
   asosByMonth: MonthPoint[];
   catsByMonth: MonthPoint[];
   positions: number;
