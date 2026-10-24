@@ -2,8 +2,8 @@ import { FormEvent, useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { api } from "../../lib/api";
-import { COLOR_CHOICES, iconByName } from "../../lib/appearance";
-import { AppearancePicker } from "../../components/company/AppearancePicker";
+import { COLOR_CHOICES, COLOR_NAMES, ICON_CHOICES, iconByName } from "../../lib/appearance";
+import { FormModal, ModalField } from "../../components/ui/modal";
 import type { EnvironmentUnitType, WorkEnvironment } from "../../lib/types";
 import type { CompanyWorkspaceContext } from "./CompanyWorkspacePage";
 
@@ -50,6 +50,7 @@ export function EnvironmentsTab() {
       {form && (
         <EnvironmentForm
           companyId={company.id}
+          companyName={company.name}
           environment={form === "new" ? undefined : form}
           onClose={() => setForm(null)}
           onSaved={async () => {
@@ -106,11 +107,13 @@ export function EnvironmentsTab() {
 
 function EnvironmentForm({
   companyId,
+  companyName,
   environment,
   onClose,
   onSaved,
 }: {
   companyId: string;
+  companyName: string;
   environment?: WorkEnvironment;
   onClose: () => void;
   onSaved: () => void;
@@ -123,6 +126,7 @@ function EnvironmentForm({
   const [unitType, setUnitType] = useState<EnvironmentUnitType>(environment?.unitType ?? "MATRIZ");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const Icon = iconByName(icon);
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -141,35 +145,62 @@ function EnvironmentForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="card mt-4 flex flex-col gap-4">
-      <h3 className="font-display text-base font-semibold text-ink">{environment ? "Editar ambiente" : "Novo Ambiente"}</h3>
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="text-ink-muted">Nome do ambiente</span>
-        <input className="input" value={name} onChange={(e) => setName(e.target.value)} required minLength={2} autoFocus />
-      </label>
-      <AppearancePicker color={color} icon={icon} onColor={setColor} onIcon={setIcon} />
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="text-ink-muted">Descrição do ambiente</span>
-        <textarea className="input min-h-[70px] resize-y" value={description} onChange={(e) => setDescription(e.target.value)} />
-      </label>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-ink-muted">Local do ambiente</span>
-          <input className="input" value={location} onChange={(e) => setLocation(e.target.value)} />
-        </label>
-        <label className="flex flex-col gap-1 text-sm">
-          <span className="text-ink-muted">Matriz ou Filial</span>
-          <select className="input" value={unitType} onChange={(e) => setUnitType(e.target.value as EnvironmentUnitType)}>
+    <FormModal
+      title={environment ? "Editar ambiente" : "Novo ambiente"}
+      onClose={onClose}
+      onSubmit={handleSubmit}
+      saving={saving}
+      canSave={name.trim().length >= 2}
+      error={error}
+    >
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <ModalField label="Nome do ambiente" required>
+          <input className="input" value={name} onChange={(e) => setName(e.target.value)} required minLength={2} autoFocus />
+        </ModalField>
+        <ModalField label="Cor">
+          <div className="flex items-center gap-2">
+            <span className="h-9 w-9 shrink-0 rounded-md border border-line" style={{ background: color }} aria-hidden />
+            <select className="input flex-1" value={color} onChange={(e) => setColor(e.target.value)} aria-label="Cor">
+              {COLOR_CHOICES.map((c, i) => (
+                <option key={c} value={c}>{COLOR_NAMES[i]}</option>
+              ))}
+            </select>
+          </div>
+        </ModalField>
+        <ModalField label="Ícone">
+          <div className="flex items-center gap-2">
+            <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-white" style={{ background: color }} aria-hidden>
+              <Icon size={17} />
+            </span>
+            <select className="input flex-1" value={icon} onChange={(e) => setIcon(e.target.value)} aria-label="Ícone">
+              {ICON_CHOICES.map((i) => (
+                <option key={i.name} value={i.name}>{i.label}</option>
+              ))}
+            </select>
+          </div>
+        </ModalField>
+      </div>
+
+      <ModalField label="Descrição do ambiente">
+        <textarea className="input min-h-[90px] resize-y" value={description} onChange={(e) => setDescription(e.target.value)} />
+      </ModalField>
+
+      <ModalField label="Local do ambiente">
+        <input className="input" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="ex.: Bloco B, galpão de estoque" />
+      </ModalField>
+
+      <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
+        <ModalField label="Matriz ou Filial">
+          <select className="input" value={unitType} onChange={(e) => setUnitType(e.target.value as EnvironmentUnitType)} aria-label="Matriz ou Filial">
             <option value="MATRIZ">Matriz</option>
             <option value="FILIAL">Filial</option>
           </select>
-        </label>
+        </ModalField>
+        <div className="flex flex-col gap-1.5 md:col-span-2">
+          <span className="font-display text-[11px] font-bold uppercase tracking-wide text-teal-deep">Empregador onde o ambiente se encontra</span>
+          <span className="inline-flex h-9 w-fit items-center rounded-md bg-teal-deep px-3 text-sm text-white">{companyName} ({unitType === "MATRIZ" ? "Matriz" : "Filial"})</span>
+        </div>
       </div>
-      {error && <p className="text-sm text-amber" role="alert">{error}</p>}
-      <div className="flex gap-2 border-t border-line pt-4">
-        <button type="submit" disabled={saving || name.trim().length < 2} className="btn-primary">{saving ? "Salvando…" : "Salvar"}</button>
-        <button type="button" className="btn-secondary" onClick={onClose}>Cancelar</button>
-      </div>
-    </form>
+    </FormModal>
   );
 }
