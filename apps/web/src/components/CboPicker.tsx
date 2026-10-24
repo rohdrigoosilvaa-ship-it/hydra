@@ -15,12 +15,14 @@ export function CboPicker({
   const [query, setQuery] = useState(value);
   const [results, setResults] = useState<CboOccupation[]>([]);
   const [open, setOpen] = useState(false);
+  const [picked, setPicked] = useState<CboOccupation | null>(null);
   const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   useEffect(() => setQuery(value), [value]);
 
   function handleInput(text: string) {
     setQuery(text);
+    setPicked(null);
     onChange(text);
     if (timeoutRef.current) clearTimeout(timeoutRef.current);
     if (text.trim().length < 2) {
@@ -36,6 +38,7 @@ export function CboPicker({
 
   function handlePick(occ: CboOccupation) {
     setQuery(occ.code);
+    setPicked(occ);
     onChange(occ.code);
     onSelectOccupation?.(occ);
     setOpen(false);
@@ -49,8 +52,12 @@ export function CboPicker({
         onChange={(e) => handleInput(e.target.value)}
         onFocus={() => results.length > 0 && setOpen(true)}
         onBlur={() => setTimeout(() => setOpen(false), 150)}
-        placeholder="Código ou nome da ocupação…"
+        placeholder="Digite o nome da ocupação ou o código…"
       />
+      {picked && <p className="mt-1 text-xs text-teal-deep">{picked.code} — {picked.title}</p>}
+      {!picked && query.trim().length >= 2 && results.length === 0 && !open && (
+        <p className="mt-1 text-xs text-ink-muted">Nenhuma ocupação encontrada para “{query.trim()}”.</p>
+      )}
       {open && results.length > 0 && (
         <div className="absolute z-10 mt-1 max-h-60 w-full min-w-[320px] overflow-y-auto rounded-md border border-line bg-paper-raised shadow-md">
           {results.map((occ) => (

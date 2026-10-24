@@ -22,6 +22,7 @@ import {
   X,
 } from "lucide-react";
 import { api } from "../lib/api";
+import { CnaePicker } from "../components/CnaePicker";
 import { DataLoadWizard } from "../components/DataLoadWizard";
 import { useCompanyFilterStore } from "../lib/company-filter-store";
 import type { Company } from "../lib/types";
@@ -541,8 +542,8 @@ export function CompanyForm({
 
       <FormSection title="CNAE e caracterização de risco">
         <FieldGrid>
-          <TextField label="CNAE principal" value={f.cnae} onChange={(v) => set("cnae", v)} />
-          <TextField label="CNAE secundário" value={f.cnaeSecundario} onChange={(v) => set("cnaeSecundario", v)} />
+          <CnaePicker label="CNAE principal" value={f.cnae} onChange={(v) => set("cnae", v)} onPick={(e) => set("grauRisco", String(e.riskGrade))} />
+          <CnaePicker label="CNAE secundário" value={f.cnaeSecundario} onChange={(v) => set("cnaeSecundario", v)} />
           <label className="flex flex-col gap-1 text-sm">
             <span className="text-ink-muted">Grau de risco (NR-4)</span>
             <select className="input" value={f.grauRisco} onChange={(e) => set("grauRisco", e.target.value)}>
