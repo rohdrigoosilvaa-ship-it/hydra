@@ -3,6 +3,7 @@ import { PrismaService } from "../../core/prisma/prisma.service";
 import { PERMISSIONS } from "../../core/permissions/permissions";
 import { allowedCompanyIds, companyScopeWhere, employeeScopeWhere, hasTenantWideAccess, relatedCompanyScopeWhere } from "../org/scope.util";
 import type { RoleAssignmentClaim } from "../../core/auth/jwt.types";
+import { lastMonths, type MonthPoint } from "./monthly-series.util";
 
 export interface CompanySummary {
   id: string;
@@ -13,6 +14,9 @@ export interface CompanySummary {
 }
 
 export interface ExecutiveSummary {
+  /** ASOs emitidos e incidentes por mês (últimos 6 meses). */
+  asosByMonth: MonthPoint[];
+  incidentsByMonth: MonthPoint[];
   activeCompanies: number;
   activeEmployees: number;
   ghes: number;
@@ -132,9 +136,29 @@ export class DashboardService {
       this.prisma.employeeDocument.count({ where: { ...docWhere, expiryDate: { not: null, lt: in30Days } } }),
     ]);
 
+    const months = lastMonths(6, now);
+    const asosByMonth = await Promise.all(
+      months.map(async (m) => ({
+        label: m.label,
+        value: await this.prisma.aso.count({
+          where: { tenantId, issuedAt: { gte: m.start, lt: m.end }, exam: { employee: employeeScope } },
+        }),
+      })),
+    );
+    const incidentsByMonth = await Promise.all(
+      months.map(async (m) => ({
+        label: m.label,
+        value: await this.prisma.occurrence.count({
+          where: { ...occurrenceWhere, deletedAt: null, occurredAt: { gte: m.start, lt: m.end } },
+        }),
+      })),
+    );
+
     const complianceRate = docsWithExpiry > 0 ? Math.round(((docsWithExpiry - docsExpired) / docsWithExpiry) * 100) : null;
 
     return {
+      asosByMonth,
+      incidentsByMonth,
       activeCompanies,
       activeEmployees,
       ghes,

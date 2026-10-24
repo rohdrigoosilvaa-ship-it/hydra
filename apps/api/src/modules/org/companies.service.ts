@@ -4,6 +4,7 @@ import { PrismaService } from "../../core/prisma/prisma.service";
 import { PERMISSIONS } from "../../core/permissions/permissions";
 import type { RoleAssignmentClaim } from "../../core/auth/jwt.types";
 import type { CreateCompanyDto } from "./dto/org.dto";
+import { lastMonths } from "../dashboard/monthly-series.util";
 import { allowedCompanyIds, employeeScopeWhere, hasTenantWideAccess, isCompanyInScope } from "./scope.util";
 
 @Injectable()
@@ -49,8 +50,27 @@ export class CompaniesService {
       this.prisma.pgr.count({ where: { tenantId, companyId: id, deletedAt: null, status: "DRAFT" } }),
       this.prisma.ltcat.count({ where: { tenantId, companyId: id, deletedAt: null, status: "DRAFT" } }),
     ]);
+    const months = lastMonths(6);
+    const asosByMonth = await Promise.all(
+      months.map(async (m) => ({
+        label: m.label,
+        value: await this.prisma.aso.count({
+          where: { tenantId, issuedAt: { gte: m.start, lt: m.end }, exam: { employee: { companyId: id } } },
+        }),
+      })),
+    );
+    const catsByMonth = await Promise.all(
+      months.map(async (m) => ({
+        label: m.label,
+        value: await this.prisma.cat.count({
+          where: { tenantId, createdAt: { gte: m.start, lt: m.end }, occurrence: { companyId: id } },
+        }),
+      })),
+    );
     const contracted = company.contractedLives ?? null;
     return {
+      asosByMonth,
+      catsByMonth,
       positions,
       ghes,
       lives,

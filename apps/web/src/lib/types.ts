@@ -608,6 +608,8 @@ export interface WorkEnvironment {
 }
 
 export interface CompanySummary {
+  asosByMonth: MonthPoint[];
+  catsByMonth: MonthPoint[];
   positions: number;
   ghes: number;
   lives: number;
@@ -840,7 +842,14 @@ export interface PsychosocialPublicSurvey {
 
 // ---- Dashboard executivo ----
 
+export interface MonthPoint {
+  label: string;
+  value: number;
+}
+
 export interface ExecutiveSummary {
+  asosByMonth: MonthPoint[];
+  incidentsByMonth: MonthPoint[];
   activeCompanies: number;
   activeEmployees: number;
   ghes: number;
