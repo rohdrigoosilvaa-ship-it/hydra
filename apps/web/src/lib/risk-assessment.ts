@@ -9,11 +9,11 @@ export const PROBABILITY_OPTIONS = [
 ] as const;
 
 export const SEVERITY_OPTIONS = [
-  { value: 1, label: "Insignificante (1)" },
-  { value: 2, label: "Leve (2)" },
+  { value: 1, label: "Leve (1)" },
+  { value: 2, label: "Baixa (2)" },
   { value: 3, label: "Moderada (3)" },
-  { value: 4, label: "Grave (4)" },
-  { value: 5, label: "Catastrófica (5)" },
+  { value: 4, label: "Alta (4)" },
+  { value: 5, label: "Extrema (5)" },
 ] as const;
 
 export const CERTAINTY_OPTIONS = [
@@ -51,10 +51,27 @@ export const RESULT_TABLE: Record<number, [string, string, string]> = {
 export const riskLevel = (probability: number | null | undefined, severity: number | null | undefined) =>
   probability && severity ? GRID[probability - 1]![severity - 1]! : null;
 
+/** Nome e classificação de cada nível (mesmos termos do PGR). */
+export const LEVEL_NAME: Record<number, { name: string; classification: string }> = {
+  1: { name: "Irrelevante", classification: "Aceitável" },
+  2: { name: "Baixo", classification: "Tolerável" },
+  3: { name: "Médio", classification: "Moderado" },
+  4: { name: "Alto", classification: "Substancial" },
+  5: { name: "Crítico", classification: "Intolerável" },
+};
+
+/** Resultado = probabilidade × severidade, classificado pela matriz; a ação recomendada depende da certeza da estimativa. */
 export function riskResult(probability?: number | null, severity?: number | null, certainty?: number | null) {
   const level = riskLevel(probability, severity);
-  if (!level || !certainty) return null;
-  return { level, text: RESULT_TABLE[level]![certainty - 1]!, color: LEVEL_COLOR[level]! };
+  if (!level || !probability || !severity) return null;
+  const { name, classification } = LEVEL_NAME[level]!;
+  return {
+    level,
+    label: `Risco ${name} · ${classification}`,
+    product: probability * severity,
+    color: LEVEL_COLOR[level]!,
+    action: certainty ? RESULT_TABLE[level]![certainty - 1]! : null,
+  };
 }
 
 export { GRID as RISK_GRID };
@@ -63,8 +80,8 @@ export interface HelpTable {
   id: string;
   title: string;
   subtitle: string;
-  headers: [string, string, string];
-  rows: [number, string, string][];
+  headers: string[];
+  rows: (string | number)[][];
   note: string;
 }
 
@@ -114,3 +131,18 @@ export const PROBABILITY_HELP: HelpTable[] = [
     note: OBS,
   },
 ];
+
+export const SEVERITY_HELP: HelpTable = {
+  id: "severidade",
+  title: "Sugestão para Avaliação Qualitativa - Riscos Ocupacionais",
+  subtitle: "Estimativa de Severidade | AIHA (2015)",
+  headers: ["Nível", "Definição"],
+  rows: [
+    [1, "Lesão leve sem necessidade de atenção médica, incômodos ou mal estar."],
+    [2, "Lesão ou doenças sérias reversíveis."],
+    [3, "Lesão ou doenças críticas irreversíveis que podem limitar a capacidade funcional."],
+    [4, "Lesão ou doença incapacitante ou mortal."],
+    [5, "Mortes ou incapacidades múltiplas (>10)."],
+  ],
+  note: "Obs.: Esta é uma sugestão para auxiliar na escolha do nível de severidade, ficando sob responsabilidade do profissional habilitado a correta gradação.",
+};

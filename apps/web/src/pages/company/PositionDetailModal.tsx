@@ -95,7 +95,7 @@ export function PositionDetailModal({
                         <span className="ml-2 text-xs text-ink-muted">
                           {RISK_CATEGORY_LABEL[r.hazard.category]} · {r.exposureType ? EXPOSURE_LABEL[r.exposureType] : "Exposição não definida"} · {r.sendEsocial ? "eSocial" : "sem eSocial"}
                         </span>
-                        {res && <span className="ml-2 rounded px-2 py-0.5 text-xs text-ink" style={{ background: res.color }}>{res.text}</span>}
+                        {res && <span className="ml-2 rounded px-2 py-0.5 text-xs text-ink" style={{ background: res.color }}>{res.label} ({res.product})</span>}
                       </button>
                       <button type="button" aria-label={`Remover ${r.hazard.name}`} className="text-amber hover:opacity-80" onClick={() => run(() => api.del(`/positions/${position.id}/risks/${r.hazardId}`))}><X size={15} /></button>
                     </li>

@@ -3,6 +3,8 @@ import { CircleHelp } from "lucide-react";
 import {
   CERTAINTY_OPTIONS,
   LEVEL_COLOR,
+  LEVEL_NAME,
+  SEVERITY_HELP,
   PROBABILITY_HELP,
   PROBABILITY_OPTIONS,
   RESULT_TABLE,
@@ -18,7 +20,7 @@ export interface Assessment {
   certainty: number | null;
 }
 
-type Help = { kind: "table"; table: HelpTable } | { kind: "matrix" } | { kind: "result" };
+type Help = { kind: "table"; table: HelpTable } | { kind: "matrix" };
 
 const labelCls = "flex items-center gap-1.5 font-display text-[11px] font-bold uppercase tracking-wide text-teal-deep";
 const selectCls = "input w-full";
@@ -61,11 +63,11 @@ function ProbabilityHelp({ table }: { table: HelpTable }) {
           </tr>
         </thead>
         <tbody>
-          {table.rows.map(([n, a, b]) => (
-            <tr key={n} className="border-b border-line">
-              <td className="px-3 py-3 text-lg text-ink">{n}</td>
-              <td className="px-3 py-3 text-ink">{a}</td>
-              <td className="px-3 py-3 text-ink">{b}</td>
+          {table.rows.map((row) => (
+            <tr key={row[0]} className="border-b border-line">
+              {row.map((cell, i) => (
+                <td key={i} className={`px-3 py-3 text-ink ${i === 0 ? "text-lg" : ""}`}>{cell}</td>
+              ))}
             </tr>
           ))}
         </tbody>
@@ -109,16 +111,17 @@ export function RiskMatrix({ value }: { value: Assessment }) {
               {RISK_GRID[p - 1]!.map((level, i) => (
                 <div
                   key={i}
-                  className="flex h-[3.25rem] items-center justify-center text-2xl font-bold text-white"
-                  style={{ background: LEVEL_COLOR[level], opacity: value.probability && value.probability !== p ? 0.55 : 1 }}
+                  className={`flex h-[3.25rem] flex-col items-center justify-center text-ink ${value.probability === p && value.severity === i + 1 ? "outline outline-[3px] -outline-offset-2 outline-black" : ""}`}
+                  style={{ background: LEVEL_COLOR[level] }}
                 >
-                  {value.probability === p && value.severity === i + 1 ? "X" : ""}
+                  <span className="text-sm font-semibold">{p * (i + 1)}</span>
+                  <span className="text-[10px]">{LEVEL_NAME[level]!.name}</span>
                 </div>
               ))}
             </div>
           ))}
         </div>
-        <p className="mt-1 text-xs text-ink-muted">Probabilidade: de 5 (em cima) a 1 (embaixo) · Severidade: de 1 a 5, da esquerda para a direita.</p>
+        <p className="mt-1 text-xs text-ink-muted">Probabilidade: de 5 (em cima) a 1 (embaixo) · Severidade: de 1 a 5, da esquerda para a direita. Cada quadro mostra probabilidade × severidade.</p>
       </div>
     </div>
   );
@@ -149,7 +152,7 @@ export function RiskAssessment({ value, onChange }: { value: Assessment; onChang
         <div className="flex flex-col gap-1.5">
           <span className={labelCls}>
             Severidade:
-            <HelpButton label="Ajuda: matriz de risco" onClick={() => setHelp({ kind: "matrix" })} />
+            <HelpButton label="Ajuda: severidade" onClick={() => setHelp({ kind: "table", table: SEVERITY_HELP })} />
           </span>
           <select className={selectCls} aria-label="Severidade" value={value.severity ?? ""} onChange={pick("severity")}>
             <option value="">Não informado</option>
@@ -166,18 +169,28 @@ export function RiskAssessment({ value, onChange }: { value: Assessment; onChang
         <div className="flex flex-col gap-1.5">
           <span className={labelCls}>
             Resultado:
-            <HelpButton label="Ajuda: resultado" onClick={() => setHelp({ kind: "result" })} />
+            <HelpButton label="Ajuda: resultado" onClick={() => setHelp({ kind: "matrix" })} />
           </span>
           <div
             aria-label="Resultado"
             className="flex min-h-[2.5rem] items-center rounded-md border border-line px-3 py-2 text-sm text-ink"
             style={{ background: result?.color ?? "var(--paper)" }}
           >
-            {result?.text ?? "Não informar"}
+            {result ? (
+              <span className="flex w-full items-center justify-between gap-2">
+                <span className="font-medium">{result.label}</span>
+                <span className="text-xs">{value.probability} × {value.severity} = {result.product}</span>
+              </span>
+            ) : (
+              "Não informar"
+            )}
           </div>
         </div>
       </div>
 
+      {result?.action && (
+        <p className="text-sm text-ink"><span className="font-semibold">Ação recomendada:</span> {result.action}</p>
+      )}
       {value.probability && <RiskMatrix value={value} />}
 
       {help?.kind === "table" && (
@@ -185,7 +198,7 @@ export function RiskAssessment({ value, onChange }: { value: Assessment; onChang
           <ProbabilityHelp table={help.table} />
         </Overlay>
       )}
-      {(help?.kind === "matrix" || help?.kind === "result") && (
+      {help?.kind === "matrix" && (
         <Overlay title="Matriz de risco" onClose={() => setHelp(null)}>
           <RiskMatrix value={value} />
         </Overlay>
