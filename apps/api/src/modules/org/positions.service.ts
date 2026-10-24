@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from "@nestjs/comm
 import { PrismaService } from "../../core/prisma/prisma.service";
 import { PERMISSIONS } from "../../core/permissions/permissions";
 import type { RoleAssignmentClaim } from "../../core/auth/jwt.types";
-import type { CreatePositionDto, ImportPositionsDto, LinkPositionRisksDto } from "./dto/org.dto";
+import type { CreatePositionDto, ImportPositionsDto, LinkPositionRisksDto, PositionRiskFieldsDto, UpdatePositionRiskDto } from "./dto/org.dto";
 import { assertCompanyInScope, companyScopeWhere } from "./scope.util";
 
 const UPDATABLE_FIELDS = [
@@ -16,11 +16,28 @@ const UPDATABLE_FIELDS = [
 const POSITION_INCLUDE = {
   environments: { select: { environmentId: true } },
   risks: {
-    select: { hazardId: true, exposureType: true, sendEsocial: true, hazard: { select: { name: true, category: true } } },
+    include: {
+      hazard: { select: { name: true, category: true } },
+      protection: { select: { equipmentId: true, equipment: { select: { id: true, kind: true, name: true } } } },
+    },
     orderBy: { hazard: { name: "asc" } },
   },
   exams: { select: { id: true, name: true }, orderBy: { name: "asc" } },
 } as const;
+
+const RISK_COPY_KEYS = [
+  "hazardId", "exposureType", "sendEsocial", "description", "damagePotential", "observations", "sourceCircumstances",
+  "adminMeasures", "measurementType", "generatesUnhealthiness", "generatesHazardPay", "specialRetirement", "insertInAso",
+  "epcStatus", "epiStatus", "probability", "severity", "certainty",
+] as const;
+
+type RiskWithProtection = { [K in (typeof RISK_COPY_KEYS)[number]]: unknown } & { protection: { equipmentId: string }[] };
+
+/** Cópia completa de um risco de cargo (dados editados, avaliação e EPC/EPI) para outro cargo. */
+function cloneRisk(r: RiskWithProtection) {
+  const data = Object.fromEntries(RISK_COPY_KEYS.map((k) => [k, r[k]]));
+  return { ...data, protection: { create: r.protection.map((p) => ({ equipmentId: p.equipmentId })) } };
+}
 
 @Injectable()
 export class PositionsService {
@@ -98,7 +115,7 @@ export class PositionsService {
       where: { ...readWhere, deletedAt: null, id: { in: dto.items.map((i) => i.sourcePositionId) } },
       include: {
         environments: { select: { environmentId: true, environment: { select: { name: true } } } },
-        risks: true,
+        risks: { include: { protection: true } },
         exams: true,
       },
     });
@@ -142,7 +159,7 @@ export class PositionsService {
               companyId: dto.targetCompanyId,
               name: item.newName.trim(),
               environments: envIds.size ? { create: [...envIds].map((environmentId) => ({ environmentId })) } : undefined,
-              risks: { create: riskRows.map((r) => ({ hazardId: r.hazardId, exposureType: r.exposureType, sendEsocial: r.sendEsocial })) },
+              risks: { create: riskRows.map((r) => cloneRisk(r) as never) },
               exams: { create: examRows.map((x) => ({ tenantId, name: x.name })) },
             },
             select: { id: true },
@@ -176,19 +193,78 @@ export class PositionsService {
     return position;
   }
 
-  /** Vincula riscos do catálogo a um ou mais cargos (ignora o que já está vinculado). */
+  /** Vincula um risco do catálogo a um ou mais cargos, já com os dados do cadastro (o que vier no corpo substitui). */
   async linkRisks(tenantId: string, dto: LinkPositionRisksDto, assignments: RoleAssignmentClaim[]) {
     for (const id of dto.positionIds) await this.assertWritable(tenantId, id, assignments);
-    const hazards = await this.prisma.hazard.findMany({
-      where: { id: { in: dto.hazardIds }, tenantId, deletedAt: null },
-      select: { id: true },
+    const hazard = await this.prisma.hazard.findFirst({
+      where: { id: dto.hazardId, tenantId, deletedAt: null },
+      include: { protections: { select: { equipmentId: true } } },
     });
-    if (hazards.length !== new Set(dto.hazardIds).size) throw new BadRequestException("Risco não encontrado.");
-    const data = dto.positionIds.flatMap((positionId) =>
-      hazards.map((h) => ({ positionId, hazardId: h.id, exposureType: dto.exposureType ?? null, sendEsocial: dto.sendEsocial ?? true })),
+    if (!hazard) throw new BadRequestException("Risco não encontrado.");
+    const equipmentIds = await this.validEquipmentIds(tenantId, dto.equipmentIds ?? hazard.protections.map((p) => p.equipmentId));
+    const data = this.riskData(hazard, dto);
+    const existing = await this.prisma.positionRisk.findMany({
+      where: { hazardId: hazard.id, positionId: { in: dto.positionIds } },
+      select: { positionId: true },
+    });
+    const have = new Set(existing.map((e) => e.positionId));
+    const fresh = dto.positionIds.filter((id) => !have.has(id));
+    if (fresh.length === 0) throw new BadRequestException("Este risco já está vinculado ao cargo. Clique nele na lista para editar.");
+    await this.prisma.$transaction(
+      fresh.map((positionId) =>
+        this.prisma.positionRisk.create({
+          data: { ...data, positionId, hazardId: hazard.id, protection: { create: equipmentIds.map((equipmentId) => ({ equipmentId })) } },
+        }),
+      ),
     );
-    const res = await this.prisma.positionRisk.createMany({ data, skipDuplicates: true });
-    return { linked: res.count };
+    return { linked: fresh.length };
+  }
+
+  async updateRisk(tenantId: string, id: string, hazardId: string, dto: UpdatePositionRiskDto, assignments: RoleAssignmentClaim[]) {
+    await this.assertWritable(tenantId, id, assignments);
+    const current = await this.prisma.positionRisk.findUnique({ where: { positionId_hazardId: { positionId: id, hazardId } } });
+    if (!current) throw new NotFoundException("Risco não vinculado a este cargo.");
+    const equipmentIds = dto.equipmentIds === undefined ? null : await this.validEquipmentIds(tenantId, dto.equipmentIds);
+    const data = this.riskData(current, dto);
+    return this.prisma.$transaction(async (tx) => {
+      if (equipmentIds) {
+        await tx.positionRiskProtection.deleteMany({ where: { positionId: id, hazardId } });
+        if (equipmentIds.length) {
+          await tx.positionRiskProtection.createMany({ data: equipmentIds.map((equipmentId) => ({ positionId: id, hazardId, equipmentId })) });
+        }
+      }
+      return tx.positionRisk.update({ where: { positionId_hazardId: { positionId: id, hazardId } }, data });
+    });
+  }
+
+  /** Base (cadastro do risco ou valor atual) com os campos enviados por cima. */
+  private riskData(base: { [K in keyof PositionRiskFieldsDto]?: PositionRiskFieldsDto[K] | null }, over: PositionRiskFieldsDto) {
+    const pick = <K extends keyof PositionRiskFieldsDto>(k: K) => (over[k] !== undefined ? over[k] : base[k]);
+    return {
+      exposureType: pick("exposureType") ?? null,
+      sendEsocial: pick("sendEsocial") ?? true,
+      description: pick("description") ?? null,
+      damagePotential: pick("damagePotential") ?? null,
+      observations: pick("observations") ?? null,
+      sourceCircumstances: pick("sourceCircumstances") ?? null,
+      adminMeasures: pick("adminMeasures") ?? null,
+      measurementType: pick("measurementType") ?? "QUALITATIVO",
+      generatesUnhealthiness: pick("generatesUnhealthiness") ?? false,
+      generatesHazardPay: pick("generatesHazardPay") ?? false,
+      specialRetirement: pick("specialRetirement") ?? false,
+      insertInAso: pick("insertInAso") ?? true,
+      epcStatus: pick("epcStatus") ?? "NAO_SE_APLICA",
+      epiStatus: pick("epiStatus") ?? "NAO_SE_APLICA",
+      probability: over.probability !== undefined ? over.probability : (base.probability ?? null),
+      severity: over.severity !== undefined ? over.severity : (base.severity ?? null),
+      certainty: over.certainty !== undefined ? over.certainty : (base.certainty ?? null),
+    };
+  }
+
+  private async validEquipmentIds(tenantId: string, ids: string[]): Promise<string[]> {
+    if (!ids.length) return [];
+    const found = await this.prisma.protectionEquipment.findMany({ where: { id: { in: ids }, tenantId, deletedAt: null }, select: { id: true } });
+    return found.map((e) => e.id);
   }
 
   async clearRisks(tenantId: string, id: string, assignments: RoleAssignmentClaim[]) {
@@ -205,12 +281,12 @@ export class PositionsService {
 
   async importRisks(tenantId: string, id: string, sourceId: string, assignments: RoleAssignmentClaim[]) {
     await this.assertWritable(tenantId, id, assignments);
-    const source = await this.get(tenantId, sourceId, assignments);
-    const res = await this.prisma.positionRisk.createMany({
-      data: source.risks.map((r) => ({ positionId: id, hazardId: r.hazardId, exposureType: r.exposureType, sendEsocial: r.sendEsocial })),
-      skipDuplicates: true,
-    });
-    return { linked: res.count };
+    await this.get(tenantId, sourceId, assignments);
+    const source = await this.prisma.positionRisk.findMany({ where: { positionId: sourceId }, include: { protection: true } });
+    const have = new Set((await this.prisma.positionRisk.findMany({ where: { positionId: id }, select: { hazardId: true } })).map((r) => r.hazardId));
+    const fresh = source.filter((r) => !have.has(r.hazardId));
+    await this.prisma.$transaction(fresh.map((r) => this.prisma.positionRisk.create({ data: { ...cloneRisk(r), positionId: id } as never })));
+    return { linked: fresh.length };
   }
 
   async addExams(tenantId: string, id: string, names: string[], assignments: RoleAssignmentClaim[]) {

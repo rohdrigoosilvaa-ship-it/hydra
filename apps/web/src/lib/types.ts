@@ -597,6 +597,29 @@ export interface Department {
   branch?: { id: string; name: string } | null;
 }
 
+export interface PositionRisk {
+  hazardId: string;
+  exposureType: ExposureType | null;
+  sendEsocial: boolean;
+  description: string | null;
+  damagePotential: string | null;
+  observations: string | null;
+  sourceCircumstances: string | null;
+  adminMeasures: string | null;
+  measurementType: "QUALITATIVO" | "QUANTITATIVO";
+  generatesUnhealthiness: boolean;
+  generatesHazardPay: boolean;
+  specialRetirement: boolean;
+  insertInAso: boolean;
+  epcStatus: string;
+  epiStatus: string;
+  probability: number | null;
+  severity: number | null;
+  certainty: number | null;
+  hazard: { name: string; category: RiskCategory };
+  protection: { equipmentId: string; equipment: { id: string; kind: "EPC" | "EPI"; name: string } }[];
+}
+
 export interface Position {
   id: string;
   companyId: string;
@@ -627,7 +650,7 @@ export interface Position {
   technicalOpinionEnabled?: boolean;
   /** Ambientes pelos quais o cargo transita. */
   environments?: { environmentId: string }[];
-  risks?: { hazardId: string; exposureType: ExposureType | null; sendEsocial: boolean; hazard: { name: string; category: RiskCategory } }[];
+  risks?: PositionRisk[];
   exams?: { id: string; name: string }[];
 }
 

@@ -25,7 +25,7 @@ export const EXPOSURE_LABEL: Record<ExposureType, string> = {
   INTERMITENTE: "Intermitente",
   PERMANENTE: "Permanente",
 };
-const TRI = [
+export const TRI = [
   ["NAO_SE_APLICA", "Não se Aplica"],
   ["SIM", "Sim"],
   ["NAO", "Não"],
@@ -151,7 +151,7 @@ export function RisksCatalogPage() {
   );
 }
 
-function YesNo({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
+export function YesNo({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
   return (
     <ModalField label={label}>
       <select className="input" value={value ? "S" : "N"} onChange={(e) => onChange(e.target.value === "S")}>
@@ -341,7 +341,7 @@ function RiskForm({ hazard, all, onClose, onSaved }: { hazard?: Hazard; all: Haz
 }
 
 /** Quadro "EPC/EPI para este risco": lista os equipamentos indicados e permite adicionar. */
-function ProtectionBox({ kind, bank, chosen, setChosen, onNew }: { kind: "EPC" | "EPI"; bank: ProtectionEquipment[]; chosen: string[]; setChosen: (v: string[]) => void; onNew: () => void }) {
+export function ProtectionBox({ kind, bank, chosen, setChosen, onNew }: { kind: "EPC" | "EPI"; bank: ProtectionEquipment[]; chosen: string[]; setChosen: (v: string[]) => void; onNew: () => void }) {
   const mine = bank.filter((b) => b.kind === kind);
   const picked = mine.filter((b) => chosen.includes(b.id));
   const free = mine.filter((b) => !chosen.includes(b.id));
@@ -380,7 +380,7 @@ function ProtectionBox({ kind, bank, chosen, setChosen, onNew }: { kind: "EPC" |
   );
 }
 
-function NewProtectionModal({ kind, onClose, onCreated }: { kind: "EPC" | "EPI"; onClose: () => void; onCreated: (eq: ProtectionEquipment) => void }) {
+export function NewProtectionModal({ kind, onClose, onCreated }: { kind: "EPC" | "EPI"; onClose: () => void; onCreated: (eq: ProtectionEquipment) => void }) {
   const [categories, setCategories] = useState<{ id: string; name: string }[]>([]);
   const [categoryId, setCategoryId] = useState("");
   const [name, setName] = useState("");

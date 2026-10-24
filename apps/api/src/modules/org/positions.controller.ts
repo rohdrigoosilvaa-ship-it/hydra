@@ -4,7 +4,7 @@ import { RequirePermission } from "../../core/decorators/require-permission.deco
 import { PERMISSIONS } from "../../core/permissions/permissions";
 import type { HydraRequestUser } from "../../core/auth/jwt.types";
 import { PositionsService } from "./positions.service";
-import { AddPositionExamsDto, CreatePositionDto, ImportFromPositionDto, ImportPositionsDto, LinkPositionRisksDto } from "./dto/org.dto";
+import { AddPositionExamsDto, CreatePositionDto, ImportFromPositionDto, ImportPositionsDto, LinkPositionRisksDto, UpdatePositionRiskDto } from "./dto/org.dto";
 
 @Controller("positions")
 export class PositionsController {
@@ -50,6 +50,17 @@ export class PositionsController {
   @RequirePermission(PERMISSIONS.ORG_POSITION_WRITE)
   removeRisk(@CurrentUser() user: HydraRequestUser, @Param("id") id: string, @Param("hazardId") hazardId: string) {
     return this.positions.removeRisk(user.tenantId, id, hazardId, user.assignments);
+  }
+
+  @Patch(":id/risks/:hazardId")
+  @RequirePermission(PERMISSIONS.ORG_POSITION_WRITE)
+  updateRisk(
+    @CurrentUser() user: HydraRequestUser,
+    @Param("id") id: string,
+    @Param("hazardId") hazardId: string,
+    @Body() dto: UpdatePositionRiskDto,
+  ) {
+    return this.positions.updateRisk(user.tenantId, id, hazardId, dto, user.assignments);
   }
 
   @Post(":id/import-risks")
