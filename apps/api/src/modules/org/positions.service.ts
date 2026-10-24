@@ -2,7 +2,7 @@ import { Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../core/prisma/prisma.service";
 import { PERMISSIONS } from "../../core/permissions/permissions";
 import type { RoleAssignmentClaim } from "../../core/auth/jwt.types";
-import type { CreatePositionDto } from "./dto/org.dto";
+import type { CreatePositionDto, ImportPositionsDto } from "./dto/org.dto";
 import { assertCompanyInScope, companyScopeWhere } from "./scope.util";
 
 const UPDATABLE_FIELDS = [
@@ -76,6 +76,63 @@ export class PositionsService {
         include: { environments: { select: { environmentId: true } } },
       });
     });
+  }
+
+  /**
+   * Copia cargos já cadastrados (desta ou de outra empresa) para a empresa de destino.
+   * Ambientes: na mesma empresa mantém os mesmos; em outra empresa liga aos de mesmo nome.
+   */
+  async importPositions(tenantId: string, dto: ImportPositionsDto, assignments: RoleAssignmentClaim[]) {
+    assertCompanyInScope(assignments, PERMISSIONS.ORG_POSITION_WRITE, dto.targetCompanyId);
+    const readWhere = companyScopeWhere(assignments, PERMISSIONS.ORG_POSITION_READ, tenantId);
+    const sources = await this.prisma.position.findMany({
+      where: { ...readWhere, deletedAt: null, id: { in: dto.items.map((i) => i.sourcePositionId) } },
+      include: { environments: { select: { environmentId: true, environment: { select: { name: true } } } } },
+    });
+    if (sources.length !== new Set(dto.items.map((i) => i.sourcePositionId)).size) {
+      throw new NotFoundException("Cargo de origem não encontrado.");
+    }
+    const targetEnvs = await this.prisma.workEnvironment.findMany({
+      where: { tenantId, companyId: dto.targetCompanyId, deletedAt: null },
+      select: { id: true, name: true },
+    });
+    const byName = new Map(targetEnvs.map((e) => [e.name.trim().toLowerCase(), e.id]));
+    const targetIds = new Set(targetEnvs.map((e) => e.id));
+
+    const created = await this.prisma.$transaction(async (tx) => {
+      const out = [];
+      for (const item of dto.items) {
+        const src = sources.find((s) => s.id === item.sourcePositionId)!;
+        const excluded = new Set(item.excludeEnvironmentIds ?? []);
+        const envIds = new Set<string>();
+        if (item.copyEnvironments !== false) {
+          for (const link of src.environments) {
+            if (excluded.has(link.environmentId)) continue;
+            const sameCompany = src.companyId === dto.targetCompanyId && targetIds.has(link.environmentId);
+            const id = sameCompany ? link.environmentId : byName.get(link.environment.name.trim().toLowerCase());
+            if (id) envIds.add(id);
+          }
+        }
+        const {
+          id: _id, tenantId: _t, companyId: _c, name: _n, code: _code, createdAt: _ca, updatedAt: _ua, deletedAt: _d,
+          environments: _e, ...data
+        } = src;
+        out.push(
+          await tx.position.create({
+            data: {
+              ...data,
+              tenantId,
+              companyId: dto.targetCompanyId,
+              name: item.newName.trim(),
+              environments: envIds.size ? { create: [...envIds].map((environmentId) => ({ environmentId })) } : undefined,
+            },
+            select: { id: true },
+          }),
+        );
+      }
+      return out;
+    });
+    return { imported: created.length };
   }
 
   /** Só aceita ambientes da mesma empresa do cargo. */

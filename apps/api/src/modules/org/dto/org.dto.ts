@@ -1,4 +1,5 @@
-import { IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsNumber, IsOptional, IsString, Max, Min, MinLength } from "class-validator";
+import { Type } from "class-transformer";
+import { ArrayMinSize, IsArray, ValidateNested, IsBoolean, IsDateString, IsIn, IsInt, IsNumber, IsOptional, IsString, Max, Min, MinLength } from "class-validator";
 
 export class CreateCompanyDto {
   @IsString()
@@ -547,4 +548,34 @@ export class CreateEmployeeDto {
   @IsOptional()
   @IsString()
   disabilityType?: string;
+}
+
+export class ImportPositionItemDto {
+  @IsString()
+  sourcePositionId!: string;
+
+  @IsString()
+  @MinLength(2)
+  newName!: string;
+
+  /** Ambientes do cargo de origem que NÃO devem ser levados para a cópia. */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  excludeEnvironmentIds?: string[];
+
+  @IsOptional()
+  @IsBoolean()
+  copyEnvironments?: boolean;
+}
+
+export class ImportPositionsDto {
+  @IsString()
+  targetCompanyId!: string;
+
+  @IsArray()
+  @ArrayMinSize(1)
+  @ValidateNested({ each: true })
+  @Type(() => ImportPositionItemDto)
+  items!: ImportPositionItemDto[];
 }

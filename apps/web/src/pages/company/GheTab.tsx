@@ -1,11 +1,12 @@
 import { FormEvent, useEffect, useState } from "react";
 import { Link, useOutletContext } from "react-router-dom";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { Copy, Pencil, Plus, Trash2 } from "lucide-react";
 import { api } from "../../lib/api";
 import { COLOR_CHOICES, iconByName } from "../../lib/appearance";
 import { AppearancePicker } from "../../components/company/AppearancePicker";
 import { CboPicker } from "../../components/CboPicker";
 import { FormModal } from "../../components/ui/modal";
+import { ImportPositionsModal } from "./ImportPositionsModal";
 import type { Position, WorkEnvironment } from "../../lib/types";
 import type { CompanyWorkspaceContext } from "./CompanyWorkspacePage";
 
@@ -45,6 +46,7 @@ export function GheTab() {
   const [positions, setPositions] = useState<Position[] | null>(null);
   const [environments, setEnvironments] = useState<WorkEnvironment[]>([]);
   const [form, setForm] = useState<Position | "new" | null>(null);
+  const [importing, setImporting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   async function load() {
@@ -79,10 +81,17 @@ export function GheTab() {
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h2 className="font-display text-lg font-semibold text-ink">GHE / Cargos</h2>
-        {positions && positions.length > 0 && (
-          <button className="btn-primary flex items-center gap-1.5" onClick={() => setForm("new")}>
-            <Plus size={15} /> Adicionar cargo
+        {positions && (
+          <div className="flex flex-wrap gap-2">
+            <button className="btn-secondary flex items-center gap-1.5" onClick={() => setImporting(true)}>
+            <Copy size={15} /> Importar cargo
           </button>
+            {positions.length > 0 && (
+              <button className="btn-primary flex items-center gap-1.5" onClick={() => setForm("new")}>
+                <Plus size={15} /> Adicionar cargo
+              </button>
+            )}
+          </div>
         )}
       </div>
 
@@ -94,6 +103,16 @@ export function GheTab() {
           onClose={() => setForm(null)}
           onSaved={async () => {
             setForm(null);
+            await load();
+          }}
+        />
+      )}
+      {importing && (
+        <ImportPositionsModal
+          companyId={company.id}
+          onClose={() => setImporting(false)}
+          onImported={async () => {
+            setImporting(false);
             await load();
           }}
         />
