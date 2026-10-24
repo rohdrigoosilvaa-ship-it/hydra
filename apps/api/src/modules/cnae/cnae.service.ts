@@ -42,9 +42,10 @@ export class CnaeService {
     const raw = (query ?? "").trim();
     const strip = ({ digits: _d, textNorm: _t, ...rest }: Entry) => rest;
     if (!raw) return catalog.slice(0, 50).map(strip);
-    const digits = raw.replace(/\D/g, "");
+    // o usuário pode digitar a subclasse inteira (ex.: 4711-3/02): a NR-04 classifica pela classe (5 primeiros dígitos)
+    const digits = raw.replace(/\D/g, "").slice(0, 5);
     const words = normalize(raw).split(/\s+/).filter(Boolean);
-    const byCode = digits.length >= 2 && digits.length === raw.replace(/[\s.\-/]/g, "").length;
+    const byCode = digits.length >= 2 && /^[\d\s.\-/]+$/.test(raw);
     return catalog
       .filter((e) => (byCode ? e.digits.startsWith(digits) : words.every((w) => e.textNorm.includes(w) || e.code.includes(w))))
       .slice(0, 50)

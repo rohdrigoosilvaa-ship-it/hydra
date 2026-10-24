@@ -41,9 +41,12 @@ export function CnaePicker({
   }
 
   function handlePick(entry: CnaeEntry) {
-    setQuery(entry.code);
+    // se foi digitada a subclasse (ex.: 4711-3/02), mantém o final "/02" junto da classe escolhida
+    const typed = query.replace(/\D/g, "");
+    const code = typed.length >= 7 && typed.startsWith(entry.code.replace(/\D/g, "")) ? `${entry.code}/${typed.slice(5, 7)}` : entry.code;
+    setQuery(code);
     setPicked(entry);
-    onChange(entry.code);
+    onChange(code);
     onPick?.(entry);
     setOpen(false);
   }
@@ -62,7 +65,7 @@ export function CnaePicker({
       />
       {picked && (
         <p className="text-xs text-teal-deep">
-          {picked.code} — {picked.description} · Grau de risco {picked.riskGrade}
+          {picked.code} — {picked.description} · Grau de risco {picked.riskGrade} (NR-04)
         </p>
       )}
       {!loaded && <p className="text-xs text-ink-muted">A lista de CNAE da NR-04 ainda não foi carregada — digite o código manualmente.</p>}
