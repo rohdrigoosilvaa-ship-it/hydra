@@ -4,7 +4,7 @@ import { RequirePermission } from "../../core/decorators/require-permission.deco
 import { PERMISSIONS } from "../../core/permissions/permissions";
 import type { HydraRequestUser } from "../../core/auth/jwt.types";
 import { PositionsService } from "./positions.service";
-import { CreatePositionDto } from "./dto/org.dto";
+import { CreatePositionDto, ImportPositionsDto } from "./dto/org.dto";
 
 @Controller("positions")
 export class PositionsController {
@@ -26,6 +26,12 @@ export class PositionsController {
   @RequirePermission(PERMISSIONS.ORG_POSITION_WRITE)
   create(@CurrentUser() user: HydraRequestUser, @Body() dto: CreatePositionDto) {
     return this.positions.create(user.tenantId, dto, user.assignments);
+  }
+
+  @Post("import")
+  @RequirePermission(PERMISSIONS.ORG_POSITION_WRITE)
+  importPositions(@CurrentUser() user: HydraRequestUser, @Body() dto: ImportPositionsDto) {
+    return this.positions.importPositions(user.tenantId, dto, user.assignments);
   }
 
   @Patch(":id")
