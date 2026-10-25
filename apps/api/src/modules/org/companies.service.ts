@@ -28,7 +28,7 @@ export class CompaniesService {
         const [employees, positions, ghes] = await Promise.all([
           this.prisma.employee.count({ where: { ...employeeScope, companyId: company.id, status: "ACTIVE" } }),
           this.prisma.position.count({ where: { tenantId, companyId: company.id, deletedAt: null, status: "ACTIVE" } }),
-          this.prisma.ghe.count({ where: { tenantId, pgr: { companyId: company.id } } }),
+          this.prisma.workEnvironment.count({ where: { tenantId, companyId: company.id, deletedAt: null } }),
         ]);
         const openStatuses = ["OPEN", "IN_PROGRESS", "LATE", "VALIDATING"] as const;
         const [pendingActions, priorityRisks, pgr] = await Promise.all([
@@ -53,7 +53,7 @@ export class CompaniesService {
     const employeeScope = employeeScopeWhere(assignments, PERMISSIONS.ORG_EMPLOYEE_READ, tenantId);
     const [positions, ghes, lives, esocialEvents, asos, cats, absent, draftPgr, draftLtcat] = await Promise.all([
       this.prisma.position.count({ where: { tenantId, companyId: id, deletedAt: null, status: "ACTIVE" } }),
-      this.prisma.ghe.count({ where: { tenantId, pgr: { companyId: id } } }),
+      this.prisma.workEnvironment.count({ where: { tenantId, companyId: id, deletedAt: null } }),
       this.prisma.employee.count({ where: { ...employeeScope, companyId: id, status: "ACTIVE" } }),
       this.prisma.esocialEvent.count({ where: { tenantId, companyId: id } }),
       this.prisma.aso.count({ where: { tenantId, exam: { employee: { companyId: id } } } }),

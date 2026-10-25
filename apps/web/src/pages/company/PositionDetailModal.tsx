@@ -28,7 +28,7 @@ function SectionActions({ onAdd, onClear, onImport, noun, disabledClear }: { onA
   );
 }
 
-/** Ficha do cargo: dados, ambientes, riscos e exames. */
+/** Ficha do cargo: dados, GHE, riscos e exames. */
 export function PositionDetailModal({
   position,
   positions,
@@ -69,7 +69,7 @@ export function PositionDetailModal({
           <Row label="Cargo">{position.name}</Row>
           <Row label="CBO">{position.cbo || DASH}</Row>
           <div className="border-b border-line py-3 text-sm text-ink">
-            <p className="font-semibold">Ambientes que transita:</p>
+            <p className="font-semibold">GHE que transita:</p>
             <p className="mt-1"><span className="font-semibold">Principal:</span> {envNames[0] ?? DASH}</p>
             <p><span className="font-semibold">Outros:</span> {envNames.length > 1 ? envNames.slice(1).join(", ") : DASH}</p>
           </div>

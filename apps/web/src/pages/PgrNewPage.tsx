@@ -13,7 +13,7 @@ import type { ActionSchedule, Company, Position, WorkEnvironment } from "../lib/
 const STEPS = [
   { id: "dados", label: "1 · Dados gerais" },
   { id: "modelo", label: "Texto do documento" },
-  { id: "ambientes", label: "2 · Ambientes e cargos" },
+  { id: "ambientes", label: "2 · GHE e cargos" },
   { id: "riscos", label: "3 · Inventário de riscos" },
   { id: "plano", label: "4 · Plano de ação" },
 ] as const;
@@ -21,7 +21,7 @@ const STEPS = [
 const today = () => new Date().toISOString().slice(0, 10);
 const plusYears = (iso: string, n: number) => `${Number(iso.slice(0, 4)) + n}${iso.slice(4)}`;
 
-/** Novo PGR: dados gerais → texto editável → ambientes (GHE) e cargos → riscos → plano de ação, tudo puxado da empresa. */
+/** Novo PGR: dados gerais → texto editável → GHE e cargos → riscos → plano de ação, tudo puxado da empresa. */
 export function PgrNewPage() {
   const navigate = useNavigate();
   const [params] = useSearchParams();
@@ -115,7 +115,7 @@ export function PgrNewPage() {
         <ArrowLeft size={14} /> PGRs
       </Link>
       <h1 className="font-display text-2xl font-semibold text-ink">Novo PGR</h1>
-      <p className="mt-1 text-sm text-ink-muted">Os ambientes, cargos, riscos e planos de ação são puxados do cadastro da empresa.</p>
+      <p className="mt-1 text-sm text-ink-muted">Os GHE, cargos, riscos e planos de ação são puxados do cadastro da empresa.</p>
 
       <nav aria-label="Etapas do novo PGR" className="mt-5 flex gap-2 overflow-x-auto pb-1">
         {STEPS.map((s, i) => (
@@ -181,8 +181,8 @@ export function PgrNewPage() {
 
         {step === 2 && (
           <div>
-            <p className="mb-3 text-sm text-ink-muted">Cada ambiente de {company?.name ?? "a empresa"} vira um GHE do PGR, com os cargos que transitam nele.</p>
-            {environments.length === 0 && <p className="text-sm text-ink-muted">Nenhum ambiente cadastrado. Cadastre em Mapeamento › Ambiente.</p>}
+            <p className="mb-3 text-sm text-ink-muted">Os GHE cadastrados em {company?.name ?? "a empresa"} entram no PGR, com os cargos que transitam neles.</p>
+            {environments.length === 0 && <p className="text-sm text-ink-muted">Nenhum GHE cadastrado. Cadastre em Mapeamento › GHE.</p>}
             <div className="flex flex-col gap-3">
               {environments.map((env) => {
                 const pos = positionsOf(env.id);
@@ -190,9 +190,9 @@ export function PgrNewPage() {
                   <label key={env.id} className="flex cursor-pointer items-start gap-3 rounded-md border border-line p-3">
                     <input type="checkbox" className="mt-1" aria-label={`Incluir ${env.name}`} checked={envIds.includes(env.id)} onChange={() => toggle(envIds, setEnvIds, env.id)} />
                     <div>
-                      <p className="font-medium text-ink">{env.name} <span className="text-xs font-normal text-ink-muted">(GHE)</span></p>
+                      <p className="font-medium text-ink">{env.name}</p>
                       <p className="mt-0.5 text-xs text-ink-muted">
-                        {pos.length ? `Cargos: ${pos.map((p) => p.name).join(", ")}` : "Nenhum cargo vinculado a este ambiente."}
+                        {pos.length ? `Cargos: ${pos.map((p) => p.name).join(", ")}` : "Nenhum cargo vinculado a este GHE."}
                       </p>
                     </div>
                   </label>
@@ -204,8 +204,8 @@ export function PgrNewPage() {
 
         {step === 3 && (
           <div>
-            <p className="mb-3 text-sm text-ink-muted">Riscos já vinculados aos cargos de cada ambiente ({totalRisks} no total). Para mudar, edite o cargo em Mapeamento › GHE / Cargos.</p>
-            {chosenEnvs.length === 0 && <p className="text-sm text-ink-muted">Nenhum ambiente escolhido na etapa anterior.</p>}
+            <p className="mb-3 text-sm text-ink-muted">Riscos já vinculados aos cargos de cada GHE ({totalRisks} no total). Para mudar, edite o cargo em Mapeamento › Cargos.</p>
+            {chosenEnvs.length === 0 && <p className="text-sm text-ink-muted">Nenhum GHE escolhido na etapa anterior.</p>}
             <div className="flex flex-col gap-4">
               {chosenEnvs.map((env) => (
                 <div key={env.id}>
@@ -224,7 +224,7 @@ export function PgrNewPage() {
                         );
                       }),
                     )}
-                    {positionsOf(env.id).every((p) => (p.risks ?? []).length === 0) && <p className="px-3 py-2 text-sm text-ink-muted">Nenhum risco vinculado aos cargos deste ambiente.</p>}
+                    {positionsOf(env.id).every((p) => (p.risks ?? []).length === 0) && <p className="px-3 py-2 text-sm text-ink-muted">Nenhum risco vinculado aos cargos deste GHE.</p>}
                   </div>
                 </div>
               ))}

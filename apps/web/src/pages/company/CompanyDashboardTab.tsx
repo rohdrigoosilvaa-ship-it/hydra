@@ -96,10 +96,10 @@ export function CompanyDashboardTab() {
     follow.push({ key: "pgr", icon: FileText, title: "Criar o PGR da empresa", text: "Ainda não há PGR para esta empresa. Comece o preenchimento para manter a gestão de SST em dia.", action: "Criar PGR", to: "/pgr" });
   }
   if (summary && summary.environments === 0) {
-    follow.push({ key: "amb", icon: Home, title: "Cadastrar ambientes", text: "Nenhum ambiente foi cadastrado. Eles organizam por onde cada cargo transita.", action: "Cadastrar", to: "../ambientes" });
+    follow.push({ key: "amb", icon: Home, title: "Cadastrar GHE", text: "Nenhum GHE foi cadastrado. Eles organizam por onde cada cargo transita.", action: "Cadastrar", to: "../ghe" });
   }
   if (summary && summary.positions === 0) {
-    follow.push({ key: "cargos", icon: Boxes, title: "Cadastrar cargos", text: "Nenhum cargo foi cadastrado para esta empresa.", action: "Adicionar cargo", to: "../ghe" });
+    follow.push({ key: "cargos", icon: Boxes, title: "Cadastrar cargos", text: "Nenhum cargo foi cadastrado para esta empresa.", action: "Adicionar cargo", to: "../cargos" });
   }
 
   const q = search.trim().toLowerCase();
@@ -142,8 +142,8 @@ export function CompanyDashboardTab() {
             {moreOpen && (
               <div className="absolute right-0 z-20 mt-1 w-48 overflow-hidden rounded-lg border border-line bg-paper-raised py-1 text-sm shadow-lg" onMouseLeave={() => setMoreOpen(false)}>
                 <button className="w-full px-3 py-2 text-left text-ink hover:bg-teal-tint" onClick={() => { setMoreOpen(false); edit(); }}>Editar empresa</button>
-                <Link className="block px-3 py-2 text-ink hover:bg-teal-tint" to="../ambientes">Ambientes</Link>
-                <Link className="block px-3 py-2 text-ink hover:bg-teal-tint" to="../ghe">GHE / Cargos</Link>
+                <Link className="block px-3 py-2 text-ink hover:bg-teal-tint" to="../ghe">GHE</Link>
+                <Link className="block px-3 py-2 text-ink hover:bg-teal-tint" to="../cargos">Cargos</Link>
               </div>
             )}
           </div>

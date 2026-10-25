@@ -86,8 +86,9 @@ export const router = createBrowserRouter([
             children: [
               { index: true, element: <Navigate to="dashboard" replace /> },
               { path: "dashboard", element: <CompanyDashboardTab /> },
-              { path: "ambientes", element: <EnvironmentsTab /> },
-              { path: "ghe", element: <GheTab /> },
+              { path: "ghe", element: <EnvironmentsTab /> },
+              { path: "ambientes", element: <Navigate to="../ghe" replace /> },
+              { path: "cargos", element: <GheTab /> },
               { path: "cbo", element: <CboSearchPage /> },
             ],
           },

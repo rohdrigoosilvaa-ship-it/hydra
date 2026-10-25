@@ -9,7 +9,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: "novos", label: "Novos Cargos" },
   { id: "riscos", label: "Exclusão de Riscos" },
   { id: "exames", label: "Exclusão de Exames" },
-  { id: "ambientes", label: "Exclusão de Ambientes" },
+  { id: "ambientes", label: "Exclusão de GHE" },
 ];
 
 const field = "rounded-md border border-line bg-paper px-3 py-2 text-sm text-ink focus:border-teal focus:outline-none";
@@ -194,10 +194,10 @@ export function ImportPositionsModal({
                       <input className={field} value={nameOf(p)} onChange={(e) => setNames((cur) => ({ ...cur, [p.id]: e.target.value }))} />
                     </ModalField>
                   </div>
-                  <ModalField label="Ambientes">
+                  <ModalField label="GHE">
                     <select className={field} value={envMode[p.id] ?? "ALL"} onChange={(e) => setEnvMode((cur) => ({ ...cur, [p.id]: e.target.value as "ALL" | "NONE" }))}>
-                      <option value="ALL">Todos os ambientes do cargo</option>
-                      <option value="NONE">Nenhum ambiente</option>
+                      <option value="ALL">Todos os GHE do cargo</option>
+                      <option value="NONE">Nenhum GHE</option>
                     </select>
                   </ModalField>
                   <ModalField label="Riscos">
@@ -221,7 +221,7 @@ export function ImportPositionsModal({
                 return (
                   <div key={p.id} className="rounded-md border border-line p-3">
                     <p className="text-sm font-medium text-ink">{nameOf(p)}</p>
-                    {linked.length === 0 && <p className="mt-1 text-xs text-ink-muted">Este cargo não tem ambientes vinculados.</p>}
+                    {linked.length === 0 && <p className="mt-1 text-xs text-ink-muted">Este cargo não tem GHE vinculado.</p>}
                     <div className="mt-2 flex flex-wrap gap-3">
                       {linked.map((id) => (
                         <label key={id} className="flex items-center gap-1.5 text-sm text-ink">

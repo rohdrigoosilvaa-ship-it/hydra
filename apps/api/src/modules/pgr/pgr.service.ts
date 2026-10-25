@@ -3,7 +3,7 @@ import { PrismaService } from "../../core/prisma/prisma.service";
 import { PERMISSIONS } from "../../core/permissions/permissions";
 import type { RoleAssignmentClaim } from "../../core/auth/jwt.types";
 import type { CreatePgrDto, GeneratePgrDto, UpdatePgrDto } from "./dto/pgr.dto";
-import type { ExposureType, RiskLevel } from "@hydra/db";
+import type { ExposureType, Prisma, RiskLevel } from "@hydra/db";
 import { assertCompanyInScope, companyScopeWhere } from "../org/scope.util";
 import { copyGheStructure } from "./ghe-copy.util";
 
@@ -109,15 +109,7 @@ export class PgrService {
     if (!company) throw new NotFoundException("Empresa não encontrada.");
     const environments = await this.prisma.workEnvironment.findMany({
       where: { id: { in: dto.environmentIds }, tenantId, companyId: dto.companyId, deletedAt: null },
-      include: {
-        positions: {
-          include: {
-            position: {
-              include: { risks: { include: { hazard: true, protection: { include: { equipment: { select: { name: true, kind: true } } } } } } },
-            },
-          },
-        },
-      },
+      include: { positions: { include: { position: { include: POSITION_RISKS_INCLUDE } } } },
     });
     const schedules = dto.scheduleIds?.length
       ? await this.prisma.actionSchedule.findMany({
@@ -161,43 +153,7 @@ export class PgrService {
             },
           },
         });
-
-        // um risco por perigo no GHE; se vários cargos têm o mesmo perigo, vale o de maior nível
-        const byHazard = new Map<string, { risk: (typeof positions)[number]["risks"][number]; level: number }>();
-        for (const pos of positions) {
-          for (const r of pos.risks) {
-            const level = positionRiskLevel(r.probability, r.severity) ?? 0;
-            const cur = byHazard.get(r.hazardId);
-            if (!cur || level > cur.level) byHazard.set(r.hazardId, { risk: r, level });
-          }
-        }
-        for (const { risk: r, level } of byHazard.values()) {
-          const names = (kind: "EPC" | "EPI") => r.protection.filter((p) => p.equipment.kind === kind).map((p) => p.equipment.name).join("; ") || null;
-          await tx.pgrRisk.create({
-            data: {
-              tenantId,
-              pgrId: pgr.id,
-              gheId: ghe.id,
-              hazardId: r.hazardId,
-              description: r.description,
-              typicalInjuries: r.damagePotential,
-              sourceCircumstances: r.sourceCircumstances,
-              exposureType: r.exposureType as ExposureType | null,
-              evaluationCriteria: r.measurementType,
-              probability: r.probability ?? 1,
-              severity: r.severity ?? 1,
-              riskLevel: LEVEL_TO_ENUM[level] ?? "IRRELEVANT",
-              classification: level ? LEVEL_CLASSIFICATION[level] : "Não avaliado",
-              adminControls: r.adminMeasures,
-              epcMeasures: names("EPC"),
-              epiMeasures: names("EPI"),
-              usesEpc: r.epcStatus,
-              usesEpi: r.epiStatus,
-              createdById: userId,
-              updatedById: userId,
-            },
-          });
-        }
+        await addRisksToGhe(tx, { tenantId, pgrId: pgr.id, gheId: ghe.id, positions, userId });
       }
 
       for (const sch of schedules) {
@@ -218,6 +174,49 @@ export class PgrService {
         }
       }
       return pgr;
+    });
+  }
+
+  /**
+   * Atualiza um PGR com o cadastro atual da empresa: traz os GHEs (ambientes) que ainda não estão no PGR e,
+   * para cada GHE, os riscos dos cargos que ainda não foram lançados. Nada que já existe é alterado ou duplicado.
+   */
+  async syncFromCompany(tenantId: string, id: string, userId: string, assignments: RoleAssignmentClaim[]) {
+    const where = companyScopeWhere(assignments, PERMISSIONS.PGR_WRITE, tenantId);
+    const pgr = await this.prisma.pgr.findFirst({ where: { ...where, id, deletedAt: null }, include: { ghes: true } });
+    if (!pgr) throw new NotFoundException("PGR não encontrado.");
+    const environments = await this.prisma.workEnvironment.findMany({
+      where: { tenantId, companyId: pgr.companyId, deletedAt: null },
+      include: { positions: { include: { position: { include: POSITION_RISKS_INCLUDE } } } },
+    });
+    const norm = (n: string) => n.trim().toLowerCase();
+    return this.prisma.$transaction(async (tx) => {
+      let ghesAdded = 0;
+      let risksAdded = 0;
+      for (const env of environments) {
+        const positions = env.positions.map((l) => l.position).filter((pos) => !pos.deletedAt);
+        let ghe = pgr.ghes.find((g) => norm(g.name) === norm(env.name));
+        if (!ghe) {
+          ghe = await tx.ghe.create({
+            data: {
+              tenantId,
+              pgrId: pgr.id,
+              name: env.name,
+              localDescription: [env.description, env.location].filter(Boolean).join(" — ") || null,
+              functions: { create: positions.map((pos) => ({ tenantId, positionId: pos.id, activityDescription: pos.description })) },
+            },
+          });
+          ghesAdded++;
+        } else {
+          const have = new Set((await tx.gheFunction.findMany({ where: { gheId: ghe.id }, select: { positionId: true } })).map((f) => f.positionId));
+          const fresh = positions.filter((pos) => !have.has(pos.id));
+          if (fresh.length) {
+            await tx.gheFunction.createMany({ data: fresh.map((pos) => ({ tenantId, gheId: ghe!.id, positionId: pos.id, activityDescription: pos.description })) });
+          }
+        }
+        risksAdded += await addRisksToGhe(tx, { tenantId, pgrId: pgr.id, gheId: ghe.id, positions, userId });
+      }
+      return { ghesAdded, risksAdded };
     });
   }
 
@@ -350,4 +349,60 @@ function positionRiskLevel(probability: number | null, severity: number | null):
 function endOfMonth(ym: string): Date {
   const [y, m] = ym.split("-").map(Number) as [number, number];
   return new Date(Date.UTC(y, m, 0));
+}
+
+
+const POSITION_RISKS_INCLUDE = {
+  risks: { include: { hazard: true, protection: { include: { equipment: { select: { name: true, kind: true } } } } } },
+} as const;
+
+type PositionWithRisks = Prisma.PositionGetPayload<{ include: typeof POSITION_RISKS_INCLUDE }>;
+
+/**
+ * Lança no GHE os riscos dos cargos (um por perigo; vale o de maior nível). Perigos que o GHE já tem são pulados.
+ * Devolve quantos riscos foram criados.
+ */
+async function addRisksToGhe(
+  tx: Prisma.TransactionClient,
+  args: { tenantId: string; pgrId: string; gheId: string; positions: PositionWithRisks[]; userId: string },
+): Promise<number> {
+  const { tenantId, pgrId, gheId, positions, userId } = args;
+  const present = new Set((await tx.pgrRisk.findMany({ where: { gheId }, select: { hazardId: true } })).map((r) => r.hazardId));
+  const byHazard = new Map<string, { risk: PositionWithRisks["risks"][number]; level: number }>();
+  for (const pos of positions) {
+    for (const r of pos.risks) {
+      if (present.has(r.hazardId)) continue;
+      const level = positionRiskLevel(r.probability, r.severity) ?? 0;
+      const cur = byHazard.get(r.hazardId);
+      if (!cur || level > cur.level) byHazard.set(r.hazardId, { risk: r, level });
+    }
+  }
+  for (const { risk: r, level } of byHazard.values()) {
+    const names = (kind: "EPC" | "EPI") => r.protection.filter((p) => p.equipment.kind === kind).map((p) => p.equipment.name).join("; ") || null;
+    await tx.pgrRisk.create({
+      data: {
+        tenantId,
+        pgrId,
+        gheId,
+        hazardId: r.hazardId,
+        description: r.description,
+        typicalInjuries: r.damagePotential,
+        sourceCircumstances: r.sourceCircumstances,
+        exposureType: r.exposureType as ExposureType | null,
+        evaluationCriteria: r.measurementType,
+        probability: r.probability ?? 1,
+        severity: r.severity ?? 1,
+        riskLevel: LEVEL_TO_ENUM[level] ?? "IRRELEVANT",
+        classification: level ? LEVEL_CLASSIFICATION[level] : "Não avaliado",
+        adminControls: r.adminMeasures,
+        epcMeasures: names("EPC"),
+        epiMeasures: names("EPI"),
+        usesEpc: r.epcStatus,
+        usesEpi: r.epiStatus,
+        createdById: userId,
+        updatedById: userId,
+      },
+    });
+  }
+  return byHazard.size;
 }

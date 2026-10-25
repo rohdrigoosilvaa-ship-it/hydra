@@ -36,8 +36,8 @@ interface SubTab {
 export const SECTION_TABS: Record<"mapeamento" | "funcionarios" | "seguranca" | "laudos" | "saude", SubTab[]> = {
   mapeamento: [
     { to: "dashboard", label: "Dashboard", icon: BarChart3 },
-    { to: "ambientes", label: "Ambiente", icon: House },
-    { to: "ghe", label: "GHE", icon: Briefcase },
+    { to: "ghe", label: "GHE", icon: House },
+    { to: "cargos", label: "Cargos", icon: Briefcase },
     { to: "cbo", label: "Consultar CBO", icon: FileText },
   ],
   funcionarios: [
