@@ -52,6 +52,7 @@ import { Nr01OverviewPage } from "./pages/Nr01OverviewPage";
 import { Nr01GroPage } from "./pages/Nr01GroPage";
 import { Nr01InventoryPage } from "./pages/Nr01InventoryPage";
 import { RisksCatalogPage } from "./pages/RisksCatalogPage";
+import { ActionSchedulesTab } from "./pages/company/ActionSchedulesTab";
 import { Nr01GhePage } from "./pages/Nr01GhePage";
 import { Nr01ReevaluationsPage } from "./pages/Nr01ReevaluationsPage";
 import { PendenciasPage } from "./pages/PendenciasPage";
@@ -108,6 +109,7 @@ export const router = createBrowserRouter([
               { path: "ghe", element: <Nr01GhePage /> },
               { path: "inventario", element: <Nr01InventoryPage /> },
               { path: "riscos", element: <RisksCatalogPage /> },
+              { path: "plano-acoes", element: <ActionSchedulesTab /> },
               { path: "incidentes", element: <OccurrencesPage /> },
               { path: "ordens-servico", element: <WorkOrdersPage /> },
               { path: "ficha-epi", element: <EpiControlPage /> },

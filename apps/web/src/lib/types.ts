@@ -1400,3 +1400,28 @@ export interface EpiStockItem {
   notes: string | null;
   createdAt: string;
 }
+
+export interface ActionScheduleItem {
+  id?: string;
+  what: string;
+  why: string | null;
+  place: string | null;
+  how: string | null;
+  responsible: string | null;
+  totalCost: string | number | null;
+  followUp: string | null;
+  priority: number;
+  months: string[];
+}
+
+export interface ActionSchedule {
+  id: string;
+  companyId: string;
+  name: string;
+  author: string;
+  elaboratedAt: string;
+  mode: "DRAFT" | "DEFINED";
+  type: "GERAL" | "W5H2";
+  startMonth: string;
+  items: ActionScheduleItem[];
+}

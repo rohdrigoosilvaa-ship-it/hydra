@@ -2,6 +2,7 @@ import { FormEvent, useEffect, useState } from "react";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
 import { X } from "lucide-react";
+import { RiskCategoryBadge } from "../components/risk/RiskCategoryBadge";
 import { FormModal, ModalField } from "../components/ui/modal";
 import type { ExposureType, Hazard, ProtectionEquipment, RiskCategory } from "../lib/types";
 
@@ -11,13 +12,6 @@ export const RISK_CATEGORY_LABEL: Record<RiskCategory, string> = {
   BIOLOGICO: "Biológicos",
   ERGONOMICO: "Ergonômicos",
   ACIDENTE: "Acidentes",
-};
-const CATEGORY_STYLE: Record<RiskCategory, string> = {
-  FISICO: "bg-teal-tint text-teal-deep",
-  QUIMICO: "bg-amber-tint text-amber",
-  BIOLOGICO: "bg-teal-tint text-teal-deep",
-  ERGONOMICO: "bg-teal-tint text-teal-deep",
-  ACIDENTE: "bg-amber-tint text-amber",
 };
 export const EXPOSURE_LABEL: Record<ExposureType, string> = {
   HABITUAL: "Habitual",
@@ -113,7 +107,7 @@ export function RisksCatalogPage() {
             {shown.map((h) => (
               <tr key={h.id} className="border-b border-line last:border-0">
                 <td className="px-4 py-3">
-                  <span className={`rounded px-2 py-1 text-xs font-semibold ${CATEGORY_STYLE[h.category]}`}>{RISK_CATEGORY_LABEL[h.category]}</span>
+                  <RiskCategoryBadge category={h.category} />
                 </td>
                 <td className="px-4 py-3 text-ink">{h.name}</td>
                 <td className="px-4 py-3 text-ink-muted">{h.esocialCode ? `(${h.esocialCode}) ${h.name}` : "—"}</td>
