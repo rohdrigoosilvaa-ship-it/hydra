@@ -6,7 +6,8 @@ import { PERMISSIONS } from "../../core/permissions/permissions";
 import type { HydraRequestUser } from "../../core/auth/jwt.types";
 import { PgrService } from "./pgr.service";
 import { PgrPdfService } from "./pgr-pdf.service";
-import { CreatePgrDto, UpdatePgrDto } from "./dto/pgr.dto";
+import { CreatePgrDto, GeneratePgrDto, UpdatePgrDto } from "./dto/pgr.dto";
+import { defaultModelHtml } from "./pgr-model.util";
 
 @Controller("pgr")
 export class PgrController {
@@ -19,6 +20,19 @@ export class PgrController {
   @RequirePermission(PERMISSIONS.PGR_READ)
   list(@CurrentUser() user: HydraRequestUser, @Query("companyId") companyId?: string) {
     return this.pgrService.list(user.tenantId, user.assignments, companyId);
+  }
+
+  /** Texto padrão do PGR (HTML) para o editor do modelo. */
+  @Get("model-default")
+  @RequirePermission(PERMISSIONS.PGR_READ)
+  modelDefault() {
+    return { html: defaultModelHtml() };
+  }
+
+  @Post("generate")
+  @RequirePermission(PERMISSIONS.PGR_WRITE)
+  generate(@CurrentUser() user: HydraRequestUser, @Body() dto: GeneratePgrDto) {
+    return this.pgrService.generate(user.tenantId, dto, user.id, user.assignments);
   }
 
   @Get(":id")

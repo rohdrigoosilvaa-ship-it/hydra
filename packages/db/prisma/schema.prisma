@@ -108,6 +108,7 @@ model Company {
   branches     Branch[]
   positions    Position[]
   environments WorkEnvironment[]
+  schedules    ActionSchedule[]
   departments  Department[]
   employees    Employee[]
 
@@ -719,6 +720,15 @@ model Pgr {
   episRecomendados        String? @db.Text
   metasPrioridades        String? @db.Text
   consideracoesFinais     String? @db.Text
+
+  /// Texto do documento editável (capítulos do modelo em HTML) — substitui o texto padrão no PDF.
+  modelHtml   String?   @db.Text
+  coordinator String?
+  description String?   @db.Text
+  /// Data sugerida para renovação do documento.
+  renewalAt   DateTime?
+  /// Cronogramas de ação da empresa anexados ao PGR.
+  scheduleIds String[]
 
   approvedAt   DateTime?
   approvedById String?
@@ -2699,4 +2709,60 @@ model HazardProtection {
   @@id([hazardId, equipmentId])
   @@index([equipmentId])
   @@map("hazard_protections")
+}
+
+enum ActionScheduleMode {
+  DRAFT
+  DEFINED
+}
+
+enum ActionScheduleType {
+  GERAL
+  W5H2
+}
+
+/// Plano / Cronograma de Ações de uma empresa (aba Segurança).
+model ActionSchedule {
+  id           String             @id @default(cuid())
+  tenantId     String
+  companyId    String
+  name         String
+  author       String
+  elaboratedAt DateTime           @db.Date
+  mode         ActionScheduleMode @default(DRAFT)
+  type         ActionScheduleType @default(GERAL)
+  /// Primeiro mês do cronograma (dia 1); o quadro mostra 12 meses a partir dele.
+  startMonth   DateTime           @db.Date
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+  deletedAt    DateTime?
+
+  company Company              @relation(fields: [companyId], references: [id])
+  items   ActionScheduleItem[]
+
+  @@index([tenantId])
+  @@index([companyId])
+  @@map("action_schedules")
+}
+
+model ActionScheduleItem {
+  id          String   @id @default(cuid())
+  scheduleId  String
+  position    Int
+  what        String   @db.Text
+  why         String?  @db.Text
+  place       String?  @db.Text
+  how         String?  @db.Text
+  responsible String?
+  totalCost   Decimal? @db.Decimal(14, 2)
+  followUp    String?  @db.Text
+  /// 0 (não informado) a 5 (intolerável).
+  priority    Int      @default(0)
+  /// Meses marcados no formato AAAA-MM.
+  months      String[]
+
+  schedule ActionSchedule @relation(fields: [scheduleId], references: [id], onDelete: Cascade)
+
+  @@index([scheduleId])
+  @@map("action_schedule_items")
 }

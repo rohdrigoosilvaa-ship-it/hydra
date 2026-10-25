@@ -3,6 +3,7 @@ import { Download, Plus, Trash2, X } from "lucide-react";
 import { api } from "../../lib/api";
 import { FormModal, ModalField, ModalFrame } from "../../components/ui/modal";
 import { EXPOSURE_LABEL, NewProtectionModal, ProtectionBox, RISK_CATEGORY_LABEL, TRI, YesNo } from "../RisksCatalogPage";
+import { RiskCategoryBadge } from "../../components/risk/RiskCategoryBadge";
 import { RiskAssessment, type Assessment } from "../../components/risk/RiskAssessment";
 import { riskResult } from "../../lib/risk-assessment";
 import type { ExposureType, Hazard, Position, PositionRisk, ProtectionEquipment, WorkEnvironment } from "../../lib/types";
@@ -91,9 +92,10 @@ export function PositionDetailModal({
                   return (
                     <li key={r.hazardId} className="flex items-center justify-between gap-3 py-2">
                       <button type="button" className="min-w-0 text-left" title="Editar risco do cargo" onClick={() => setEditingRisk(r)}>
-                        <span className="text-ink hover:underline">{r.hazard.name}</span>
+                        <RiskCategoryBadge category={r.hazard.category} />
+                        <span className="ml-2 text-ink hover:underline">{r.hazard.name}</span>
                         <span className="ml-2 text-xs text-ink-muted">
-                          {RISK_CATEGORY_LABEL[r.hazard.category]} · {r.exposureType ? EXPOSURE_LABEL[r.exposureType] : "Exposição não definida"} · {r.sendEsocial ? "eSocial" : "sem eSocial"}
+                          [{r.protection.filter((p) => p.equipment.kind === "EPC").length} EPC {r.protection.filter((p) => p.equipment.kind === "EPI").length} EPI] · {r.exposureType ? EXPOSURE_LABEL[r.exposureType] : "Exposição não definida"} · {r.sendEsocial ? "eSocial" : "sem eSocial"}
                         </span>
                         {res && <span className="ml-2 rounded px-2 py-0.5 text-xs text-ink" style={{ background: res.color }}>{res.label} ({res.product})</span>}
                       </button>
@@ -167,6 +169,7 @@ function LinkRiskModal({ position, positions, editing, onClose, onSaved }: { pos
   const [bank, setBank] = useState<ProtectionEquipment[]>([]);
   const [positionIds, setPositionIds] = useState<string[]>([position.id]);
   const [hazardId, setHazardId] = useState(editing?.hazardId ?? "");
+  const [riskSearch, setRiskSearch] = useState("");
   const [exposure, setExposure] = useState<ExposureType | "">(editing?.exposureType ?? "");
   const [esocial, setEsocial] = useState(editing?.sendEsocial ?? true);
   const [f, setF] = useState<Fields>(() => (editing ? { ...BLANK, ...Object.fromEntries(Object.keys(BLANK).map((k) => [k, (editing as unknown as Record<string, unknown>)[k] ?? (BLANK as Record<string, unknown>)[k]])) } as Fields : BLANK));
@@ -268,12 +271,30 @@ function LinkRiskModal({ position, positions, editing, onClose, onSaved }: { pos
           </ModalField>
         </div>
 
-        <ModalField label="Risco" required>
-          <select className="input" aria-label="Risco" value={hazardId} disabled={!!editing} onChange={(e) => pickHazard(e.target.value)}>
-            <option value="">Escolha o risco…</option>
-            {hazards.map((h) => <option key={h.id} value={h.id}>{h.name} — {RISK_CATEGORY_LABEL[h.category]}</option>)}
-          </select>
-        </ModalField>
+        <div>
+          <p className="flex items-center gap-1 font-display text-[11px] font-bold uppercase tracking-wide text-teal-deep"><span aria-hidden>★</span> Risco</p>
+          {!editing && (
+            <input className="input mt-1.5 w-full" placeholder="Pesquisar risco…" aria-label="Pesquisar risco" value={riskSearch} onChange={(e) => setRiskSearch(e.target.value)} />
+          )}
+          <div className="mt-1.5 max-h-56 overflow-y-auto rounded-md border border-line" role="listbox" aria-label="Risco">
+            {hazards
+              .filter((h) => (editing ? h.id === hazardId : !riskSearch.trim() || h.name.toLowerCase().includes(riskSearch.trim().toLowerCase())))
+              .map((h) => (
+                <button
+                  key={h.id}
+                  type="button"
+                  role="option"
+                  aria-selected={h.id === hazardId}
+                  disabled={!!editing}
+                  onClick={() => pickHazard(h.id)}
+                  className={`flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm hover:bg-paper ${h.id === hazardId ? "bg-teal-tint font-medium" : ""}`}
+                >
+                  <RiskCategoryBadge category={h.category} />
+                  <span className="text-ink">{h.name}</span>
+                </button>
+              ))}
+          </div>
+        </div>
         {hazards.length === 0 && <p className="text-xs text-ink-muted">Nenhum risco cadastrado. Cadastre em Segurança › Riscos.</p>}
 
         {hazardId && (

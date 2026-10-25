@@ -23,6 +23,8 @@ import { DataLoadController } from "./data-load.controller";
 import { DataLoadService } from "./data-load.service";
 import { EmployeeDocumentsController } from "./employee-documents.controller";
 import { EmployeeDocumentsService } from "./employee-documents.service";
+import { ActionSchedulesController } from "./action-schedules.controller";
+import { ActionSchedulesService } from "./action-schedules.service";
 
 @Module({
   controllers: [
@@ -38,9 +40,11 @@ import { EmployeeDocumentsService } from "./employee-documents.service";
     EmployeesImportController,
     EmployeeDocumentsController,
     DataLoadController,
+    ActionSchedulesController,
   ],
   providers: [
     CompaniesService,
+    ActionSchedulesService,
     WorkEnvironmentsService,
     BranchesService,
     UnitsService,

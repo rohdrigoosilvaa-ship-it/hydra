@@ -20,6 +20,7 @@ import { EmployeesPage } from "./pages/EmployeesPage";
 import { EmployeeDetailPage } from "./pages/EmployeeDetailPage";
 import { PgrListPage } from "./pages/PgrListPage";
 import { PgrDetailPage } from "./pages/PgrDetailPage";
+import { PgrNewPage } from "./pages/PgrNewPage";
 import { ActionsPage } from "./pages/ActionsPage";
 import { HealthPage } from "./pages/HealthPage";
 import { OccurrencesPage } from "./pages/OccurrencesPage";
@@ -52,6 +53,7 @@ import { Nr01OverviewPage } from "./pages/Nr01OverviewPage";
 import { Nr01GroPage } from "./pages/Nr01GroPage";
 import { Nr01InventoryPage } from "./pages/Nr01InventoryPage";
 import { RisksCatalogPage } from "./pages/RisksCatalogPage";
+import { ActionSchedulesTab } from "./pages/company/ActionSchedulesTab";
 import { Nr01GhePage } from "./pages/Nr01GhePage";
 import { Nr01ReevaluationsPage } from "./pages/Nr01ReevaluationsPage";
 import { PendenciasPage } from "./pages/PendenciasPage";
@@ -108,6 +110,7 @@ export const router = createBrowserRouter([
               { path: "ghe", element: <Nr01GhePage /> },
               { path: "inventario", element: <Nr01InventoryPage /> },
               { path: "riscos", element: <RisksCatalogPage /> },
+              { path: "plano-acoes", element: <ActionSchedulesTab /> },
               { path: "incidentes", element: <OccurrencesPage /> },
               { path: "ordens-servico", element: <WorkOrdersPage /> },
               { path: "ficha-epi", element: <EpiControlPage /> },
@@ -152,6 +155,7 @@ export const router = createBrowserRouter([
       { path: "pendencias", element: <PendenciasPage /> },
 
       { path: "pgr", element: <PgrListPage /> },
+      { path: "pgr/novo", element: <PgrNewPage /> },
       { path: "pgr/:id", element: <PgrDetailPage /> },
       { path: "acoes", element: <ActionsPage /> },
       { path: "saude", element: <HealthPage /> },

@@ -29,10 +29,11 @@ export function PgrProgressBar({ percent }: { percent: number }) {
   );
 }
 
-export type PgrTabId = "dados-gerais" | "ghe" | "inventario" | "plano-acoes" | "cronograma" | "finalizacao";
+export type PgrTabId = "dados-gerais" | "modelo" | "ghe" | "inventario" | "plano-acoes" | "cronograma" | "finalizacao";
 
 export const PGR_TABS: { id: PgrTabId; label: string; icon: LucideIcon }[] = [
   { id: "dados-gerais", label: "Dados gerais", icon: FileText },
+  { id: "modelo", label: "Texto do documento", icon: FileText },
   { id: "ghe", label: "GHE", icon: Layers },
   { id: "inventario", label: "Inventário de riscos", icon: ShieldAlert },
   { id: "plano-acoes", label: "Plano de ações", icon: ClipboardList },

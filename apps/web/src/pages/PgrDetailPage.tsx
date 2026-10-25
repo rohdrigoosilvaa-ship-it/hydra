@@ -3,6 +3,7 @@ import { useNavigate, useParams } from "react-router-dom";
 import { AlertTriangle, CheckCircle2, ClipboardList, Download, Layers, ShieldAlert, ShieldCheck, Trash2, Users } from "lucide-react";
 import { api } from "../lib/api";
 import { PgrDadosGeraisTab } from "../components/pgr/PgrDadosGeraisTab";
+import { PgrModeloTab } from "../components/pgr/PgrModeloTab";
 import { PgrGheTab } from "../components/pgr/PgrGheTab";
 import { PgrInventarioTab } from "../components/pgr/PgrInventarioTab";
 import { PgrPlanoAcoesTab } from "../components/pgr/PgrPlanoAcoesTab";
@@ -219,6 +220,7 @@ export function PgrDetailPage() {
 
       <div className="mt-6">
         {activeTab === "dados-gerais" && <PgrDadosGeraisTab pgr={pgr} onChanged={load} />}
+        {activeTab === "modelo" && <PgrModeloTab pgr={pgr} onChanged={load} />}
         {activeTab === "ghe" && (
           <PgrGheTab pgr={pgr} departments={departments} positions={positions} onChanged={load} />
         )}
