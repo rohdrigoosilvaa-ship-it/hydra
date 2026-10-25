@@ -1,5 +1,5 @@
-import { FormEvent, MouseEvent, useEffect, useState } from "react";
-import { Link } from "react-router-dom";
+import { MouseEvent, useEffect, useState } from "react";
+import { Link, useNavigate } from "react-router-dom";
 import { Plus, ShieldCheck, Trash2 } from "lucide-react";
 import { api } from "../lib/api";
 import { useCompanyFilterStore } from "../lib/company-filter-store";
@@ -21,7 +21,7 @@ const STATUS_STYLE: Record<Pgr["status"], string> = {
 export function PgrListPage() {
   const [pgrs, setPgrs] = useState<Pgr[] | null>(null);
   const [companies, setCompanies] = useState<Company[]>([]);
-  const [showForm, setShowForm] = useState(false);
+  const navigate = useNavigate();
   const selectedCompanyId = useCompanyFilterStore((s) => s.selectedCompanyId);
 
   async function load() {
@@ -67,22 +67,10 @@ export function PgrListPage() {
               : "Programa de Gerenciamento de Riscos — inventário e plano de ação por documento."}
           </p>
         </div>
-        <button className="btn-primary flex items-center gap-1.5" onClick={() => setShowForm(true)}>
+        <button className="btn-primary flex items-center gap-1.5" onClick={() => navigate(`/pgr/novo${selectedCompanyId ? `?companyId=${selectedCompanyId}` : ""}`)}>
           <Plus size={15} /> Novo PGR
         </button>
       </div>
-
-      {showForm && (
-        <NewPgrForm
-          companies={companies}
-          defaultCompanyId={selectedCompanyId ?? undefined}
-          onClose={() => setShowForm(false)}
-          onCreated={() => {
-            setShowForm(false);
-            load();
-          }}
-        />
-      )}
 
       <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {pgrs === null && <p className="text-sm text-ink-muted">Carregando…</p>}
@@ -141,68 +129,5 @@ export function PgrListPage() {
         ))}
       </div>
     </div>
-  );
-}
-
-function NewPgrForm({
-  companies,
-  defaultCompanyId,
-  onClose,
-  onCreated,
-}: {
-  companies: Company[];
-  defaultCompanyId?: string;
-  onClose: () => void;
-  onCreated: () => void;
-}) {
-  const [title, setTitle] = useState("");
-  const [code, setCode] = useState("");
-  const [companyId, setCompanyId] = useState(defaultCompanyId ?? companies[0]?.id ?? "");
-  const [saving, setSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  async function handleSubmit(e: FormEvent) {
-    e.preventDefault();
-    setSaving(true);
-    setError(null);
-    try {
-      await api.post("/pgr", { title, companyId, code: code || undefined });
-      onCreated();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Erro ao salvar.");
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="card mt-4 flex flex-wrap items-end gap-3">
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="text-ink-muted">Título</span>
-        <input className="input" value={title} onChange={(e) => setTitle(e.target.value)} required />
-      </label>
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="text-ink-muted">Código</span>
-        <input className="input" value={code} onChange={(e) => setCode(e.target.value)} placeholder="ex.: PGR-2026-001" />
-      </label>
-      <label className="flex flex-col gap-1 text-sm">
-        <span className="text-ink-muted">Empresa</span>
-        <select className="input" value={companyId} onChange={(e) => setCompanyId(e.target.value)} required>
-          {companies.length === 0 && <option value="">Cadastre uma empresa primeiro</option>}
-          {companies.map((c) => (
-            <option key={c.id} value={c.id}>
-              {c.name}
-            </option>
-          ))}
-        </select>
-      </label>
-      <button type="submit" disabled={saving || !companyId} className="btn-primary">
-        {saving ? "Salvando…" : "Salvar"}
-      </button>
-      <button type="button" onClick={onClose} className="btn-secondary">
-        Cancelar
-      </button>
-      {error && <p className="w-full text-sm text-amber">{error}</p>}
-    </form>
   );
 }

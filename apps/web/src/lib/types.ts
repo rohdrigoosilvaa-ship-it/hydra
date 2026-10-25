@@ -492,6 +492,10 @@ export interface Pgr {
   episRecomendados: string | null;
   metasPrioridades: string | null;
   consideracoesFinais: string | null;
+  modelHtml?: string | null;
+  coordinator?: string | null;
+  description?: string | null;
+  renewalAt?: string | null;
   updatedAt: string;
   _count?: { risks: number; actions: number };
 }

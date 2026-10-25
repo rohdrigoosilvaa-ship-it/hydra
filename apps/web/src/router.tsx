@@ -20,6 +20,7 @@ import { EmployeesPage } from "./pages/EmployeesPage";
 import { EmployeeDetailPage } from "./pages/EmployeeDetailPage";
 import { PgrListPage } from "./pages/PgrListPage";
 import { PgrDetailPage } from "./pages/PgrDetailPage";
+import { PgrNewPage } from "./pages/PgrNewPage";
 import { ActionsPage } from "./pages/ActionsPage";
 import { HealthPage } from "./pages/HealthPage";
 import { OccurrencesPage } from "./pages/OccurrencesPage";
@@ -154,6 +155,7 @@ export const router = createBrowserRouter([
       { path: "pendencias", element: <PendenciasPage /> },
 
       { path: "pgr", element: <PgrListPage /> },
+      { path: "pgr/novo", element: <PgrNewPage /> },
       { path: "pgr/:id", element: <PgrDetailPage /> },
       { path: "acoes", element: <ActionsPage /> },
       { path: "saude", element: <HealthPage /> },

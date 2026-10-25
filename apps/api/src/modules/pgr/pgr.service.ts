@@ -2,7 +2,8 @@ import { ForbiddenException, Injectable, NotFoundException } from "@nestjs/commo
 import { PrismaService } from "../../core/prisma/prisma.service";
 import { PERMISSIONS } from "../../core/permissions/permissions";
 import type { RoleAssignmentClaim } from "../../core/auth/jwt.types";
-import type { CreatePgrDto, UpdatePgrDto } from "./dto/pgr.dto";
+import type { CreatePgrDto, GeneratePgrDto, UpdatePgrDto } from "./dto/pgr.dto";
+import type { ExposureType, RiskLevel } from "@hydra/db";
 import { assertCompanyInScope, companyScopeWhere } from "../org/scope.util";
 import { copyGheStructure } from "./ghe-copy.util";
 
@@ -82,6 +83,7 @@ export class PgrService {
           issuedAt: dto.issuedAt ? new Date(dto.issuedAt) : undefined,
           validFrom: dto.validFrom ? new Date(dto.validFrom) : undefined,
           validUntil: dto.validUntil ? new Date(dto.validUntil) : undefined,
+          renewalAt: dto.renewalAt ? new Date(dto.renewalAt) : undefined,
           tenantId,
           createdById: userId,
           updatedById: userId,
@@ -92,6 +94,129 @@ export class PgrService {
         await copyGheStructure(tx, tenantId, previousPgr.ghes, { pgrId: pgr.id });
       }
 
+      return pgr;
+    });
+  }
+
+  /**
+   * Gera o PGR a partir dos dados já cadastrados da empresa: cada ambiente escolhido vira um GHE, os cargos
+   * ligados ao ambiente viram as funções do GHE, os riscos dos cargos viram o inventário e os cronogramas de
+   * ação escolhidos viram o plano de ação.
+   */
+  async generate(tenantId: string, dto: GeneratePgrDto, userId: string, assignments: RoleAssignmentClaim[]) {
+    assertCompanyInScope(assignments, PERMISSIONS.PGR_WRITE, dto.companyId);
+    const company = await this.prisma.company.findFirst({ where: { id: dto.companyId, tenantId }, select: { cnae: true, grauRisco: true } });
+    if (!company) throw new NotFoundException("Empresa não encontrada.");
+    const environments = await this.prisma.workEnvironment.findMany({
+      where: { id: { in: dto.environmentIds }, tenantId, companyId: dto.companyId, deletedAt: null },
+      include: {
+        positions: {
+          include: {
+            position: {
+              include: { risks: { include: { hazard: true, protection: { include: { equipment: { select: { name: true, kind: true } } } } } } },
+            },
+          },
+        },
+      },
+    });
+    const schedules = dto.scheduleIds?.length
+      ? await this.prisma.actionSchedule.findMany({
+          where: { id: { in: dto.scheduleIds }, tenantId, companyId: dto.companyId, deletedAt: null },
+          include: { items: { orderBy: { position: "asc" } } },
+        })
+      : [];
+    const employeeCount = await this.prisma.employee.count({
+      where: { tenantId, companyId: dto.companyId, deletedAt: null, status: { not: "TERMINATED" } },
+    });
+    const { environmentIds: _e, scheduleIds: _s, ...docFields } = dto;
+
+    return this.prisma.$transaction(async (tx) => {
+      const pgr = await tx.pgr.create({
+        data: {
+          ...docFields,
+          cnae: company.cnae ?? undefined,
+          grauRisco: company.grauRisco ?? undefined,
+          employeeCount,
+          issuedAt: dto.issuedAt ? new Date(dto.issuedAt) : new Date(),
+          validFrom: dto.validFrom ? new Date(dto.validFrom) : undefined,
+          validUntil: dto.validUntil ? new Date(dto.validUntil) : undefined,
+          renewalAt: dto.renewalAt ? new Date(dto.renewalAt) : undefined,
+          scheduleIds: schedules.map((s) => s.id),
+          tenantId,
+          createdById: userId,
+          updatedById: userId,
+        },
+      });
+
+      for (const env of environments) {
+        const positions = env.positions.map((l) => l.position).filter((pos) => !pos.deletedAt);
+        const ghe = await tx.ghe.create({
+          data: {
+            tenantId,
+            pgrId: pgr.id,
+            name: env.name,
+            localDescription: [env.description, env.location].filter(Boolean).join(" — ") || null,
+            functions: {
+              create: positions.map((pos) => ({ tenantId, positionId: pos.id, activityDescription: pos.description })),
+            },
+          },
+        });
+
+        // um risco por perigo no GHE; se vários cargos têm o mesmo perigo, vale o de maior nível
+        const byHazard = new Map<string, { risk: (typeof positions)[number]["risks"][number]; level: number }>();
+        for (const pos of positions) {
+          for (const r of pos.risks) {
+            const level = positionRiskLevel(r.probability, r.severity) ?? 0;
+            const cur = byHazard.get(r.hazardId);
+            if (!cur || level > cur.level) byHazard.set(r.hazardId, { risk: r, level });
+          }
+        }
+        for (const { risk: r, level } of byHazard.values()) {
+          const names = (kind: "EPC" | "EPI") => r.protection.filter((p) => p.equipment.kind === kind).map((p) => p.equipment.name).join("; ") || null;
+          await tx.pgrRisk.create({
+            data: {
+              tenantId,
+              pgrId: pgr.id,
+              gheId: ghe.id,
+              hazardId: r.hazardId,
+              description: r.description,
+              typicalInjuries: r.damagePotential,
+              sourceCircumstances: r.sourceCircumstances,
+              exposureType: r.exposureType as ExposureType | null,
+              evaluationCriteria: r.measurementType,
+              probability: r.probability ?? 1,
+              severity: r.severity ?? 1,
+              riskLevel: LEVEL_TO_ENUM[level] ?? "IRRELEVANT",
+              classification: level ? LEVEL_CLASSIFICATION[level] : "Não avaliado",
+              adminControls: r.adminMeasures,
+              epcMeasures: names("EPC"),
+              epiMeasures: names("EPI"),
+              usesEpc: r.epcStatus,
+              usesEpi: r.epiStatus,
+              createdById: userId,
+              updatedById: userId,
+            },
+          });
+        }
+      }
+
+      for (const sch of schedules) {
+        for (const it of sch.items) {
+          const last = [...it.months].sort().pop();
+          await tx.pgrAction.create({
+            data: {
+              tenantId,
+              companyId: dto.companyId,
+              pgrId: pgr.id,
+              description: it.why ? `${it.what} — ${it.why}` : it.what,
+              dueDate: last ? endOfMonth(last) : null,
+              priority: it.priority >= 4 ? 1 : it.priority === 3 || it.priority === 0 ? 2 : 3,
+              createdById: userId,
+              updatedById: userId,
+            },
+          });
+        }
+      }
       return pgr;
     });
   }
@@ -107,6 +232,7 @@ export class PgrService {
         issuedAt: dto.issuedAt ? new Date(dto.issuedAt) : undefined,
         validFrom: dto.validFrom ? new Date(dto.validFrom) : undefined,
         validUntil: dto.validUntil ? new Date(dto.validUntil) : undefined,
+        renewalAt: dto.renewalAt ? new Date(dto.renewalAt) : undefined,
         updatedById: userId,
       },
     });
@@ -202,4 +328,26 @@ export function countEmployeesForGhe(functions: GheFunctionForMatch[], employees
     if (employeeMatchesAnyFunction(functions, emp)) matched.add(emp.id);
   }
   return matched.size;
+}
+
+
+/** Matriz 5x5 (linha = probabilidade, coluna = severidade) → nível de 1 a 5, a mesma da tela de avaliação do cargo. */
+const RISK_GRID = [
+  [1, 1, 2, 3, 3],
+  [1, 2, 3, 3, 4],
+  [1, 2, 3, 4, 5],
+  [2, 2, 3, 4, 5],
+  [2, 3, 4, 5, 5],
+];
+const LEVEL_TO_ENUM: Record<number, RiskLevel> = { 1: "IRRELEVANT", 2: "LOW", 3: "MEDIUM", 4: "HIGH", 5: "CRITICAL" };
+const LEVEL_CLASSIFICATION: Record<number, string> = { 1: "Aceitável", 2: "Tolerável", 3: "Moderado", 4: "Substancial", 5: "Intolerável" };
+
+function positionRiskLevel(probability: number | null, severity: number | null): number | null {
+  return probability && severity ? RISK_GRID[probability - 1]![severity - 1]! : null;
+}
+
+/** Último dia do mês "AAAA-MM". */
+function endOfMonth(ym: string): Date {
+  const [y, m] = ym.split("-").map(Number) as [number, number];
+  return new Date(Date.UTC(y, m, 0));
 }

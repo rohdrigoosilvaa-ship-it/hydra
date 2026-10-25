@@ -4,7 +4,7 @@ import { RequirePermission } from "../../core/decorators/require-permission.deco
 import { PERMISSIONS } from "../../core/permissions/permissions";
 import type { HydraRequestUser } from "../../core/auth/jwt.types";
 import { ActionSchedulesService } from "./action-schedules.service";
-import { SaveActionScheduleDto, SetActionScheduleModeDto } from "./dto/action-schedules.dto";
+import { ImportActionScheduleDto, SaveActionScheduleDto, SetActionScheduleModeDto } from "./dto/action-schedules.dto";
 
 @Controller("action-schedules")
 export class ActionSchedulesController {
@@ -20,6 +20,12 @@ export class ActionSchedulesController {
   @RequirePermission(PERMISSIONS.ORG_COMPANY_WRITE)
   create(@CurrentUser() user: HydraRequestUser, @Body() dto: SaveActionScheduleDto) {
     return this.schedules.create(user.tenantId, dto, user.assignments);
+  }
+
+  @Post("import")
+  @RequirePermission(PERMISSIONS.ORG_COMPANY_WRITE)
+  importFrom(@CurrentUser() user: HydraRequestUser, @Body() dto: ImportActionScheduleDto) {
+    return this.schedules.importFrom(user.tenantId, dto, user.assignments);
   }
 
   @Put(":id")

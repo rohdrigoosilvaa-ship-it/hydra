@@ -2,7 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from "@nestjs/comm
 import { PrismaService } from "../../core/prisma/prisma.service";
 import { PERMISSIONS } from "../../core/permissions/permissions";
 import type { RoleAssignmentClaim } from "../../core/auth/jwt.types";
-import type { SaveActionScheduleDto } from "./dto/action-schedules.dto";
+import type { ImportActionScheduleDto, SaveActionScheduleDto } from "./dto/action-schedules.dto";
 import { assertCompanyInScope, isCompanyInScope } from "./scope.util";
 
 const INCLUDE = { items: { orderBy: { position: "asc" as const } } };
@@ -26,6 +26,31 @@ export class ActionSchedulesService {
     const company = await this.prisma.company.findFirst({ where: { id: dto.companyId, tenantId }, select: { id: true } });
     if (!company) throw new NotFoundException("Empresa não encontrada.");
     return this.prisma.actionSchedule.create({ data: this.data(tenantId, dto), include: INCLUDE });
+  }
+
+  /** Copia um cronograma de outra empresa (ou da mesma) como rascunho. */
+  async importFrom(tenantId: string, dto: ImportActionScheduleDto, assignments: RoleAssignmentClaim[]) {
+    assertCompanyInScope(assignments, PERMISSIONS.ORG_COMPANY_WRITE, dto.targetCompanyId);
+    const src = await this.prisma.actionSchedule.findFirst({ where: { id: dto.sourceId, tenantId, deletedAt: null }, include: INCLUDE });
+    if (!src || !isCompanyInScope(assignments, PERMISSIONS.ORG_COMPANY_READ, src.companyId)) throw new NotFoundException("Cronograma não encontrado.");
+    return this.prisma.actionSchedule.create({
+      data: {
+        tenantId,
+        companyId: dto.targetCompanyId,
+        name: `${src.name} (cópia)`,
+        author: src.author,
+        elaboratedAt: new Date(),
+        type: src.type,
+        startMonth: src.startMonth,
+        items: {
+          create: src.items.map((i) => ({
+            position: i.position, what: i.what, why: i.why, place: i.place, how: i.how, responsible: i.responsible,
+            totalCost: i.totalCost, followUp: i.followUp, priority: i.priority, months: i.months,
+          })),
+        },
+      },
+      include: INCLUDE,
+    });
   }
 
   async update(tenantId: string, id: string, dto: SaveActionScheduleDto, assignments: RoleAssignmentClaim[]) {

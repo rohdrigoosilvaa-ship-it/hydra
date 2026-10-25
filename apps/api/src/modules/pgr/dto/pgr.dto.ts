@@ -89,6 +89,23 @@ class PgrDocumentFields {
   @IsString()
   code?: string;
 
+  /** Texto do documento editável (HTML do editor do modelo). */
+  @IsOptional()
+  @IsString()
+  modelHtml?: string;
+
+  @IsOptional()
+  @IsString()
+  coordinator?: string;
+
+  @IsOptional()
+  @IsString()
+  description?: string;
+
+  @IsOptional()
+  @IsDateString()
+  renewalAt?: string;
+
   @IsOptional()
   @IsDateString()
   issuedAt?: string;
@@ -488,4 +505,24 @@ export class CreatePgrActionDto {
 export class UpdatePgrActionStatusDto {
   @IsIn(ACTION_STATUSES)
   status!: ActionStatus;
+}
+
+export class GeneratePgrDto extends PgrDocumentFields {
+  @IsString()
+  companyId!: string;
+
+  @IsString()
+  @MinLength(2)
+  title!: string;
+
+  /** Ambientes da empresa que viram GHEs do PGR. */
+  @IsArray()
+  @IsString({ each: true })
+  environmentIds!: string[];
+
+  /** Cronogramas de ação da empresa anexados (viram as ações do plano de ação). */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  scheduleIds?: string[];
 }

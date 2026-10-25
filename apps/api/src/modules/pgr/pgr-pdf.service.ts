@@ -5,6 +5,7 @@ import { PERMISSIONS } from "../../core/permissions/permissions";
 import type { RoleAssignmentClaim } from "../../core/auth/jwt.types";
 import { companyScopeWhere } from "../org/scope.util";
 import * as T from "./pgr-pdf.templates";
+import { parseModel, type Block } from "./pgr-model.util";
 import { POPPINS_BOLD_BASE64, POPPINS_SEMIBOLD_BASE64, POPPINS_REGULAR_BASE64 } from "./pgr-pdf.fonts";
 
 const RISK_CATEGORY_LABEL: Record<string, string> = {
@@ -361,6 +362,35 @@ export class PgrPdfService {
         gap(5);
       }
 
+      const edited = parseModel(pgr.modelHtml);
+
+      /** Blocos do texto editado: subtítulo, parágrafo e lista. */
+      function renderBlocks(blocks: Block[]) {
+        let list: string[] = [];
+        const flushList = () => {
+          if (list.length) bullets(list);
+          list = [];
+        };
+        for (const b of blocks) {
+          if (b.type === "li") {
+            list.push(b.text);
+            continue;
+          }
+          flushList();
+          if (b.type === "h2") heading2(b.text);
+          else paragraph(b.text);
+        }
+        flushList();
+      }
+
+      /** Capítulo do texto padrão: usa o texto editado pelo usuário, se houver, senão o padrão. */
+      function chapter(n: number, title: string, fallback: () => void) {
+        heading1(title);
+        const blocks = edited.chapters.get(n);
+        if (blocks) renderBlocks(blocks);
+        else fallback();
+      }
+
       function greenTitle(text: string) {
         ensureSpace(60);
         doc.font("Poppins-SemiBold").fontSize(14.5).fillColor(C_GREEN_DARK).text(nfc(text), MARGIN, doc.y, { width: CONTENT_WIDTH });
@@ -548,22 +578,26 @@ export class PgrPdfService {
       // 1 Introdução / 2 Objetivos
       // ------------------------------------------------------------------
       doc.addPage();
-      heading1("1. INTRODUÇÃO");
-      for (const p of T.INTRODUCAO) paragraph(p);
+      chapter(1, "1. INTRODUÇÃO", () => {
+        for (const p of T.INTRODUCAO) paragraph(p);
+      });
       gap(6);
-      heading1("2. OBJETIVOS");
-      paragraph(T.OBJETIVOS_INTRO);
-      bullets(T.OBJETIVOS);
+      chapter(2, "2. OBJETIVOS", () => {
+        paragraph(T.OBJETIVOS_INTRO);
+        bullets(T.OBJETIVOS);
+      });
 
       // ---- 3 Abrangência / 4 Definições ----
       doc.addPage();
-      heading1("3. ABRANGÊNCIA");
-      for (const p of T.ABRANGENCIA_PARAGRAFOS) paragraph(p);
-      for (const t of T.ABRANGENCIA_TIPOS) termParagraph(t.term, t.text);
+      chapter(3, "3. ABRANGÊNCIA", () => {
+        for (const p of T.ABRANGENCIA_PARAGRAFOS) paragraph(p);
+        for (const t of T.ABRANGENCIA_TIPOS) termParagraph(t.term, t.text);
+      });
       gap(8);
-      heading1("4. DEFINIÇÕES");
-      for (const d of T.DEFINICOES) termParagraph(d.term, d.text);
-      for (const p of T.DEFINICOES_FINAIS) paragraph(p);
+      chapter(4, "4. DEFINIÇÕES", () => {
+        for (const d of T.DEFINICOES) termParagraph(d.term, d.text);
+        for (const p of T.DEFINICOES_FINAIS) paragraph(p);
+      });
 
       // ---- 5 Estratégia e metodologia ----
       doc.addPage();
@@ -643,18 +677,28 @@ export class PgrPdfService {
       // ------------------------------------------------------------------
       doc.addPage();
       eyebrow("Conclusão PGR");
-      heading1("7. DIVULGAÇÕES DO PROGRAMA");
-      for (const p of T.DIVULGACOES) paragraph(p);
+      chapter(7, "7. DIVULGAÇÕES DO PROGRAMA", () => {
+        for (const p of T.DIVULGACOES) paragraph(p);
+      });
       gap(6);
-      heading1("8. REGISTRO");
-      for (const p of T.REGISTRO) paragraph(p);
+      chapter(8, "8. REGISTRO", () => {
+        for (const p of T.REGISTRO) paragraph(p);
+      });
       gap(6);
-      heading1("9. GARANTIA DE IMPLEMENTAÇÃO DO PROGRAMA DE GERENCIAMENTO DE RISCO");
-      paragraph(T.GARANTIA_IMPLEMENTACAO);
+      chapter(9, "9. GARANTIA DE IMPLEMENTAÇÃO DO PROGRAMA DE GERENCIAMENTO DE RISCO", () => {
+        paragraph(T.GARANTIA_IMPLEMENTACAO);
+      });
       gap(6);
-      heading1("10. CONSIDERAÇÕES GERAIS");
-      for (const p of T.CONSIDERACOES_GERAIS) paragraph(p);
+      chapter(10, "10. CONSIDERAÇÕES GERAIS", () => {
+        for (const p of T.CONSIDERACOES_GERAIS) paragraph(p);
+      });
       if (pgr.consideracoesFinais && pgr.consideracoesFinais.trim()) paragraph(pgr.consideracoesFinais);
+      // capítulos novos que o usuário escreveu no modelo editável
+      for (const extra of edited.extra) {
+        gap(6);
+        if (extra.title) heading1(extra.title);
+        renderBlocks(extra.blocks);
+      }
       gap(6);
       ensureSpace(70);
       doc.moveTo(MARGIN, doc.y).lineTo(PAGE_WIDTH - MARGIN, doc.y).lineWidth(0.8).strokeColor(C_INK).stroke();

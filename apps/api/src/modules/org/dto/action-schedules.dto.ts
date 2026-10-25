@@ -28,3 +28,8 @@ export class SaveActionScheduleDto {
 export class SetActionScheduleModeDto {
   @IsIn(["DRAFT", "DEFINED"]) mode!: "DRAFT" | "DEFINED";
 }
+
+export class ImportActionScheduleDto {
+  @IsString() sourceId!: string;
+  @IsString() targetCompanyId!: string;
+}
