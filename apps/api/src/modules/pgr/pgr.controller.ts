@@ -35,6 +35,12 @@ export class PgrController {
     return this.pgrService.generate(user.tenantId, dto, user.id, user.assignments);
   }
 
+  @Post(":id/sync-company")
+  @RequirePermission(PERMISSIONS.PGR_WRITE)
+  syncFromCompany(@CurrentUser() user: HydraRequestUser, @Param("id") id: string) {
+    return this.pgrService.syncFromCompany(user.tenantId, id, user.id, user.assignments);
+  }
+
   @Get(":id")
   @RequirePermission(PERMISSIONS.PGR_READ)
   get(@CurrentUser() user: HydraRequestUser, @Param("id") id: string) {

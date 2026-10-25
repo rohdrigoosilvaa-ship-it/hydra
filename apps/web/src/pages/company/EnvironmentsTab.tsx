@@ -7,7 +7,7 @@ import { FormModal, ModalField } from "../../components/ui/modal";
 import type { EnvironmentUnitType, WorkEnvironment } from "../../lib/types";
 import type { CompanyWorkspaceContext } from "./CompanyWorkspacePage";
 
-/** Ambientes da empresa. */
+/** GHE da empresa (antes "Ambientes"). */
 export function EnvironmentsTab() {
   const { company, search } = useOutletContext<CompanyWorkspaceContext>();
   const [items, setItems] = useState<WorkEnvironment[] | null>(null);
@@ -23,7 +23,7 @@ export function EnvironmentsTab() {
   }, [company.id]);
 
   async function handleDelete(env: WorkEnvironment) {
-    if (!window.confirm(`Excluir o ambiente "${env.name}"? Os cargos deixam de transitar por ele.`)) return;
+    if (!window.confirm(`Excluir o GHE "${env.name}"? Os cargos deixam de transitar por ele.`)) return;
     setError(null);
     try {
       await api.del(`/environments/${env.id}`);
@@ -39,10 +39,10 @@ export function EnvironmentsTab() {
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-display text-lg font-semibold text-ink">Ambientes</h2>
+        <h2 className="font-display text-lg font-semibold text-ink">GHE</h2>
         {items && items.length > 0 && (
           <button className="btn-primary flex items-center gap-1.5" onClick={() => setForm("new")}>
-            <Plus size={15} /> Novo ambiente
+            <Plus size={15} /> Novo GHE
           </button>
         )}
       </div>
@@ -63,9 +63,9 @@ export function EnvironmentsTab() {
 
       {items && items.length === 0 && !form && (
         <div className="card mt-4 flex flex-col items-center gap-3 py-10 text-center">
-          <p className="text-sm text-ink-muted">Nenhum ambiente foi cadastrado para esta empresa.</p>
+          <p className="text-sm text-ink-muted">Nenhum GHE foi cadastrado para esta empresa.</p>
           <button className="btn-primary flex items-center gap-1.5" onClick={() => setForm("new")}>
-            <Plus size={15} /> Cadastrar novo ambiente
+            <Plus size={15} /> Cadastrar novo GHE
           </button>
         </div>
       )}
@@ -100,7 +100,7 @@ export function EnvironmentsTab() {
           })}
         </div>
       )}
-      {items && items.length > 0 && shown.length === 0 && <p className="mt-4 text-sm text-ink-muted">Nenhum ambiente encontrado para “{search}”.</p>}
+      {items && items.length > 0 && shown.length === 0 && <p className="mt-4 text-sm text-ink-muted">Nenhum GHE encontrado para “{search}”.</p>}
     </div>
   );
 }
@@ -154,7 +154,7 @@ function EnvironmentForm({
       error={error}
     >
       <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
-        <ModalField label="Nome do ambiente" required>
+        <ModalField label="Nome do GHE" required>
           <input className="input" value={name} onChange={(e) => setName(e.target.value)} required minLength={2} autoFocus />
         </ModalField>
         <ModalField label="Cor">
@@ -181,11 +181,11 @@ function EnvironmentForm({
         </ModalField>
       </div>
 
-      <ModalField label="Descrição do ambiente">
+      <ModalField label="Descrição do GHE">
         <textarea className="input min-h-[90px] resize-y" value={description} onChange={(e) => setDescription(e.target.value)} />
       </ModalField>
 
-      <ModalField label="Local do ambiente">
+      <ModalField label="Local do GHE">
         <input className="input" value={location} onChange={(e) => setLocation(e.target.value)} placeholder="ex.: Bloco B, galpão de estoque" />
       </ModalField>
 
@@ -197,7 +197,7 @@ function EnvironmentForm({
           </select>
         </ModalField>
         <div className="flex flex-col gap-1.5 md:col-span-2">
-          <span className="font-display text-[11px] font-bold uppercase tracking-wide text-teal-deep">Empregador onde o ambiente se encontra</span>
+          <span className="font-display text-[11px] font-bold uppercase tracking-wide text-teal-deep">Empregador onde o GHE se encontra</span>
           <span className="inline-flex h-9 w-fit items-center rounded-md bg-teal-deep px-3 text-sm text-white">{companyName} ({unitType === "MATRIZ" ? "Matriz" : "Filial"})</span>
         </div>
       </div>

@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { AlertTriangle, CheckCircle2, ClipboardList, Download, Layers, ShieldAlert, ShieldCheck, Trash2, Users } from "lucide-react";
+import { AlertTriangle, CheckCircle2, ClipboardList, Download, Layers, RefreshCw, ShieldAlert, ShieldCheck, Trash2, Users } from "lucide-react";
 import { api } from "../lib/api";
 import { PgrDadosGeraisTab } from "../components/pgr/PgrDadosGeraisTab";
 import { PgrModeloTab } from "../components/pgr/PgrModeloTab";
@@ -29,6 +29,8 @@ export function PgrDetailPage() {
   const [approving, setApproving] = useState(false);
   const [downloadingPdf, setDownloadingPdf] = useState(false);
   const [pdfError, setPdfError] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
   const [checkingInconsistencies, setCheckingInconsistencies] = useState(false);
   const [inconsistenciesError, setInconsistenciesError] = useState<string | null>(null);
   const [inconsistencies, setInconsistencies] = useState<
@@ -97,6 +99,22 @@ export function PgrDetailPage() {
     }
   }
 
+  async function handleSync() {
+    if (!id) return;
+    if (!window.confirm("Trazer para este PGR os GHE e os riscos dos cargos que estão cadastrados na empresa? O que já está no PGR não é alterado.")) return;
+    setSyncing(true);
+    setSyncMessage(null);
+    try {
+      const r = await api.post<{ ghesAdded: number; risksAdded: number }>(`/pgr/${id}/sync-company`, {});
+      setSyncMessage(`${r.ghesAdded} GHE e ${r.risksAdded} risco(s) trazidos da empresa.`);
+      await load();
+    } catch (err) {
+      setSyncMessage(err instanceof Error ? err.message : "Erro ao atualizar com a empresa.");
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   async function handleCheckInconsistencies() {
     if (!id) return;
     setCheckingInconsistencies(true);
@@ -139,6 +157,9 @@ export function PgrDetailPage() {
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2">
+            <button onClick={handleSync} disabled={syncing} className="btn-secondary flex items-center gap-1.5">
+              <RefreshCw size={15} /> {syncing ? "Atualizando…" : "Atualizar da empresa"}
+            </button>
             <button
               onClick={handleCheckInconsistencies}
               disabled={checkingInconsistencies}
@@ -187,6 +208,7 @@ export function PgrDetailPage() {
         />
       </div>
 
+      {syncMessage && <p className="mt-3 rounded-md border-l-2 border-teal bg-teal-tint px-3 py-2 text-sm" role="status">{syncMessage}</p>}
       {pdfError && (
         <p className="mt-3 rounded-md border-l-2 border-amber bg-amber-tint px-3 py-2 text-sm">{pdfError}</p>
       )}

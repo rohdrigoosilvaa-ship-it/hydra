@@ -41,7 +41,7 @@ function Switch({ label, checked, onChange }: { label: string; checked: boolean;
   );
 }
 
-/** GHE / Cargos da empresa. */
+/** Cargos da empresa. */
 export function GheTab() {
   const { company, search } = useOutletContext<CompanyWorkspaceContext>();
   const [positions, setPositions] = useState<Position[] | null>(null);
@@ -82,7 +82,7 @@ export function GheTab() {
   return (
     <div>
       <div className="flex flex-wrap items-center justify-between gap-3">
-        <h2 className="font-display text-lg font-semibold text-ink">GHE / Cargos</h2>
+        <h2 className="font-display text-lg font-semibold text-ink">Cargos</h2>
         {positions && (
           <div className="flex flex-wrap gap-2">
             <button className="btn-secondary flex items-center gap-1.5" onClick={() => setImporting(true)}>
@@ -138,7 +138,7 @@ export function GheTab() {
           </button>
           {environments.length === 0 && (
             <p className="text-xs text-ink-muted">
-              Dica: cadastre antes os <Link to="../ambientes" className="text-teal-deep hover:underline">ambientes</Link> para vincular o cargo a eles.
+              Dica: cadastre antes os <Link to="../ghe" className="text-teal-deep hover:underline">GHE</Link> para vincular o cargo a eles.
             </p>
           )}
         </div>
@@ -163,7 +163,7 @@ export function GheTab() {
                   </button>
                 </div>
                 <p className="mt-2 text-xs text-ink-muted">
-                  {names.length ? `Ambientes: ${names.join(", ")}` : "Sem ambientes vinculados"}
+                  {names.length ? `GHE: ${names.join(", ")}` : "Sem GHE vinculado"}
                 </p>
                 <div className="mt-3 flex gap-3 border-t border-line pt-3">
                   <button onClick={() => setForm(p)} className="flex items-center gap-1.5 text-xs text-teal-deep hover:underline">
@@ -289,7 +289,7 @@ function PositionForm({
 
       <fieldset className="flex flex-col gap-2 text-sm">
         <div className="flex items-center justify-between">
-          <legend className="text-ink-muted">Ambientes pelos quais o cargo transita</legend>
+          <legend className="text-ink-muted">GHE pelos quais o cargo transita</legend>
           {environments.length > 0 && (
             <button
               type="button"
@@ -301,7 +301,7 @@ function PositionForm({
           )}
         </div>
         {environments.length === 0 ? (
-          <p className="text-xs text-ink-muted">Nenhum ambiente cadastrado — cadastre na aba Ambiente.</p>
+          <p className="text-xs text-ink-muted">Nenhum GHE cadastrado — cadastre na aba GHE.</p>
         ) : (
           <div className="grid grid-cols-1 gap-1.5 sm:grid-cols-2 lg:grid-cols-3">
             {environments.map((env) => (
