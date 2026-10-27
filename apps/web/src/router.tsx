@@ -107,8 +107,8 @@ export const router = createBrowserRouter([
             path: "seguranca",
             element: <SectionLayout section="seguranca" />,
             children: [
-              { index: true, element: <Navigate to="ghe" replace /> },
-              { path: "ghe", element: <Nr01GhePage /> },
+              { index: true, element: <Navigate to="riscos" replace /> },
+              { path: "ghe", element: <Navigate to="../riscos" replace /> },
               { path: "inventario", element: <Nr01InventoryPage /> },
               { path: "riscos", element: <RisksCatalogPage /> },
               { path: "plano-acoes", element: <ActionSchedulesTab /> },

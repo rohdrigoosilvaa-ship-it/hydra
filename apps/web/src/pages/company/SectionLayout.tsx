@@ -13,7 +13,6 @@ import {
   HardHat,
   HeartPulse,
   House,
-  Network,
   Scale,
   ShieldCheck,
   Siren,
@@ -47,7 +46,6 @@ export const SECTION_TABS: Record<"mapeamento" | "funcionarios" | "seguranca" | 
     { to: "treinamentos", label: "Treinamentos", icon: GraduationCap },
   ],
   seguranca: [
-    { to: "ghe", label: "GHE", icon: Network },
     { to: "riscos", label: "Riscos", icon: TriangleAlert },
     { to: "plano-acoes", label: "Plano / Cronograma de Ações", icon: CalendarRange },
     { to: "incidentes", label: "Incidentes", icon: Siren },

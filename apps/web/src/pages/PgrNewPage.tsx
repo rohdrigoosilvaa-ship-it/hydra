@@ -36,6 +36,7 @@ export function PgrNewPage() {
   const [coordinator, setCoordinator] = useState("");
   const [issuedAt, setIssuedAt] = useState(today());
   const [validFrom, setValidFrom] = useState(today());
+  const [validUntil, setValidUntil] = useState(plusYears(today(), 1));
   const [renewalAt, setRenewalAt] = useState(plusYears(today(), 2));
   const [description, setDescription] = useState("");
 
@@ -94,6 +95,7 @@ export function PgrNewPage() {
         coordinator: coordinator.trim() || undefined,
         issuedAt,
         validFrom,
+        validUntil: validUntil || undefined,
         renewalAt: renewalAt || undefined,
         description: description.trim() || undefined,
         modelHtml: modelTouched ? modelHtml : undefined,
@@ -157,7 +159,10 @@ export function PgrNewPage() {
               <input className="input" type="date" aria-label="Data do documento" value={issuedAt} onChange={(e) => setIssuedAt(e.target.value)} />
             </ModalField>
             <ModalField label="Início da validade" required>
-              <input className="input" type="date" aria-label="Início da validade" value={validFrom} onChange={(e) => setValidFrom(e.target.value)} />
+              <input className="input" type="date" aria-label="Início da validade" value={validFrom} onChange={(e) => { setValidFrom(e.target.value); if (e.target.value) setValidUntil(plusYears(e.target.value, 1)); }} />
+            </ModalField>
+            <ModalField label="Fim da validade">
+              <input className="input" type="date" aria-label="Fim da validade" value={validUntil} onChange={(e) => setValidUntil(e.target.value)} />
             </ModalField>
             <ModalField label="Data sugerida para renovação (opcional)">
               <input className="input" type="date" aria-label="Data sugerida para renovação" value={renewalAt} onChange={(e) => setRenewalAt(e.target.value)} />
