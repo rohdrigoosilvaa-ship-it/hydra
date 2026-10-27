@@ -1,4 +1,4 @@
-import { Body, Controller, Get, Param, Patch, Post, Query } from "@nestjs/common";
+import { Body, Controller, Delete, Get, Param, Patch, Post, Query } from "@nestjs/common";
 import { CurrentUser } from "../../core/decorators/current-user.decorator";
 import { RequirePermission } from "../../core/decorators/require-permission.decorator";
 import { PERMISSIONS } from "../../core/permissions/permissions";
@@ -32,5 +32,11 @@ export class GheController {
   @RequirePermission(PERMISSIONS.PGR_WRITE)
   update(@CurrentUser() user: HydraRequestUser, @Param("id") id: string, @Body() dto: UpdateGheDto) {
     return this.ghe.update(user.tenantId, id, dto, user.assignments);
+  }
+
+  @Delete(":id")
+  @RequirePermission(PERMISSIONS.PGR_WRITE)
+  remove(@CurrentUser() user: HydraRequestUser, @Param("id") id: string) {
+    return this.ghe.remove(user.tenantId, id, user.assignments);
   }
 }

@@ -202,6 +202,12 @@ function GheCard({
   const [editing, setEditing] = useState(false);
   const [showFunctionForm, setShowFunctionForm] = useState(false);
 
+  async function handleDelete() {
+    if (!window.confirm(`Excluir o GHE "${ghe.name}" deste PGR? Os riscos lançados nele também serão excluídos.`)) return;
+    await api.del(`/pgr/ghe/${ghe.id}`);
+    onChanged();
+  }
+
   return (
     <article className="flex flex-col overflow-hidden rounded-xl border border-line bg-paper-raised shadow-sm">
       <div className="h-1 bg-gradient-to-r from-teal to-teal-deep" />
@@ -225,13 +231,23 @@ function GheCard({
             </div>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setEditing(true)}
-          className="flex shrink-0 items-center gap-1 rounded-md border border-line px-2.5 py-1.5 text-xs font-medium text-teal-deep hover:bg-teal-tint"
-        >
-          <Pencil size={12} /> Editar
-        </button>
+        <div className="flex shrink-0 items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setEditing(true)}
+            className="flex items-center gap-1 rounded-md border border-line px-2.5 py-1.5 text-xs font-medium text-teal-deep hover:bg-teal-tint"
+          >
+            <Pencil size={12} /> Editar
+          </button>
+          <button
+            type="button"
+            onClick={handleDelete}
+            aria-label={`Excluir GHE ${ghe.name}`}
+            className="flex items-center gap-1 rounded-md border border-line px-2.5 py-1.5 text-xs font-medium text-amber hover:bg-amber-tint"
+          >
+            <Trash2 size={12} /> Excluir
+          </button>
+        </div>
       </header>
 
       <div className="flex flex-1 flex-col gap-4 px-5 pb-5 pt-4">
