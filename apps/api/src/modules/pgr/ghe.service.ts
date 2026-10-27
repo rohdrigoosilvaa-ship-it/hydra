@@ -62,6 +62,23 @@ export class GheService {
     return ghe;
   }
 
+  /**
+   * Exclui o GHE do documento junto com seus riscos e vínculos de cargo. As ações do plano ligadas a esses
+   * riscos continuam existindo (só perdem o vínculo com o risco), como na exclusão de um risco avulso.
+   */
+  async remove(tenantId: string, id: string, assignments: RoleAssignmentClaim[]) {
+    await this.assertGheEditable(tenantId, id, assignments);
+    await this.prisma.$transaction(async (tx) => {
+      const riskIds = (await tx.pgrRisk.findMany({ where: { gheId: id }, select: { id: true } })).map((r) => r.id);
+      if (riskIds.length) await tx.pgrAction.updateMany({ where: { pgrRiskId: { in: riskIds } }, data: { pgrRiskId: null } });
+      await tx.pgrRisk.deleteMany({ where: { gheId: id } });
+      await tx.gheFunction.deleteMany({ where: { gheId: id } });
+      await tx.ltcatAgent.updateMany({ where: { gheId: id }, data: { gheId: null } });
+      await tx.ghe.delete({ where: { id } });
+    });
+    return { success: true };
+  }
+
   async create(tenantId: string, dto: CreateGheDto, assignments: RoleAssignmentClaim[]) {
     if (!dto.pgrId && !dto.ltcatId) throw new BadRequestException("Informe pgrId ou ltcatId.");
     if (dto.pgrId && dto.ltcatId) throw new BadRequestException("Um GHE pertence a um PGR ou a um LTCAT, nunca aos dois.");

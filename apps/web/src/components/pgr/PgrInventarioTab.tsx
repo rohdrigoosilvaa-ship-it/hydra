@@ -508,6 +508,25 @@ function RiskForm({
   const [probability, setProbability] = useState(clampScale(risk?.probability ?? 2));
   const [severity, setSeverity] = useState(clampScale(risk?.severity ?? 2));
   const level = riskLevelOf(probability, severity);
+
+  /** Ao escolher o perigo num risco novo, o formulário já vem preenchido com o cadastro do risco. */
+  function pickHazard(id: string) {
+    setHazardId(id);
+    const h = hazardList.find((x) => x.id === id);
+    if (risk || !h) return;
+    const names = (kind: "EPC" | "EPI") => (h.protections ?? []).filter((p) => p.equipment.kind === kind).map((p) => p.equipment.name).join("; ");
+    const tri = (v?: string): YesNo | "" => (v === "SIM" || v === "NAO" ? v : "");
+    setDescription(h.description ?? "");
+    setTypicalInjuries(h.damagePotential ?? "");
+    setSourceCircumstances(h.sourceCircumstances ?? "");
+    setExposureType(h.exposureType ?? "");
+    setEvaluationCriteria(h.measurementType ?? "QUALITATIVO");
+    setAdminControls(h.adminMeasures ?? "");
+    setUsesEpc(tri(h.epcStatus));
+    setUsesEpi(tri(h.epiStatus));
+    setEpcMeasures(names("EPC"));
+    setEpiMeasures(names("EPI"));
+  }
   // "Ausência de agentes…" é uma declaração de inexistência: não pede detalhes, avaliação nem medidas.
   const hazardName = hazardList.find((h) => h.id === hazardId)?.name ?? "";
   const isAbsence = /^aus.{1,2}ncia/i.test(hazardName.normalize("NFC").trim());
@@ -601,7 +620,7 @@ function RiskForm({
           <HazardPicker
             hazards={hazardList}
             value={hazardId}
-            onChange={setHazardId}
+            onChange={pickHazard}
             onCreated={(h) => setHazardList((prev) => [...prev, h])}
             onUpdated={(h) => {
               setHazardList((prev) => prev.map((x) => (x.id === h.id ? h : x)));
@@ -632,7 +651,7 @@ function RiskForm({
           <HazardPicker
             hazards={hazardList}
             value={hazardId}
-            onChange={setHazardId}
+            onChange={pickHazard}
             onCreated={(h) => setHazardList((prev) => [...prev, h])}
             onUpdated={(h) => {
               setHazardList((prev) => prev.map((x) => (x.id === h.id ? h : x)));
