@@ -6,6 +6,7 @@ import type { RoleAssignmentClaim } from "../../core/auth/jwt.types";
 import { companyScopeWhere } from "../org/scope.util";
 import * as T from "./pgr-pdf.templates";
 import { parseModel, type Block } from "./pgr-model.util";
+import { PROTECSEG_EPI_FOOTER_JPEG_BASE64, PROTECSEG_EPI_HEADER_PNG_BASE64 } from "../../core/pdf/protecseg-epi-letterhead";
 import { POPPINS_BOLD_BASE64, POPPINS_SEMIBOLD_BASE64, POPPINS_REGULAR_BASE64 } from "./pgr-pdf.fonts";
 
 const RISK_CATEGORY_LABEL: Record<string, string> = {
@@ -48,6 +49,8 @@ const PAGE_WIDTH = 595.28; // A4 pt
 const PAGE_HEIGHT = 841.89;
 const CONTENT_WIDTH = PAGE_WIDTH - MARGIN * 2;
 const CONTENT_TOP = 58;
+const EPI_HEADER = Buffer.from(PROTECSEG_EPI_HEADER_PNG_BASE64, "base64");
+const EPI_FOOTER = Buffer.from(PROTECSEG_EPI_FOOTER_JPEG_BASE64, "base64");
 const CONTENT_BOTTOM = 790;
 
 // Paleta do PGR Modelo (amostrada do documento de referência).
@@ -215,8 +218,15 @@ export class PgrPdfService {
       attachments.push({ fileName: ev.fileName, buffer: await this.fetchImage(ev.fileUrl) });
     }
 
+    const schedules = pgr.scheduleIds.length
+      ? await this.prisma.actionSchedule.findMany({
+          where: { id: { in: pgr.scheduleIds }, tenantId, companyId: pgr.companyId, deletedAt: null },
+          include: { items: { orderBy: { position: "asc" } } },
+          orderBy: { createdAt: "asc" },
+        })
+      : [];
     const logoBuffer = await this.fetchImage(company?.logoUrl ?? null);
-    const buffer = await this.render(pgr, company, branch, employees, logoBuffer, attachments);
+    const buffer = await this.render({ ...pgr, schedules }, company, branch, employees, logoBuffer, attachments);
     const filename = this.buildFilename(pgr, company, branch);
     return { buffer, filename };
   }
@@ -275,7 +285,26 @@ export class PgrPdfService {
       const footerRight = vigenciaFrom || vigenciaUntil ? `Vigência ${vigenciaFrom ?? "—"} a ${vigenciaUntil ?? "—"}` : "";
 
       // ---- Cabeçalho e rodapé de toda página (logo do cliente à esquerda) ----
+      let epiLetterheadMode = false;
       doc.on("pageAdded", () => {
+        if (epiLetterheadMode) {
+          // páginas do modelo de Ficha de EPI: timbrado próprio, sem o cabeçalho/rodapé do PGR
+          doc.image(EPI_HEADER, 2.7, 9.05, { width: 589.05, height: 86.94 });
+          doc.save();
+          doc.rect(0, 770.25, PAGE_WIDTH, 71.2).clip();
+          doc.image(EPI_FOOTER, -154.7, 770.25, { width: 749.91, height: 71.2 });
+          doc.restore();
+          if (logoBuffer) {
+            try {
+              doc.image(logoBuffer, 428, 16, { fit: [150, 74], align: "center", valign: "center" });
+            } catch {
+              // formato de imagem que o pdfkit não lê — segue sem logo
+            }
+          }
+          doc.x = MARGIN;
+          doc.y = 108;
+          return;
+        }
         const originalBottom = doc.page.margins.bottom;
         doc.page.margins.bottom = 0; // escrever abaixo da margem inferior dispararia nova página
         if (logoBuffer) {
@@ -762,6 +791,7 @@ export class PgrPdfService {
       drawFichaEpiBlank();
       drawPlanoAcoes();
       drawCronograma();
+      drawPlanosDeAcao();
       drawAnexosEnviados();
 
       doc.end();
@@ -1161,65 +1191,176 @@ export class PgrPdfService {
         return out;
       }
 
+      /** Modelo de Ficha de EPI em branco (mesmo timbrado e seções da ficha emitida pelo sistema), para anexar ao PGR. */
       function drawFichaEpiBlank() {
-        doc.addPage();
-        const full = (text: string, extra: Partial<Cell> = {}): Cell => ({ text, w: CONTENT_WIDTH, ...extra });
-        const thick = C_INK;
-        drawRow([full("CONTROLE DE ENTREGA DE EPI - EQUIPAMENTO DE PROTEÇÃO INDIVIDUAL", { align: "center", size: 9.5, color: C_INK })], { minH: 34, borderColor: thick, pad: 8 });
-        drawRow(
-          [
-            { text: "CARGO / SETOR:", w: frac(0.28), size: 9.5 },
-            { text: "DATA DA ADMISSÃO:", w: frac(0.36), size: 9.5 },
-            { text: "DATA DA DEMISSÃO:", w: frac(0.36), size: 9.5 },
-          ],
-          { minH: 36, borderColor: thick, pad: 8 },
-        );
-        drawRow([full("NOME DA EMPRESA:", { size: 9.5 })], { minH: 36, borderColor: thick, pad: 8 });
-        drawRow(
-          [
-            { text: "NOME DO FUNCIONÁRIO:", w: frac(0.74), size: 9.5 },
-            { text: "MATRÍCULA:", w: frac(0.26), size: 9.5 },
-          ],
-          { minH: 36, borderColor: thick, pad: 8 },
-        );
-        drawRow([full("DECLARAÇÃO DE RECEBIMENTO", { align: "center", size: 9.5, color: C_INK })], { minH: 28, borderColor: thick, pad: 8 });
+        const E_TOP = 108;
+        const E_BOTTOM = PAGE_HEIGHT - 100;
+        const BOX_PAD = 8;
+        const innerX = MARGIN + BOX_PAD;
+        const innerW = CONTENT_WIDTH - BOX_PAD * 2;
+        const C_BOX = "#8fa89b";
+        const C_TITLE_BG = "#e8f0ec";
+        const C_TABLE_BG = "#d5e6dc";
+        const C_MUTED = "#777777";
 
-        // Corpo da declaração dentro de um quadro único
-        const bodyTop = doc.y;
-        const inner = CONTENT_WIDTH - 32;
-        let y = bodyTop + 14;
-        doc.font("Helvetica-Bold").fontSize(9).fillColor(C_BODY);
-        const intro = nfc(T.FICHA_EPI_DECLARACAO_INTRO);
-        doc.text(intro, MARGIN + 16, y, { width: inner, align: "justify", lineGap: 2.5 });
-        y = doc.y + 8;
-        T.FICHA_EPI_ITENS.forEach((item, i) => {
-          doc.font("Helvetica-Bold").fontSize(9);
-          doc.text(`${i + 1}.`, MARGIN + 22, y, { lineBreak: false });
-          doc.text(nfc(item), MARGIN + 38, y, { width: inner - 22, align: "justify", lineGap: 2.5 });
-          y = doc.y + 5;
-        });
-        y += 4;
-        doc.font("Helvetica-Bold").fontSize(9).text(nfc(T.FICHA_EPI_TREINAMENTO), MARGIN + 16, y, { width: inner, align: "justify", lineGap: 2.5 });
-        y = doc.y + 12;
-        doc.text(T.FICHA_EPI_ACORDO, MARGIN + 16, y, { width: inner, align: "center" });
-        y = doc.y + 18;
-        const city = nfc(company?.cidade ?? branch?.city ?? "");
-        doc.text(`${city ? `${city}, ` : ""}______ de ________________ ______.`, MARGIN + 16, y, { width: inner, align: "center" });
-        y = doc.y + 42;
-        doc.moveTo(MARGIN + 100, y).lineTo(PAGE_WIDTH - MARGIN - 100, y).lineWidth(0.9).strokeColor(C_INK).stroke();
-        y += 6;
-        doc.text("Assinatura do Funcionário", MARGIN + 16, y, { width: inner, align: "center" });
-        y = doc.y + 14;
-        doc.rect(MARGIN, bodyTop, CONTENT_WIDTH, y - bodyTop).lineWidth(0.8).strokeColor(thick).stroke();
-        doc.y = y;
-
-        // Segunda página: tabela de entregas
+        epiLetterheadMode = true;
         doc.addPage();
-        const tw = [frac(0.12), frac(0.16), frac(0.29), frac(0.15), frac(0.28)];
-        const th = (t: string, i: number): Cell => ({ text: t, w: tw[i]!, size: 9.5, color: C_INK });
-        drawRow([th("DATA", 0), th("QUANTIDADE", 1), th("EPI ENTREGUE", 2), th("Nº DO C.A.", 3), th("ASSINATURA DO FUNCIONÁRIO", 4)], { minH: 40, borderColor: thick, pad: 8 });
-        for (let i = 0; i < 17; i++) {
-          drawRow(tw.map((w) => ({ text: "", w }) as Cell), { minH: 30, borderColor: thick });
+        let boxTop: number | null = null;
+
+        const border = (bottom: number) => {
+          if (boxTop !== null) doc.rect(MARGIN, boxTop, CONTENT_WIDTH, bottom - boxTop).strokeColor(C_BOX).lineWidth(0.8).stroke();
+        };
+        const ensure = (h: number) => {
+          if (doc.y + h <= E_BOTTOM) return;
+          if (boxTop !== null) {
+            border(doc.y);
+            doc.addPage();
+            boxTop = doc.y;
+            doc.y = boxTop + BOX_PAD;
+          } else doc.addPage();
+        };
+        const begin = (title: string, minH: number) => {
+          ensure(minH);
+          boxTop = doc.y;
+          doc.rect(MARGIN, boxTop, CONTENT_WIDTH, 22).fill(C_TITLE_BG);
+          doc.font("Helvetica-Bold").fontSize(10).fillColor(C_INK).text(nfc(title), innerX, boxTop + 6.5, { width: innerW, lineBreak: false });
+          doc.y = boxTop + 22 + BOX_PAD;
+        };
+        const end = () => {
+          border(doc.y + BOX_PAD - 2);
+          doc.y += BOX_PAD + 10;
+          boxTop = null;
+        };
+        const fields = (pairs: [string, string][]) => {
+          const colW = innerW / pairs.length;
+          ensure(34);
+          const y = doc.y;
+          pairs.forEach(([label, value], i) => {
+            const x = innerX + i * colW;
+            doc.font("Helvetica").fontSize(8).fillColor(C_MUTED).text(nfc(label), x, y, { width: colW - 10 });
+            if (value) doc.font("Helvetica-Bold").fontSize(9.5).fillColor(C_INK).text(nfc(value), x, y + 12, { width: colW - 10 });
+            else doc.moveTo(x, y + 24).lineTo(x + colW - 14, y + 24).lineWidth(0.5).strokeColor("#bbbbbb").stroke();
+          });
+          doc.y = y + 34;
+        };
+        const para = (text: string) => {
+          const t = nfc(text);
+          const h = doc.heightOfString(t, { width: innerW, align: "justify" });
+          ensure(h + 4);
+          doc.font("Helvetica").fontSize(8.5).fillColor(C_INK).text(t, innerX, doc.y, { width: innerW, align: "justify" });
+          doc.moveDown(0.6);
+        };
+
+        begin("1. IDENTIFICAÇÃO DA ORGANIZAÇÃO", 110);
+        fields([["EMPRESA", legalName], ["CNPJ", cnpj ?? ""]]);
+        fields([["UNIDADE", ""], ["SETOR", ""]]);
+        end();
+
+        begin("2. IDENTIFICAÇÃO DO TRABALHADOR", 110);
+        fields([["NOME COMPLETO", ""], ["CPF", ""]]);
+        fields([["CARGO/FUNÇÃO", ""], ["ADMISSÃO", ""]]);
+        end();
+
+        begin("3. REGISTRO DE FORNECIMENTO", 100);
+        const cols = [
+          { label: "Data", width: 55 },
+          { label: "EPI", width: 140 },
+          { label: "CA", width: 50 },
+          { label: "Qtd.", width: 35 },
+          { label: "Próx. troca", width: 65 },
+          { label: "Observação", width: innerW - 55 - 140 - 50 - 35 - 65 },
+        ];
+        const tableHeader = () => {
+          const y = doc.y;
+          doc.rect(innerX, y, innerW, 20).fill(C_TABLE_BG);
+          doc.fillColor(C_INK).font("Helvetica-Bold").fontSize(8);
+          let hx = innerX;
+          for (const c of cols) {
+            doc.text(c.label, hx + 3, y + 6, { width: c.width - 6, lineBreak: false });
+            hx += c.width;
+          }
+          doc.y = y + 22;
+        };
+        ensure(24);
+        tableHeader();
+        for (let i = 0; i < 8; i++) {
+          ensure(22);
+          const y = doc.y;
+          doc.strokeColor("#dddddd").lineWidth(0.5).moveTo(innerX, y).lineTo(innerX + innerW, y).stroke();
+          doc.y = y + 22;
+        }
+        end();
+
+        begin("4. DECLARAÇÃO DE RECEBIMENTO, ORIENTAÇÃO E RESPONSABILIDADE", 130);
+        para(
+          "Declaro que recebi gratuitamente da organização os Equipamentos de Proteção Individual (EPIs) registrados nesta ficha, adequados aos riscos ocupacionais da atividade e em condições de uso. Declaro também que fui orientado(a) quanto à finalidade e ao uso correto dos equipamentos, incluindo, quando aplicável, seus componentes, os riscos contra os quais oferecem proteção, suas restrições e limitações, forma de uso e ajuste, manutenção e substituição, limpeza, higienização, guarda e conservação, conforme as orientações do fabricante/importador e as disposições aplicáveis da NR-06. Comprometo-me a utilizar os EPIs somente para a finalidade a que se destinam, cumprir as determinações da organização quanto ao uso adequado e comunicar imediatamente qualquer extravio, dano ou alteração que torne o equipamento impróprio para uso.",
+        );
+        end();
+
+        begin("5. CIÊNCIA E ACEITE DO TRABALHADOR", 190);
+        para(
+          "O registro desta ficha poderá ser realizado em meio físico ou por sistema eletrônico. O aceite eletrônico deverá permitir a identificação do trabalhador e sua vinculação inequívoca ao respectivo registro de fornecimento.",
+        );
+        doc.moveDown(0.5);
+        const sigW = innerW / 2 - 15;
+        ensure(80);
+        const sigY = doc.y + 40;
+        doc.moveTo(innerX, sigY).lineTo(innerX + sigW, sigY).strokeColor(C_INK).lineWidth(0.75).stroke();
+        doc.moveTo(innerX + sigW + 30, sigY).lineTo(innerX + sigW + 30 + sigW, sigY).strokeColor(C_INK).lineWidth(0.75).stroke();
+        doc.font("Helvetica").fontSize(8).fillColor(C_MUTED);
+        doc.text("TRABALHADOR", innerX, sigY + 6, { width: sigW, align: "center", lineBreak: false });
+        doc.text("RESPONSÁVEL PELO FORNECIMENTO", innerX + sigW + 30, sigY + 6, { width: sigW, align: "center", lineBreak: false });
+        doc.y = sigY + 24;
+        end();
+
+        begin("6. OBSERVAÇÕES", 90);
+        para(
+          "CA aplicável ao EPI fornecido: o equipamento deve corresponder ao produto efetivamente entregue. A seleção e o fornecimento devem considerar a avaliação dos riscos ocupacionais e os critérios de seleção aplicáveis à organização.",
+        );
+        end();
+        epiLetterheadMode = false;
+      }
+
+      /** Planos / cronogramas de ação da empresa incluídos no PGR: uma tabela por plano. */
+      function drawPlanosDeAcao() {
+        const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+        const mes = (ym: string) => `${MESES[Number(ym.slice(5, 7)) - 1]}/${ym.slice(2, 4)}`;
+        const dataBr = (d: Date) => d.toISOString().slice(0, 10).split("-").reverse().join("/");
+        for (const sch of pgr.schedules as any[]) {
+          doc.addPage();
+          heading2Green(`Plano / Cronograma de Ações — ${sch.name}`);
+          const start = sch.startMonth.toISOString().slice(0, 7);
+          paragraph(
+            `Autor: ${sch.author} · Elaborado em ${dataBr(sch.elaboratedAt)} · Tipo: ${sch.type === "W5H2" ? "5W2H" : "Geral"} · Cronograma a partir de ${mes(start)}${sch.mode === "DEFINED" ? " · Versão final" : " · Rascunho"}`,
+          );
+          const w = [frac(0.55), frac(0.2), frac(0.25)];
+          drawRow(
+            [
+              { text: "AÇÃO", w: w[0]!, size: 9, fill: C_GRAY_BAR, color: C_INK },
+              { text: "RESPONSÁVEL", w: w[1]!, size: 9, fill: C_GRAY_BAR, color: C_INK },
+              { text: "QUANDO", w: w[2]!, size: 9, fill: C_GRAY_BAR, color: C_INK },
+            ],
+            { minH: 24, borderColor: C_GRAY_BAR },
+          );
+          sch.items.forEach((it: any, i: number) => {
+            const lines = [`${i + 1}. ${it.what}`];
+            if (sch.type === "W5H2") {
+              if (it.why) lines.push(`Por quê: ${it.why}`);
+              if (it.place) lines.push(`Onde: ${it.place}`);
+              if (it.how) lines.push(`Como: ${it.how}`);
+              if (it.totalCost != null) lines.push(`Custo total: R$ ${Number(it.totalCost).toFixed(2).replace(".", ",")}`);
+              if (it.priority) lines.push(`Prioridade: ${it.priority}`);
+              if (it.followUp) lines.push(`Acompanhamento: ${it.followUp}`);
+            }
+            drawRow(
+              [
+                { text: lines.join("\n"), w: w[0]!, size: 8.5, valign: "top" },
+                { text: it.responsible ?? "—", w: w[1]!, size: 8.5, valign: "top" },
+                { text: it.months.length ? it.months.map(mes).join(", ") : "—", w: w[2]!, size: 8.5, valign: "top" },
+              ],
+              { minH: 28 },
+            );
+          });
         }
       }
 

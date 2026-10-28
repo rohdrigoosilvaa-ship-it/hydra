@@ -179,17 +179,3 @@ export const ANEXOS_LISTA = [
   "CRONOGRAMA DE AÇÕES;",
   "CERTIFICADO DE CALIBRAÇÃO DO EQUIPAMENTO DE MEDIÇÃO;",
 ];
-
-export const FICHA_EPI_DECLARACAO_INTRO =
-  "Declaro para todos os efeitos legais, que recebi os equipamentos de proteção acima relacionados, em perfeitas condições de uso e com as devidas instruções sobre seu uso adequado, comprometendo-me a mantê-los em perfeito estado de conservação, ficando ciente de que:";
-export const FICHA_EPI_ITENS = [
-  "Se o equipamento for danificado ou inutilizado por emprega inadequada, mau uso, negligência ou extravio, a empresa me fornecerá novo equipamento e cobrará o valor de um equipamento da mesma marca ou equivalente ao da praça (parágrafo único do art. 462 da CLT).",
-  "Fico proibido dar, ou emprestar o equipamento, que estiver sob minha responsabilidade, a menos que receber ordem por escrito da pessoa autorizada para tal fim.",
-  "Em caso de dano, inutilização ou extravio de algum dos equipamentos, deverei comunicar imediatamente ao setor competente.",
-  "Terminando os serviços, ou no caso de rescisão do contrato de trabalho, devolverei o equipamento completo e em perfeito estado de conservação, considerando-se o tempo do uso do mesmo, ao setor competente.",
-  "Estando os equipamentos em minha posse, estarei sujeito a inspeções sem prévio aviso.",
-  "Fico ciente de que não utilizando o equipamento de proteção individual em serviço estarei sujeito às sanções disciplinares cabíveis que irão desde simples advertências até a dispensa por justa causa nos termos do art. 482 da CLT combinado com a NR-6 da Portaria 3.214/78.",
-];
-export const FICHA_EPI_TREINAMENTO =
-  "Recebi treinamento quanto à necessidade da utilização dos referidos EPI'S, a maneira correta de usá-los, higienizá-los e guardá-los, bem como, da minha responsabilidade quanto a seu uso, conforme determinado na NR-6, da Portaria 3.214/78.";
-export const FICHA_EPI_ACORDO = "Declaro estar de acordo com todos os termos presentes neste recibo, que agora dato e assino.";

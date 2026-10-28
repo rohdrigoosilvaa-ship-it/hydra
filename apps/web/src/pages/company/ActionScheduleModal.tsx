@@ -56,7 +56,7 @@ function HistoryArea({ label, required, value, onChange, options, disabled }: { 
   );
 }
 
-export function ActionScheduleModal({ companyId, schedule, history, onClose, onSaved }: { companyId: string; schedule?: ActionSchedule; history: ActionSchedule[]; onClose: () => void; onSaved: () => void }) {
+export function ActionScheduleModal({ companyId, schedule, history, onClose, onSaved }: { companyId: string; schedule?: ActionSchedule; history: ActionSchedule[]; onClose: () => void; onSaved: (saved?: ActionSchedule) => void }) {
   const today = new Date().toISOString().slice(0, 10);
   const [name, setName] = useState(schedule?.name ?? "");
   const [author, setAuthor] = useState(schedule?.author ?? "");
@@ -119,7 +119,7 @@ export function ActionScheduleModal({ companyId, schedule, history, onClose, onS
         ? await api.put<ActionSchedule>(`/action-schedules/${schedule.id}`, body)
         : await api.post<ActionSchedule>("/action-schedules", body);
       if (mode === "DEFINED") await api.patch(`/action-schedules/${saved.id}/mode`, { mode: "DEFINED" });
-      onSaved();
+      onSaved(saved);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao salvar.");
       setSaving(false);

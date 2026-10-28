@@ -224,10 +224,19 @@ export class PgrService {
     const where = companyScopeWhere(assignments, PERMISSIONS.PGR_WRITE, tenantId);
     const pgr = await this.prisma.pgr.findFirst({ where: { ...where, id, deletedAt: null } });
     if (!pgr) throw new NotFoundException("PGR não encontrado.");
+    // só cronogramas da própria empresa podem ser incluídos
+    const scheduleIds =
+      dto.scheduleIds === undefined
+        ? undefined
+        : (await this.prisma.actionSchedule.findMany({
+            where: { id: { in: dto.scheduleIds }, tenantId, companyId: pgr.companyId, deletedAt: null },
+            select: { id: true },
+          })).map((x) => x.id);
     return this.prisma.pgr.update({
       where: { id },
       data: {
         ...dto,
+        scheduleIds,
         issuedAt: dto.issuedAt ? new Date(dto.issuedAt) : undefined,
         validFrom: dto.validFrom ? new Date(dto.validFrom) : undefined,
         validUntil: dto.validUntil ? new Date(dto.validUntil) : undefined,

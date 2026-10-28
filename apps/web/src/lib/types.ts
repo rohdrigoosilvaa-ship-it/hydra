@@ -181,6 +181,8 @@ export interface MedicalExam {
   employeeId: string;
   type: ExamType;
   performedAt: string | null;
+  scheduledAt?: string | null;
+  nextDueAt?: string | null;
   result: ExamResult;
   aso: { id: string; result: ExamResult } | null;
 }
@@ -496,6 +498,7 @@ export interface Pgr {
   coordinator?: string | null;
   description?: string | null;
   renewalAt?: string | null;
+  scheduleIds?: string[];
   updatedAt: string;
   _count?: { risks: number; actions: number };
 }
