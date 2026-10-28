@@ -218,8 +218,15 @@ export class PgrPdfService {
       attachments.push({ fileName: ev.fileName, buffer: await this.fetchImage(ev.fileUrl) });
     }
 
+    const schedules = pgr.scheduleIds.length
+      ? await this.prisma.actionSchedule.findMany({
+          where: { id: { in: pgr.scheduleIds }, tenantId, companyId: pgr.companyId, deletedAt: null },
+          include: { items: { orderBy: { position: "asc" } } },
+          orderBy: { createdAt: "asc" },
+        })
+      : [];
     const logoBuffer = await this.fetchImage(company?.logoUrl ?? null);
-    const buffer = await this.render(pgr, company, branch, employees, logoBuffer, attachments);
+    const buffer = await this.render({ ...pgr, schedules }, company, branch, employees, logoBuffer, attachments);
     const filename = this.buildFilename(pgr, company, branch);
     return { buffer, filename };
   }
@@ -784,6 +791,7 @@ export class PgrPdfService {
       drawFichaEpiBlank();
       drawPlanoAcoes();
       drawCronograma();
+      drawPlanosDeAcao();
       drawAnexosEnviados();
 
       doc.end();
@@ -1311,6 +1319,49 @@ export class PgrPdfService {
         );
         end();
         epiLetterheadMode = false;
+      }
+
+      /** Planos / cronogramas de ação da empresa incluídos no PGR: uma tabela por plano. */
+      function drawPlanosDeAcao() {
+        const MESES = ["jan", "fev", "mar", "abr", "mai", "jun", "jul", "ago", "set", "out", "nov", "dez"];
+        const mes = (ym: string) => `${MESES[Number(ym.slice(5, 7)) - 1]}/${ym.slice(2, 4)}`;
+        const dataBr = (d: Date) => d.toISOString().slice(0, 10).split("-").reverse().join("/");
+        for (const sch of pgr.schedules as any[]) {
+          doc.addPage();
+          heading2Green(`Plano / Cronograma de Ações — ${sch.name}`);
+          const start = sch.startMonth.toISOString().slice(0, 7);
+          paragraph(
+            `Autor: ${sch.author} · Elaborado em ${dataBr(sch.elaboratedAt)} · Tipo: ${sch.type === "W5H2" ? "5W2H" : "Geral"} · Cronograma a partir de ${mes(start)}${sch.mode === "DEFINED" ? " · Versão final" : " · Rascunho"}`,
+          );
+          const w = [frac(0.55), frac(0.2), frac(0.25)];
+          drawRow(
+            [
+              { text: "AÇÃO", w: w[0]!, size: 9, fill: C_GRAY_BAR, color: C_INK },
+              { text: "RESPONSÁVEL", w: w[1]!, size: 9, fill: C_GRAY_BAR, color: C_INK },
+              { text: "QUANDO", w: w[2]!, size: 9, fill: C_GRAY_BAR, color: C_INK },
+            ],
+            { minH: 24, borderColor: C_GRAY_BAR },
+          );
+          sch.items.forEach((it: any, i: number) => {
+            const lines = [`${i + 1}. ${it.what}`];
+            if (sch.type === "W5H2") {
+              if (it.why) lines.push(`Por quê: ${it.why}`);
+              if (it.place) lines.push(`Onde: ${it.place}`);
+              if (it.how) lines.push(`Como: ${it.how}`);
+              if (it.totalCost != null) lines.push(`Custo total: R$ ${Number(it.totalCost).toFixed(2).replace(".", ",")}`);
+              if (it.priority) lines.push(`Prioridade: ${it.priority}`);
+              if (it.followUp) lines.push(`Acompanhamento: ${it.followUp}`);
+            }
+            drawRow(
+              [
+                { text: lines.join("\n"), w: w[0]!, size: 8.5, valign: "top" },
+                { text: it.responsible ?? "—", w: w[1]!, size: 8.5, valign: "top" },
+                { text: it.months.length ? it.months.map(mes).join(", ") : "—", w: w[2]!, size: 8.5, valign: "top" },
+              ],
+              { minH: 28 },
+            );
+          });
+        }
       }
 
       function drawPlanoAcoes() {

@@ -106,6 +106,12 @@ class PgrDocumentFields {
   @IsDateString()
   renewalAt?: string;
 
+  /** Planos / cronogramas de ação da empresa incluídos neste PGR. */
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  scheduleIds?: string[];
+
   @IsOptional()
   @IsDateString()
   issuedAt?: string;
@@ -519,10 +525,4 @@ export class GeneratePgrDto extends PgrDocumentFields {
   @IsArray()
   @IsString({ each: true })
   environmentIds!: string[];
-
-  /** Cronogramas de ação da empresa anexados (viram as ações do plano de ação). */
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  scheduleIds?: string[];
 }

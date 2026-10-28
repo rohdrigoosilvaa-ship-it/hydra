@@ -498,6 +498,7 @@ export interface Pgr {
   coordinator?: string | null;
   description?: string | null;
   renewalAt?: string | null;
+  scheduleIds?: string[];
   updatedAt: string;
   _count?: { risks: number; actions: number };
 }
