@@ -6,15 +6,19 @@ import { SectionCard } from "./pgr-shared";
 
 const MONTH_LABELS = ["Jan", "Fev", "Mar", "Abr", "Mai", "Jun", "Jul", "Ago", "Set", "Out", "Nov", "Dez"];
 
-/** Meses da vigência (validFrom → validUntil), no máximo 36 colunas. Sem vigência
- * definida, mostra os 12 meses do ano corrente. */
+/** Meses da vigência (validFrom → validUntil), no máximo 36 colunas. Sem fim de vigência, mostra
+ * 13 meses a partir do início (ex.: out/2026 a out/2027). Sem início, os 12 meses do ano corrente. */
 export function cronogramaMonths(validFrom: string | null, validUntil: string | null): { year: number; month: number }[] {
   const from = validFrom ? new Date(validFrom) : new Date();
   const start = validFrom ? { year: from.getUTCFullYear(), month: from.getUTCMonth() + 1 } : { year: from.getFullYear(), month: 1 };
   let end: { year: number; month: number };
-  if (validUntil) {
-    const until = new Date(validUntil);
+  const until = validUntil ? new Date(validUntil) : null;
+  const untilIdx = until ? until.getUTCFullYear() * 12 + until.getUTCMonth() : -1;
+  if (until && untilIdx >= start.year * 12 + start.month - 1) {
     end = { year: until.getUTCFullYear(), month: until.getUTCMonth() + 1 };
+  } else if (validFrom) {
+    const idx = start.year * 12 + start.month - 1 + 12;
+    end = { year: Math.floor(idx / 12), month: (idx % 12) + 1 };
   } else {
     end = { year: start.year, month: 12 };
   }
