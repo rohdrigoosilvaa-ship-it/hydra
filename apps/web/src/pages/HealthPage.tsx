@@ -1,5 +1,6 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useOutletContext } from "react-router-dom";
+import { useCompanyFilterStore } from "../lib/company-filter-store";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { FormModal, ModalField } from "../components/ui/modal";
 import type { CompanyWorkspaceContext } from "./company/CompanyWorkspacePage";
@@ -20,12 +21,17 @@ const RESULT_STYLE: Record<string, string> = {
 };
 const RESULT_LABEL: Record<string, string> = { APTO: "Apto", INAPTO: "Inapto", PENDENTE: "Pendente" };
 
+const plusOneYear = (iso: string) => `${Number(iso.slice(0, 4)) + 1}${iso.slice(4)}`;
 const fmt = (iso?: string | null) => (iso ? iso.slice(0, 10).split("-").reverse().join("/") : "—");
 
 export function HealthPage() {
   // dentro da empresa (Saúde › Saúde Ocupacional) mostra só os colaboradores e exames dela
   const workspace = useOutletContext<CompanyWorkspaceContext | undefined>();
-  const companyId = workspace?.company?.id;
+  const filterCompanyId = useCompanyFilterStore((s) => s.selectedCompanyId);
+  // empresa da tela da empresa ou, fora dela, a empresa escolhida no filtro do topo
+  const companyId = workspace?.company?.id ?? filterCompanyId ?? undefined;
+  const [syncMessage, setSyncMessage] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
   const [pcmsos, setPcmsos] = useState<Pcmso[] | null>(null);
   const [exams, setExams] = useState<MedicalExam[] | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
@@ -42,7 +48,7 @@ export function HealthPage() {
       api.get<Employee[]>(`/employees${q}`),
       api.get<Company[]>("/companies"),
     ]);
-    setPcmsos(pcmsoList);
+    setPcmsos(companyId ? pcmsoList.filter((p) => p.companyId === companyId) : pcmsoList);
     setExams(examList);
     setEmployees(employeeList);
     setCompanies(companyList);
@@ -52,6 +58,27 @@ export function HealthPage() {
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId]);
+
+  async function handleSync() {
+    if (!companyId) return;
+    if (!window.confirm("Lançar o exame admissional de todos os colaboradores desta empresa que têm data de admissão? O vencimento de cada um fica 1 ano depois da admissão.")) return;
+    setSyncing(true);
+    setSyncMessage(null);
+    setError(null);
+    try {
+      const r = await api.post<{ created: number; withoutAdmission: number }>("/health/exams/sync-admissions", { companyId });
+      setSyncMessage(
+        `${r.created} exame(s) admissional(is) lançado(s)` +
+          (r.withoutAdmission ? ` · ${r.withoutAdmission} colaborador(es) sem data de admissão cadastrada` : "") +
+          ". Confirme o resultado de cada um (Editar) para virar ASO emitido.",
+      );
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao puxar os exames.");
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   async function handleDelete(exam: MedicalExam, name: string) {
     if (!window.confirm(`Excluir o exame ${EXAM_TYPE_LABEL[exam.type].toLowerCase()} de ${name}?`)) return;
@@ -67,7 +94,7 @@ export function HealthPage() {
   return (
     <div>
       <h1 className="font-display text-2xl font-semibold text-ink">Saúde Ocupacional</h1>
-      <p className="mt-1 text-sm text-ink-muted">PCMSO, exames e resultados (ASO). Exame com data entra nos ASOs emitidos do painel da empresa.</p>
+      <p className="mt-1 text-sm text-ink-muted">PCMSO, exames e resultados (ASO). Exame com resultado Apto ou Inapto entra nos ASOs emitidos do painel da empresa. Vencimento: 1 ano depois do exame (no admissional, 1 ano após a admissão).</p>
 
       <section className="mt-8">
         <div className="flex items-center justify-between">
@@ -92,10 +119,21 @@ export function HealthPage() {
       <section className="mt-8">
         <div className="flex items-center justify-between">
           <h2 className="font-display text-lg font-semibold text-ink">Exames</h2>
-          <button className="btn-primary flex items-center gap-1.5" onClick={() => setExamForm("new")}>
-            <Plus size={15} /> Lançar exame
-          </button>
+          <div className="flex flex-wrap gap-2">
+            <button
+              className="btn-secondary flex items-center gap-1.5"
+              onClick={handleSync}
+              disabled={!companyId || syncing}
+              title={companyId ? "Lança o exame admissional de cada colaborador pela data de admissão" : "Escolha uma empresa no filtro do topo"}
+            >
+              {syncing ? "Puxando…" : "Puxar exames da admissão"}
+            </button>
+            <button className="btn-primary flex items-center gap-1.5" onClick={() => setExamForm("new")}>
+              <Plus size={15} /> Lançar exame
+            </button>
+          </div>
         </div>
+        {syncMessage && <p className="mt-3 rounded-md border-l-2 border-teal bg-teal-tint px-3 py-2 text-sm" role="status">{syncMessage}</p>}
         {error && <p className="mt-3 text-sm text-amber" role="alert">{error}</p>}
         <div className="mt-3 panel">
           <table className="w-full text-left text-sm">
@@ -125,7 +163,9 @@ export function HealthPage() {
                         {RESULT_LABEL[e.result]}
                       </span>
                     </td>
-                    <td className="px-4 py-3 text-ink-muted">{fmt(e.nextDueAt)}</td>
+                    <td className="px-4 py-3 text-ink-muted">
+                      {fmt(e.nextDueAt)} <DueBadge iso={e.nextDueAt} />
+                    </td>
                     <td className="px-4 py-3">
                       <div className="flex justify-end gap-2">
                         <button type="button" aria-label={`Editar exame de ${employeeName}`} title="Editar" onClick={() => setExamForm(e)} className="rounded-md bg-teal-deep p-2 text-white hover:opacity-90"><Pencil size={14} /></button>
@@ -153,6 +193,15 @@ export function HealthPage() {
       )}
     </div>
   );
+}
+
+/** Vencido ou vencendo nos próximos 30 dias. */
+function DueBadge({ iso }: { iso?: string | null }) {
+  if (!iso) return null;
+  const days = Math.floor((new Date(iso.slice(0, 10)).getTime() - Date.now()) / 86_400_000);
+  if (days < 0) return <span className="ml-1 rounded bg-amber-tint px-1.5 py-0.5 text-[11px] font-semibold text-amber">Vencido</span>;
+  if (days <= 30) return <span className="ml-1 rounded bg-amber-tint px-1.5 py-0.5 text-[11px] font-semibold text-amber">Vence em {days}d</span>;
+  return null;
 }
 
 function NewPcmsoForm({ companies, onClose, onCreated }: { companies: Company[]; onClose: () => void; onCreated: () => void }) {
@@ -195,7 +244,8 @@ function ExamModal({ employees, exam, onClose, onSaved }: { employees: Employee[
   const [type, setType] = useState<ExamType>(exam?.type ?? "PERIODICO");
   const [performedAt, setPerformedAt] = useState(exam?.performedAt?.slice(0, 10) ?? new Date().toISOString().slice(0, 10));
   const [result, setResult] = useState<"APTO" | "INAPTO" | "PENDENTE">(exam?.result ?? "APTO");
-  const [nextDueAt, setNextDueAt] = useState(exam?.nextDueAt?.slice(0, 10) ?? "");
+  const [nextDueAt, setNextDueAt] = useState(exam?.nextDueAt?.slice(0, 10) ?? plusOneYear(exam?.performedAt?.slice(0, 10) ?? new Date().toISOString().slice(0, 10)));
+  const [dueTouched, setDueTouched] = useState(!!exam?.nextDueAt);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -231,7 +281,17 @@ function ExamModal({ employees, exam, onClose, onSaved }: { employees: Employee[
           </select>
         </ModalField>
         <ModalField label="Data do exame">
-          <input className="input" type="date" aria-label="Data do exame" value={performedAt} onChange={(e) => setPerformedAt(e.target.value)} />
+          <input
+            className="input"
+            type="date"
+            aria-label="Data do exame"
+            value={performedAt}
+            onChange={(e) => {
+              setPerformedAt(e.target.value);
+              // vencimento padrão: 1 ano depois do exame, enquanto não for mudado à mão
+              if (!dueTouched && e.target.value) setNextDueAt(plusOneYear(e.target.value));
+            }}
+          />
         </ModalField>
         <ModalField label="Resultado">
           <select className="input" aria-label="Resultado" value={result} onChange={(e) => setResult(e.target.value as "APTO" | "INAPTO" | "PENDENTE")}>
@@ -241,10 +301,10 @@ function ExamModal({ employees, exam, onClose, onSaved }: { employees: Employee[
           </select>
         </ModalField>
         <ModalField label="Próximo vencimento">
-          <input className="input" type="date" aria-label="Próximo vencimento" value={nextDueAt} onChange={(e) => setNextDueAt(e.target.value)} />
+          <input className="input" type="date" aria-label="Próximo vencimento" value={nextDueAt} onChange={(e) => { setNextDueAt(e.target.value); setDueTouched(true); }} />
         </ModalField>
       </div>
-      <p className="text-xs text-ink-muted">Com a data do exame preenchida, ele conta como ASO emitido no painel da empresa.</p>
+      <p className="text-xs text-ink-muted">O vencimento sugerido é 1 ano depois do exame. Com resultado Apto ou Inapto, o exame conta como ASO emitido no painel da empresa.</p>
     </FormModal>
   );
 }

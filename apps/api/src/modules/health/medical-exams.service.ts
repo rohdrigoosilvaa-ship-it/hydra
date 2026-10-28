@@ -6,7 +6,16 @@ import type { RoleAssignmentClaim } from "../../core/auth/jwt.types";
 import type { CreateMedicalExamDto, UpdateMedicalExamDto } from "./dto/health.dto";
 import { assertCompanyInScope, relatedCompanyScopeWhere } from "../org/scope.util";
 
-/** Exames ocupacionais lançados. Exame com data vira um ASO emitido nessa data (aparece no painel da empresa). */
+const addYear = (d: Date) => {
+  const n = new Date(d);
+  n.setUTCFullYear(n.getUTCFullYear() + 1);
+  return n;
+};
+
+/**
+ * Exames ocupacionais lançados. Regra de vencimento: 1 ano depois do exame (e, no admissional, 1 ano após a admissão).
+ * Exame com data e resultado definido (Apto/Inapto) vira um ASO emitido nessa data (aparece no painel da empresa).
+ */
 @Injectable()
 export class MedicalExamsService {
   constructor(private readonly prisma: PrismaService) {}
@@ -29,12 +38,14 @@ export class MedicalExamsService {
     assertCompanyInScope(assignments, PERMISSIONS.HEALTH_WRITE, employee.companyId);
 
     return this.prisma.$transaction(async (tx) => {
+      const performedAt = dto.performedAt ? new Date(dto.performedAt) : undefined;
       const exam = await tx.medicalExam.create({
         data: {
           ...dto,
           scheduledAt: dto.scheduledAt ? new Date(dto.scheduledAt) : undefined,
-          performedAt: dto.performedAt ? new Date(dto.performedAt) : undefined,
-          nextDueAt: dto.nextDueAt ? new Date(dto.nextDueAt) : undefined,
+          performedAt,
+          // sem vencimento informado: 1 ano depois do exame (demissional não tem próximo exame)
+          nextDueAt: dto.nextDueAt ? new Date(dto.nextDueAt) : performedAt && dto.type !== "DEMISSIONAL" ? addYear(performedAt) : undefined,
           tenantId,
           createdById: userId,
         },
@@ -42,6 +53,40 @@ export class MedicalExamsService {
       await this.syncAso(tx, tenantId, exam);
       return tx.medicalExam.findUniqueOrThrow({ where: { id: exam.id }, include: { aso: true } });
     });
+  }
+
+  /**
+   * Lança o exame admissional de cada colaborador da empresa que tem data de admissão e ainda não tem esse exame:
+   * data do exame = data de admissão, vencimento = 1 ano depois. O resultado fica Pendente até alguém confirmar.
+   */
+  async syncAdmissions(tenantId: string, companyId: string, userId: string, assignments: RoleAssignmentClaim[]) {
+    assertCompanyInScope(assignments, PERMISSIONS.HEALTH_WRITE, companyId);
+    const employees = await this.prisma.employee.findMany({
+      where: { tenantId, companyId, deletedAt: null, status: { not: "TERMINATED" } },
+      select: { id: true, admittedAt: true, medicalExams: { where: { type: "ADMISSIONAL" }, select: { id: true } } },
+    });
+    let created = 0;
+    let withoutAdmission = 0;
+    for (const emp of employees) {
+      if (!emp.admittedAt) {
+        withoutAdmission++;
+        continue;
+      }
+      if (emp.medicalExams.length) continue;
+      await this.prisma.medicalExam.create({
+        data: {
+          tenantId,
+          employeeId: emp.id,
+          type: "ADMISSIONAL",
+          performedAt: emp.admittedAt,
+          nextDueAt: addYear(emp.admittedAt),
+          result: "PENDENTE",
+          createdById: userId,
+        },
+      });
+      created++;
+    }
+    return { created, withoutAdmission };
   }
 
   async update(tenantId: string, id: string, dto: UpdateMedicalExamDto, assignments: RoleAssignmentClaim[]) {
@@ -72,9 +117,9 @@ export class MedicalExamsService {
     return { success: true };
   }
 
-  /** Exame com data realizada = ASO emitido nessa data; sem data, não há ASO. */
+  /** Exame com data e resultado Apto/Inapto = ASO emitido nessa data; pendente ou sem data, não há ASO. */
   private async syncAso(tx: Prisma.TransactionClient, tenantId: string, exam: { id: string; performedAt: Date | null; result: "APTO" | "INAPTO" | "PENDENTE" }) {
-    if (!exam.performedAt) {
+    if (!exam.performedAt || exam.result === "PENDENTE") {
       await tx.aso.deleteMany({ where: { examId: exam.id } });
       return;
     }

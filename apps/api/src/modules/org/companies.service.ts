@@ -5,6 +5,7 @@ import { PERMISSIONS } from "../../core/permissions/permissions";
 import type { RoleAssignmentClaim } from "../../core/auth/jwt.types";
 import type { CreateCompanyDto } from "./dto/org.dto";
 import { lastMonths } from "../dashboard/monthly-series.util";
+import { computePgrProgress, type PgrProgressInput } from "../pgr/pgr-progress.util";
 import { allowedCompanyIds, employeeScopeWhere, hasTenantWideAccess, isCompanyInScope } from "./scope.util";
 
 @Injectable()
@@ -72,7 +73,11 @@ export class CompaniesService {
       this.prisma.pgr.findFirst({
         where: { tenantId, companyId: id, deletedAt: null },
         orderBy: { updatedAt: "desc" },
-        select: { id: true, title: true, status: true },
+        select: {
+          id: true, title: true, status: true, validFrom: true, validUntil: true, technicalResponsibleName: true,
+          procedimentoTrabalho: true, treinamentosNecessarios: true, episRecomendados: true, metasPrioridades: true,
+          consideracoesFinais: true, scheduleIds: true,
+        },
       }),
     ]);
     const pgrProgress = pgr ? await this.pgrProgress(tenantId, pgr) : null;
@@ -113,26 +118,17 @@ export class CompaniesService {
     };
   }
 
-  /** Andamento do PGR em 6 etapas, para o banner "PGR em andamento" do painel da empresa. */
-  private async pgrProgress(tenantId: string, pgr: { id: string; title: string; status: string }) {
-    const [ghes, risks, actions, cronograma] = await Promise.all([
+  /** Andamento do PGR em 6 etapas, para o banner "PGR em andamento" do painel da empresa (mesma regra da tela do PGR). */
+  private async pgrProgress(tenantId: string, pgr: PgrProgressInput & { id: string; title: string; status: string }) {
+    const [ghes, risks, actions, cronograma, attachments] = await Promise.all([
       this.prisma.ghe.count({ where: { tenantId, pgrId: pgr.id } }),
       this.prisma.pgrRisk.count({ where: { tenantId, pgrId: pgr.id } }),
       this.prisma.pgrAction.count({ where: { tenantId, pgrId: pgr.id } }),
       this.prisma.pgrCronogramaItem.count({ where: { tenantId, pgrId: pgr.id } }),
+      this.prisma.evidence.count({ where: { tenantId, sourceType: "PGR", sourceId: pgr.id } }),
     ]);
-    const steps = [
-      { label: "Dados gerais", done: true },
-      { label: "GHE", done: ghes > 0 },
-      { label: "Inventário de riscos", done: risks > 0 },
-      { label: "Plano de ações", done: actions > 0 },
-      { label: "Cronograma", done: cronograma > 0 },
-      { label: "Finalização", done: pgr.status === "APPROVED" },
-    ];
-    const done = steps.filter((s) => s.done).length;
-    const lastDone = [...steps].reverse().find((s) => s.done)?.label ?? null;
-    const next = steps.find((s) => !s.done)?.label ?? null;
-    return { id: pgr.id, title: pgr.title, status: pgr.status, percent: Math.round((done / steps.length) * 100), lastDone, next };
+    const { percent, lastDone, next } = computePgrProgress(pgr, { ghes, risks, actions, cronograma, attachments });
+    return { id: pgr.id, title: pgr.title, status: pgr.status, percent, lastDone, next };
   }
 
   async get(tenantId: string, id: string, assignments: RoleAssignmentClaim[]) {

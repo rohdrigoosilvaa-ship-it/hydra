@@ -4,7 +4,7 @@ import { RequirePermission } from "../../core/decorators/require-permission.deco
 import { PERMISSIONS } from "../../core/permissions/permissions";
 import type { HydraRequestUser } from "../../core/auth/jwt.types";
 import { MedicalExamsService } from "./medical-exams.service";
-import { CreateMedicalExamDto, UpdateMedicalExamDto } from "./dto/health.dto";
+import { CreateMedicalExamDto, SyncAdmissionsDto, UpdateMedicalExamDto } from "./dto/health.dto";
 
 @Controller("health/exams")
 export class MedicalExamsController {
@@ -20,6 +20,12 @@ export class MedicalExamsController {
   @RequirePermission(PERMISSIONS.HEALTH_WRITE)
   create(@CurrentUser() user: HydraRequestUser, @Body() dto: CreateMedicalExamDto) {
     return this.exams.create(user.tenantId, dto, user.id, user.assignments);
+  }
+
+  @Post("sync-admissions")
+  @RequirePermission(PERMISSIONS.HEALTH_WRITE)
+  syncAdmissions(@CurrentUser() user: HydraRequestUser, @Body() dto: SyncAdmissionsDto) {
+    return this.exams.syncAdmissions(user.tenantId, dto.companyId, user.id, user.assignments);
   }
 
   @Patch(":id")

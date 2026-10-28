@@ -174,6 +174,7 @@ export interface Pcmso {
   title: string;
   status: DocumentStatus;
   version: number;
+  companyId?: string;
 }
 
 export interface MedicalExam {
