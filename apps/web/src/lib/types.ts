@@ -181,6 +181,8 @@ export interface MedicalExam {
   employeeId: string;
   type: ExamType;
   performedAt: string | null;
+  scheduledAt?: string | null;
+  nextDueAt?: string | null;
   result: ExamResult;
   aso: { id: string; result: ExamResult } | null;
 }

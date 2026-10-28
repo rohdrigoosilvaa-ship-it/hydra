@@ -57,6 +57,33 @@ export class CreateMedicalExamDto {
   @IsOptional()
   @IsDateString()
   nextDueAt?: string;
+
+  @IsOptional()
+  @IsIn(EXAM_RESULTS)
+  result?: ExamResult;
+}
+
+/** Edição do exame lançado: tudo opcional; data vazia (null) limpa o campo. */
+export class UpdateMedicalExamDto {
+  @IsOptional()
+  @IsIn(EXAM_TYPES)
+  type?: ExamType;
+
+  @IsOptional()
+  @IsDateString()
+  scheduledAt?: string | null;
+
+  @IsOptional()
+  @IsDateString()
+  performedAt?: string | null;
+
+  @IsOptional()
+  @IsDateString()
+  nextDueAt?: string | null;
+
+  @IsOptional()
+  @IsIn(EXAM_RESULTS)
+  result?: ExamResult;
 }
 
 export class CreateAsoDto {
