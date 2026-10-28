@@ -101,3 +101,8 @@ export class CreateAsoDto {
   @IsString()
   fileUrl?: string;
 }
+
+export class SyncAdmissionsDto {
+  @IsString()
+  companyId!: string;
+}
