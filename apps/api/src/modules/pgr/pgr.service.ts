@@ -6,6 +6,7 @@ import type { CreatePgrDto, GeneratePgrDto, UpdatePgrDto } from "./dto/pgr.dto";
 import type { ExposureType, Prisma, RiskLevel } from "@hydra/db";
 import { assertCompanyInScope, companyScopeWhere } from "../org/scope.util";
 import { copyGheStructure } from "./ghe-copy.util";
+import { computePgrProgress } from "./pgr-progress.util";
 
 @Injectable()
 export class PgrService {
@@ -48,7 +49,14 @@ export class PgrService {
       employeesCount: countEmployeesForGhe(ghe.functions, employees),
     }));
 
-    return { ...pgr, ghes, progressPercent: computeProgressPercent(pgr, attachmentsCount) };
+    return { ...pgr, ghes, progressPercent: computePgrProgress(pgr, {
+        ghes: pgr.ghes.length,
+        risks: pgr.risks.length,
+        actions: pgr.actions.length,
+        cronograma: pgr.cronograma.length,
+        attachments: attachmentsCount,
+      }).percent,
+    };
   }
 
   async create(tenantId: string, dto: CreatePgrDto, userId: string, assignments: RoleAssignmentClaim[]) {
@@ -272,37 +280,6 @@ export class PgrService {
 }
 
 const hasText = (v: string | null | undefined) => !!v && v.trim().length > 0;
-
-/** Progresso = abas preenchidas / 6 (Dados gerais, GHE, Inventário, Plano de ações,
- * Cronograma, Finalização). */
-function computeProgressPercent(
-  pgr: {
-    validFrom: Date | null;
-    validUntil: Date | null;
-    technicalResponsibleName: string | null;
-    procedimentoTrabalho: string | null;
-    treinamentosNecessarios: string | null;
-    episRecomendados: string | null;
-    metasPrioridades: string | null;
-    consideracoesFinais: string | null;
-    ghes: unknown[];
-    risks: unknown[];
-    actions: unknown[];
-    cronograma: unknown[];
-  },
-  attachmentsCount: number,
-): number {
-  const steps = [
-    !!pgr.validFrom && !!pgr.validUntil && hasText(pgr.technicalResponsibleName),
-    pgr.ghes.length > 0,
-    pgr.risks.length > 0,
-    pgr.actions.length > 0 ||
-      [pgr.procedimentoTrabalho, pgr.treinamentosNecessarios, pgr.episRecomendados, pgr.metasPrioridades].some(hasText),
-    pgr.cronograma.length > 0,
-    hasText(pgr.consideracoesFinais) || attachmentsCount > 0,
-  ];
-  return Math.round((steps.filter(Boolean).length / steps.length) * 100);
-}
 
 interface EmployeeForMatch {
   id: string;
