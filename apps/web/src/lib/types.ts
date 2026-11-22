@@ -429,7 +429,7 @@ export interface Unit {
   name: string;
 }
 
-export type RiskCategory = "FISICO" | "QUIMICO" | "BIOLOGICO" | "ERGONOMICO" | "ACIDENTE";
+export type RiskCategory = "FISICO" | "QUIMICO" | "BIOLOGICO" | "ERGONOMICO" | "ACIDENTE" | "PSICOSSOCIAL";
 export type RiskLevel = "IRRELEVANT" | "LOW" | "MEDIUM" | "HIGH" | "CRITICAL";
 export type PgrStatus = "DRAFT" | "IN_REVIEW" | "APPROVED" | "ARCHIVED";
 export type ActionStatus = "OPEN" | "IN_PROGRESS" | "LATE" | "VALIDATING" | "DONE" | "CANCELED";

@@ -127,7 +127,7 @@ export class PgrValidationService {
             entityId: risk.id,
           });
         }
-        if (!risk.hazard.esocialCode) {
+        if (!risk.hazard.esocialCode && ["FISICO", "QUIMICO", "BIOLOGICO"].includes(risk.hazard.category as string)) {
           alerts.push({
             code: "PERIGO_SEM_CODIGO_ESOCIAL",
             severity: "info",

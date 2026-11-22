@@ -24,6 +24,7 @@ const RISK_CATEGORY_LABEL: Record<string, string> = {
   BIOLOGICO: "Biológico",
   ERGONOMICO: "Ergonômico",
   ACIDENTE: "Acidente",
+  PSICOSSOCIAL: "Psicossocial",
 };
 
 const RISK_LEVEL_LABEL: Record<string, string> = {

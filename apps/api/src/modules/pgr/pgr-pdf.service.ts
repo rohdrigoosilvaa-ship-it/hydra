@@ -15,6 +15,7 @@ const RISK_CATEGORY_LABEL: Record<string, string> = {
   BIOLOGICO: "Biológico",
   ERGONOMICO: "Ergonômico",
   ACIDENTE: "Acidente",
+  PSICOSSOCIAL: "Psicossocial",
 };
 const EXPOSURE_TYPE_LABEL: Record<string, string> = {
   HABITUAL: "Habitual",
@@ -75,6 +76,7 @@ const CATEGORY_COLOR: Record<string, string> = {
   BIOLOGICO: C_GREEN_DARK,
   ERGONOMICO: C_YELLOW,
   ACIDENTE: C_BLUE,
+  PSICOSSOCIAL: "#7c5cbf",
 };
 // Versão escurecida (texto sobre fundo branco) das cores acima.
 const CATEGORY_TEXT_COLOR: Record<string, string> = {
@@ -83,6 +85,7 @@ const CATEGORY_TEXT_COLOR: Record<string, string> = {
   BIOLOGICO: C_GREEN_DARK,
   ERGONOMICO: "#8a6d00",
   ACIDENTE: C_BLUE,
+  PSICOSSOCIAL: "#7c5cbf",
 };
 const RISK_LEVEL_TEXT_COLOR: Record<string, string> = {
   LOW: C_GREEN_DARK,

@@ -44,6 +44,7 @@ const RISK_CATEGORY_LABEL: Record<RiskCategory, string> = {
   BIOLOGICO: "Biológico",
   ERGONOMICO: "Ergonômico",
   ACIDENTE: "Acidente",
+  PSICOSSOCIAL: "Psicossocial",
 };
 const EXPOSURE_TYPE_LABEL: Record<ExposureType, string> = {
   HABITUAL: "Habitual",
@@ -367,6 +368,7 @@ const CATEGORY_CHIP: Record<RiskCategory, string> = {
   BIOLOGICO: "bg-teal-tint text-teal-deep",
   ERGONOMICO: "bg-line text-ink-muted",
   ACIDENTE: "bg-danger-tint text-danger",
+  PSICOSSOCIAL: "bg-line text-ink",
 };
 
 /** Tabela de referência (4x4) com a célula escolhida em destaque. */

@@ -12,6 +12,7 @@ export const RISK_CATEGORY_LABEL: Record<RiskCategory, string> = {
   BIOLOGICO: "Biológicos",
   ERGONOMICO: "Ergonômicos",
   ACIDENTE: "Acidentes",
+  PSICOSSOCIAL: "Psicossociais",
 };
 export const EXPOSURE_LABEL: Record<ExposureType, string> = {
   HABITUAL: "Habitual",
@@ -34,11 +35,34 @@ export function RisksCatalogPage() {
   const [applied, setApplied] = useState({ name: "", category: "", code: "" });
   const [form, setForm] = useState<Hazard | "new" | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [loadingMaster, setLoadingMaster] = useState(false);
+  const [masterMessage, setMasterMessage] = useState<string | null>(null);
 
   const load = () => api.get<Hazard[]>("/pgr/hazards").then(setHazards).catch(() => setHazards([]));
   useEffect(() => {
     load();
   }, []);
+
+  async function handleLoadMaster() {
+    if (
+      !window.confirm(
+        "Carregar a base mestra de riscos ocupacionais (115 riscos, 6 categorias)? Riscos novos são criados. Riscos que já existem com o mesmo nome recebem o texto padrão da base, e o texto anterior fica guardado no histórico. Suas decisões (exposição, eSocial, insalubridade, periculosidade, ASO, EPC/EPI), os exames e os equipamentos não são alterados.",
+      )
+    )
+      return;
+    setLoadingMaster(true);
+    setError(null);
+    setMasterMessage(null);
+    try {
+      const r = await api.post<{ total: number; created: number; updated: number; unchanged: number }>("/pgr/hazards/load-master", {});
+      setMasterMessage(`Base mestra carregada: ${r.created} risco(s) novo(s), ${r.updated} atualizado(s), ${r.unchanged} já estavam iguais.`);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Erro ao carregar a base mestra.");
+    } finally {
+      setLoadingMaster(false);
+    }
+  }
 
   async function handleDelete(h: Hazard) {
     if (!window.confirm(`Excluir o risco "${h.name}"?`)) return;
@@ -65,7 +89,11 @@ export function RisksCatalogPage() {
         <button className="btn-primary flex items-center gap-1.5" onClick={() => setForm("new")}>
           <Plus size={15} /> Adicionar risco
         </button>
+        <button className="btn-secondary" onClick={handleLoadMaster} disabled={loadingMaster} title="Carrega a base mestra de riscos ocupacionais (referência de 22/11/2026)">
+          {loadingMaster ? "Carregando…" : "Carregar base mestra"}
+        </button>
       </div>
+      {masterMessage && <p className="mt-3 rounded-md border-l-2 border-teal bg-teal-tint px-3 py-2 text-sm" role="status">{masterMessage}</p>}
 
       <form
         className="mt-4 grid grid-cols-1 items-end gap-3 md:grid-cols-[1fr_1fr_1fr_auto]"

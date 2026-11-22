@@ -12,6 +12,7 @@ const RISK_CATEGORY_LABEL: Record<RiskCategory, string> = {
   BIOLOGICO: "Biológico",
   ERGONOMICO: "Ergonômico",
   ACIDENTE: "Acidente",
+  PSICOSSOCIAL: "Psicossocial",
 };
 
 function naOrValue(v: string | null | undefined): string {

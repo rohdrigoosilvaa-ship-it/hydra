@@ -23,6 +23,7 @@ const RISK_CATEGORY_LABEL: Record<string, string> = {
   BIOLOGICO: "Biológico",
   ERGONOMICO: "Ergonômico",
   ACIDENTE: "Acidente",
+  PSICOSSOCIAL: "Psicossocial",
 };
 
 const dateFmt = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "2-digit", year: "numeric", timeZone: "UTC" });

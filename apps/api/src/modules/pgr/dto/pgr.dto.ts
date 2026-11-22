@@ -2,7 +2,7 @@ import { Type } from "class-transformer";
 import { ValidateNested, IsArray, IsBoolean, IsNumber, IsDateString, IsIn, IsInt, IsOptional, IsString, Max, Min, MinLength } from "class-validator";
 import type { ActionStatus, EvaluationCriteria, ExposureType, RiskCategory } from "@hydra/db";
 
-const RISK_CATEGORIES: RiskCategory[] = ["FISICO", "QUIMICO", "BIOLOGICO", "ERGONOMICO", "ACIDENTE"];
+const RISK_CATEGORIES: RiskCategory[] = ["FISICO", "QUIMICO", "BIOLOGICO", "ERGONOMICO", "ACIDENTE", "PSICOSSOCIAL"];
 const EXPOSURE_TYPES: ExposureType[] = ["HABITUAL", "EVENTUAL", "INTERMITENTE", "PERMANENTE"];
 const EVALUATION_CRITERIA: EvaluationCriteria[] = ["QUALITATIVO", "QUANTITATIVO"];
 

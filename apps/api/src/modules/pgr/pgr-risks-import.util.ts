@@ -45,6 +45,7 @@ const SHEET_CATEGORY: Record<string, RiskCategory> = {
   biologico: "BIOLOGICO",
   ergonomico: "ERGONOMICO",
   acidente: "ACIDENTE",
+  psicossocial: "PSICOSSOCIAL",
 };
 
 const COLUMN_ALIASES: Record<Field, string[]> = {
