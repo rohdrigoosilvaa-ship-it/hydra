@@ -184,6 +184,7 @@ export interface MedicalExam {
   performedAt: string | null;
   scheduledAt?: string | null;
   nextDueAt?: string | null;
+  items?: { id: string; name: string; performedAt: string | null; nextDueAt: string | null }[];
   result: ExamResult;
   aso: { id: string; result: ExamResult } | null;
 }
@@ -455,6 +456,7 @@ export interface Hazard {
   epcStatus?: string;
   epiStatus?: string;
   protections?: { equipment: ProtectionEquipment }[];
+  exams?: { id?: string; name: string; periodicityMonths: number }[];
 }
 
 export interface ProtectionEquipment {
@@ -659,7 +661,7 @@ export interface Position {
   /** Ambientes pelos quais o cargo transita. */
   environments?: { environmentId: string }[];
   risks?: PositionRisk[];
-  exams?: { id: string; name: string }[];
+  exams?: { id: string; name: string; periodicityMonths: number; hazardId: string | null }[];
 }
 
 export type EnvironmentUnitType = "MATRIZ" | "FILIAL";

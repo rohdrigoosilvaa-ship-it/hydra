@@ -119,7 +119,10 @@ export function PositionDetailModal({
               <ul className="mt-3 divide-y divide-line text-sm">
                 {exams.map((x) => (
                   <li key={x.id} className="flex items-center justify-between gap-3 py-2">
-                    <span className="text-ink">{x.name}</span>
+                    <span className="text-ink">
+                      {x.name}
+                      <span className="ml-2 text-xs text-ink-muted">a cada {x.periodicityMonths} meses{x.hazardId ? " · vem de um risco do cargo" : ""}</span>
+                    </span>
                     <button type="button" aria-label={`Remover ${x.name}`} className="text-amber hover:opacity-80" onClick={() => run(() => api.del(`/positions/${position.id}/exams/${x.id}`))}><X size={15} /></button>
                   </li>
                 ))}
@@ -358,6 +361,7 @@ function LinkRiskModal({ position, positions, editing, onClose, onSaved }: { pos
 
 function AddExamModal({ position, onClose, onSaved }: { position: Position; onClose: () => void; onSaved: () => void }) {
   const [name, setName] = useState("");
+  const [months, setMonths] = useState("12");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -366,7 +370,7 @@ function AddExamModal({ position, onClose, onSaved }: { position: Position; onCl
     setSaving(true);
     setError(null);
     try {
-      await api.post(`/positions/${position.id}/exams`, { names: [name.trim()] });
+      await api.post(`/positions/${position.id}/exams`, { names: [name.trim()], periodicityMonths: Number(months) || 12 });
       onSaved();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Erro ao salvar.");
@@ -378,6 +382,9 @@ function AddExamModal({ position, onClose, onSaved }: { position: Position; onCl
     <FormModal title="Adicionar exame ao cargo" onClose={onClose} onSubmit={handleSubmit} saving={saving} canSave={name.trim().length >= 2} error={error} size="max-w-xl">
       <ModalField label="Exame" required>
         <input className="input" placeholder="Ex.: Audiometria" value={name} onChange={(e) => setName(e.target.value)} />
+      </ModalField>
+      <ModalField label="Periodicidade (meses)">
+        <input className="input" type="number" min={1} max={120} aria-label="Periodicidade" value={months} onChange={(e) => setMonths(e.target.value)} />
       </ModalField>
     </FormModal>
   );

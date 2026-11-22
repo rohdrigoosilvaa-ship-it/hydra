@@ -1,9 +1,11 @@
 import { BadRequestException, Injectable, NotFoundException } from "@nestjs/common";
 import { PrismaService } from "../../core/prisma/prisma.service";
 import type { CreateHazardDto, UpdateHazardDto } from "./dto/pgr.dto";
+import { syncPositionExams } from "../org/position-exams.util";
 
 const HAZARD_INCLUDE = {
   protections: { select: { equipment: { select: { id: true, kind: true, name: true } } } },
+  exams: { select: { id: true, name: true, periodicityMonths: true }, orderBy: { name: "asc" } },
 } as const;
 
 @Injectable()
@@ -25,10 +27,15 @@ export class HazardsService {
   }
 
   async create(tenantId: string, dto: CreateHazardDto) {
-    const { equipmentIds, ...rest } = dto;
+    const { equipmentIds, exams, ...rest } = dto;
     const ids = await this.validEquipmentIds(tenantId, equipmentIds);
     return this.prisma.hazard.create({
-      data: { ...rest, tenantId, protections: { create: ids.map((equipmentId) => ({ equipmentId })) } },
+      data: {
+        ...rest,
+        tenantId,
+        protections: { create: ids.map((equipmentId) => ({ equipmentId })) },
+        exams: { create: (exams ?? []).map((e) => ({ tenantId, name: e.name.trim(), periodicityMonths: e.periodicityMonths ?? 12 })) },
+      },
       include: HAZARD_INCLUDE,
     });
   }
@@ -42,9 +49,18 @@ export class HazardsService {
 
   async update(tenantId: string, id: string, dto: UpdateHazardDto) {
     await this.get(tenantId, id);
-    const { equipmentIds, ...rest } = dto;
+    const { equipmentIds, exams, ...rest } = dto;
     const ids = equipmentIds === undefined ? null : await this.validEquipmentIds(tenantId, equipmentIds);
     return this.prisma.$transaction(async (tx) => {
+      if (exams) {
+        await tx.hazardExam.deleteMany({ where: { hazardId: id } });
+        if (exams.length) {
+          await tx.hazardExam.createMany({ data: exams.map((e) => ({ tenantId, hazardId: id, name: e.name.trim(), periodicityMonths: e.periodicityMonths ?? 12 })) });
+        }
+        // cargos que têm este risco passam a ter os exames atualizados
+        const linked = await tx.positionRisk.findMany({ where: { hazardId: id }, select: { positionId: true } });
+        for (const { positionId } of linked) await syncPositionExams(tx, tenantId, positionId);
+      }
       if (ids) {
         await tx.hazardProtection.deleteMany({ where: { hazardId: id } });
         if (ids.length) await tx.hazardProtection.createMany({ data: ids.map((equipmentId) => ({ hazardId: id, equipmentId })) });

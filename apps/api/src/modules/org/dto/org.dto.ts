@@ -637,6 +637,13 @@ export class AddPositionExamsDto {
   @IsString({ each: true })
   @MinLength(2, { each: true })
   names!: string[];
+
+  /** Periodicidade em meses (padrão 12). */
+  @IsOptional()
+  @IsInt()
+  @Min(1)
+  @Max(120)
+  periodicityMonths?: number;
 }
 
 export class ImportFromPositionDto {

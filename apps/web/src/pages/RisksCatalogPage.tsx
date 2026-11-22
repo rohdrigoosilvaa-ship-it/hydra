@@ -169,6 +169,7 @@ function RiskForm({ hazard, all, onClose, onSaved }: { hazard?: Hazard; all: Haz
   const [copying, setCopying] = useState(false);
   const [bank, setBank] = useState<ProtectionEquipment[]>([]);
   const [chosen, setChosen] = useState<string[]>(() => (hazard?.protections ?? []).map((p) => p.equipment.id));
+  const [exams, setExams] = useState<{ name: string; periodicityMonths: number }[]>(() => (hazard?.exams ?? []).map((e) => ({ name: e.name, periodicityMonths: e.periodicityMonths })));
   const [newKind, setNewKind] = useState<"EPC" | "EPI" | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -207,6 +208,7 @@ function RiskForm({ hazard, all, onClose, onSaved }: { hazard?: Hazard; all: Haz
       epcStatus: v.epcStatus,
       epiStatus: v.epiStatus,
       description: v.description ?? "",
+      exams: exams.filter((e) => e.name.trim().length >= 2).map((e) => ({ name: e.name.trim(), periodicityMonths: Number(e.periodicityMonths) || 12 })),
       equipmentIds: chosen.filter((id) => {
         const kind = bank.find((b) => b.id === id)?.kind;
         return kind === "EPC" ? v.epcStatus === "SIM" : kind === "EPI" ? v.epiStatus === "SIM" : false;
@@ -311,6 +313,29 @@ function RiskForm({ hazard, all, onClose, onSaved }: { hazard?: Hazard; all: Haz
           {TRI.map(([k, l]) => <option key={k} value={k}>{l}</option>)}
         </select>
       </ModalField>
+      <div className="rounded-md border border-line p-4">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="font-display text-sm font-bold uppercase text-ink">Exames exigidos por este risco</p>
+          <button type="button" className="btn-secondary flex items-center gap-1.5 text-xs" onClick={() => setExams((cur) => [...cur, { name: "", periodicityMonths: 12 }])}>
+            <Plus size={13} /> Adicionar exame
+          </button>
+        </div>
+        <p className="mt-1 text-xs text-ink-muted">Quando este risco é ligado a um cargo, estes exames entram sozinhos nos exames do cargo (PCMSO). Você define os exames e a periodicidade.</p>
+        {exams.length === 0 && <p className="mt-3 text-sm text-ink-muted">Nenhum exame definido para este risco.</p>}
+        <div className="mt-3 flex flex-col gap-2">
+          {exams.map((e, i) => (
+            <div key={i} className="grid grid-cols-[1fr_9rem_auto] items-center gap-2">
+              <input className="input" aria-label={`Exame ${i + 1}`} placeholder="ex.: Audiometria" value={e.name} onChange={(ev) => setExams((cur) => cur.map((x, j) => (j === i ? { ...x, name: ev.target.value } : x)))} />
+              <label className="flex items-center gap-1 text-xs text-ink-muted">
+                a cada
+                <input className="input w-16" type="number" min={1} max={120} aria-label={`Periodicidade do exame ${i + 1} em meses`} value={e.periodicityMonths} onChange={(ev) => setExams((cur) => cur.map((x, j) => (j === i ? { ...x, periodicityMonths: Number(ev.target.value) } : x)))} />
+                meses
+              </label>
+              <button type="button" aria-label={`Remover exame ${i + 1}`} className="text-amber" onClick={() => setExams((cur) => cur.filter((_, j) => j !== i))}><X size={15} /></button>
+            </div>
+          ))}
+        </div>
+      </div>
       {v.epcStatus === "SIM" && <ProtectionBox kind="EPC" bank={bank} chosen={chosen} setChosen={setChosen} onNew={() => setNewKind("EPC")} />}
       <ModalField label="EPIs: implementam medidas de proteção individual">
         <select className="input" value={v.epiStatus} onChange={(e) => set("epiStatus", e.target.value)}>

@@ -662,6 +662,7 @@ model Hazard {
   pgrRisks      PgrRisk[]
   positionRisks PositionRisk[]
   protections   HazardProtection[]
+  exams         HazardExam[]
 
   @@index([tenantId])
   @@map("hazards")
@@ -1027,9 +1028,10 @@ model MedicalExam {
   updatedAt   DateTime   @updatedAt
   createdById String?
 
-  pcmso    Pcmso?   @relation(fields: [pcmsoId], references: [id])
+  pcmso    Pcmso?            @relation(fields: [pcmsoId], references: [id])
+  items    MedicalExamItem[]
   aso      Aso?
-  employee Employee @relation(fields: [employeeId], references: [id])
+  employee Employee          @relation(fields: [employeeId], references: [id])
 
   @@index([tenantId])
   @@index([employeeId])
@@ -2646,11 +2648,15 @@ model PositionRiskProtection {
 
 /// Exame ocupacional exigido para o cargo.
 model PositionExam {
-  id         String   @id @default(cuid())
-  tenantId   String
-  positionId String
-  name       String
-  createdAt  DateTime @default(now())
+  id                String   @id @default(cuid())
+  tenantId          String
+  positionId        String
+  name              String
+  /// Periodicidade do exame em meses (padrão: 12 = anual).
+  periodicityMonths Int      @default(12)
+  /// Risco que originou o exame (vem do cadastro do risco); vazio = lançado à mão no cargo.
+  hazardId          String?
+  createdAt         DateTime @default(now())
 
   position Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
 
@@ -2765,4 +2771,34 @@ model ActionScheduleItem {
 
   @@index([scheduleId])
   @@map("action_schedule_items")
+}
+
+/// Exame que o risco exige (ex.: audiometria para ruído), com a periodicidade em meses.
+model HazardExam {
+  id                String @id @default(cuid())
+  tenantId          String
+  hazardId          String
+  name              String
+  periodicityMonths Int    @default(12)
+
+  hazard Hazard @relation(fields: [hazardId], references: [id], onDelete: Cascade)
+
+  @@index([hazardId])
+  @@map("hazard_exams")
+}
+
+/// Exame complementar feito dentro de um exame/ASO do colaborador (ex.: audiometria), com a data e o próximo vencimento.
+model MedicalExamItem {
+  id          String    @id @default(cuid())
+  tenantId    String
+  examId      String
+  name        String
+  performedAt DateTime? @db.Date
+  nextDueAt   DateTime? @db.Date
+
+  exam MedicalExam @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  @@index([examId])
+  @@index([tenantId])
+  @@map("medical_exam_items")
 }
