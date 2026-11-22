@@ -369,36 +369,37 @@ const CATEGORY_CHIP: Record<RiskCategory, string> = {
 };
 
 /** Tabela de referência (4x4) com a célula escolhida em destaque. */
-function RiskMatrix({ probability, severity }: { probability: number; severity: number }) {
-  const rows = [1, 2, 3, 4];
+function RiskMatrix({ probability, severity }: { probability: number | null; severity: number | null }) {
+  const scale = [1, 2, 3, 4, 5];
+  const probs = [5, 4, 3, 2, 1];
   return (
     <div className="text-center text-xs" aria-label="Matriz de classificação do risco">
-      <p className="mb-1 font-display text-[11px] font-bold uppercase tracking-wide text-ink-muted">Severidade / potencial de dano</p>
+      <p className="mb-1 font-display text-[11px] font-bold uppercase tracking-wide text-ink-muted">Severidade</p>
       <div className="inline-flex gap-1.5">
         <div className="flex items-center">
           <span className="font-display text-[11px] font-bold uppercase tracking-wide text-ink-muted [writing-mode:vertical-rl] rotate-180">
-            Frequência / probabilidade
+            Probabilidade
           </span>
         </div>
         <div>
           <div className="mb-1 flex gap-0.5 pl-0">
-            {rows.map((c) => (
-              <span key={c} className="w-16 py-0.5 font-semibold text-ink-muted">{c}</span>
+            {scale.map((c) => (
+              <span key={c} className="w-14 py-0.5 font-semibold text-ink-muted">{c}</span>
             ))}
           </div>
-          {rows.map((p) => (
+          {probs.map((p) => (
             <div key={p} className="mb-0.5 flex items-center gap-0.5">
-              {rows.map((c) => {
+              {scale.map((c) => {
                 const lvl = riskLevelOf(p, c);
                 const on = p === probability && c === severity;
                 return (
                   <div
                     key={c}
-                    className={`flex h-14 w-16 flex-col items-center justify-center rounded-sm font-medium leading-tight text-black ${on ? "ring-2 ring-ink ring-offset-1" : "opacity-70"}`}
+                    className={`flex h-12 w-14 flex-col items-center justify-center rounded-sm font-medium leading-tight text-black ${on ? "ring-2 ring-ink ring-offset-1" : probability && severity ? "opacity-60" : ""}`}
                     style={{ background: MATRIX_LEVEL_COLOR[lvl] }}
                   >
                     <span className="text-sm">{p * c}</span>
-                    <span>{MATRIX_LEVEL_LABEL[lvl]}</span>
+                    <span className="text-[10px]">{MATRIX_LEVEL_LABEL[lvl]}</span>
                   </div>
                 );
               })}
@@ -413,10 +414,17 @@ function RiskMatrix({ probability, severity }: { probability: number; severity: 
 
 /** Contagem de riscos por nível, em cinco quadros coloridos. */
 function RiskSummary({ risks }: { risks: PgrRisk[] }) {
+  const pending = risks.filter((r) => r.evaluated === false).length;
   return (
+    <>
+    {pending > 0 && (
+      <p className="mt-4 rounded-md border-l-2 border-amber bg-amber-tint px-3 py-2 text-sm" role="status">
+        {pending} risco{pending === 1 ? "" : "s"} pendente{pending === 1 ? "" : "s"} de avaliação: abra o risco e informe a probabilidade e a severidade.
+      </p>
+    )}
     <div className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-5">
       {LEVEL_ORDER.map((level) => {
-        const count = risks.filter((r) => r.riskLevel === level).length;
+        const count = risks.filter((r) => r.evaluated !== false && r.riskLevel === level).length;
         return (
           <div key={level} className="flex items-center gap-3 overflow-hidden rounded-xl border border-line bg-paper-raised shadow-sm">
             <span className={`h-full w-1.5 self-stretch ${LEVEL_BAR[level]}`} />
@@ -428,20 +436,21 @@ function RiskSummary({ risks }: { risks: PgrRisk[] }) {
         );
       })}
     </div>
+    </>
   );
 }
 
 function RiskCard({ risk, onEdit, onRemove }: { risk: PgrRisk; onEdit: () => void; onRemove: () => void }) {
   return (
     <article className="flex overflow-hidden rounded-xl border border-line bg-paper-raised shadow-sm">
-      <span className={`w-1.5 shrink-0 ${LEVEL_BAR[risk.riskLevel]}`} />
+      <span className={`w-1.5 shrink-0 ${risk.evaluated === false ? "bg-line" : LEVEL_BAR[risk.riskLevel]}`} />
       <div className="flex min-w-0 flex-1 flex-col gap-2 p-4">
         <div className="flex items-start justify-between gap-2">
           <span className={`rounded-full px-2.5 py-0.5 text-xs font-medium ${CATEGORY_CHIP[risk.hazard.category]}`}>
             {RISK_CATEGORY_LABEL[risk.hazard.category]}
           </span>
-          <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${LEVEL_BADGE[risk.riskLevel]}`}>
-            {RISK_LEVEL_LABEL[risk.riskLevel]}
+          <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${risk.evaluated === false ? "bg-line text-ink-muted" : LEVEL_BADGE[risk.riskLevel]}`}>
+            {risk.evaluated === false ? "Pendente de avaliação" : RISK_LEVEL_LABEL[risk.riskLevel]}
           </span>
         </div>
         <h4 className="font-medium text-ink">{risk.hazard.name}</h4>
@@ -449,12 +458,12 @@ function RiskCard({ risk, onEdit, onRemove }: { risk: PgrRisk; onEdit: () => voi
           <div className="rounded-md bg-paper px-2.5 py-1.5">
             <dt className="font-mono text-[10px] uppercase tracking-wide text-ink-muted">Prob. × Sev.</dt>
             <dd className="font-mono tabular-nums text-ink">
-              {risk.probability} × {risk.severity}
+              {risk.evaluated === false ? "—" : `${risk.probability} × ${risk.severity}`}
             </dd>
           </div>
           <div className="rounded-md bg-paper px-2.5 py-1.5">
             <dt className="font-mono text-[10px] uppercase tracking-wide text-ink-muted">Classificação</dt>
-            <dd className="truncate text-ink">{MATRIX_CLASSIFICATION[risk.riskLevel] ?? risk.classification ?? "A definir"}</dd>
+            <dd className="truncate text-ink">{risk.evaluated === false ? "Pendente de avaliação" : (MATRIX_CLASSIFICATION[risk.riskLevel] ?? risk.classification ?? "A definir")}</dd>
           </div>
         </dl>
         <div className="mt-auto flex justify-end gap-3 pt-1">
@@ -505,9 +514,10 @@ function RiskForm({
   const [exposureType, setExposureType] = useState<ExposureType | "">(risk?.exposureType ?? "");
   const [evaluationCriteria, setEvaluationCriteria] = useState<EvaluationCriteria | "">(risk?.evaluationCriteria ?? "QUALITATIVO");
   const [exposureProfile, setExposureProfile] = useState(risk?.exposureProfile ?? "");
-  const [probability, setProbability] = useState(clampScale(risk?.probability ?? 2));
-  const [severity, setSeverity] = useState(clampScale(risk?.severity ?? 2));
-  const level = riskLevelOf(probability, severity);
+  // vazio = ainda não avaliado ("Pendente de avaliação"): sem probabilidade e severidade não há nível
+  const [probability, setProbability] = useState<number | null>(risk && risk.evaluated !== false ? clampScale(risk.probability) : null);
+  const [severity, setSeverity] = useState<number | null>(risk && risk.evaluated !== false ? clampScale(risk.severity) : null);
+  const level = probability && severity ? riskLevelOf(probability, severity) : null;
 
   /** Ao escolher o perigo num risco novo, o formulário já vem preenchido com o cadastro do risco. */
   function pickHazard(id: string) {
@@ -583,8 +593,8 @@ function RiskForm({
             exposureType: exposureType || null,
             evaluationCriteria: evaluationCriteria || null,
             exposureProfile: t(exposureProfile),
-            probability,
-            severity,
+            probability: probability ?? null,
+            severity: severity ?? null,
             conclusion: t(conclusion),
             adminControls: t(adminControls),
             engineeringControls: t(engineeringControls),
@@ -752,16 +762,18 @@ function RiskForm({
         <div className="mt-4 grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_auto]">
           <div className="grid grid-cols-1 content-start gap-3 sm:grid-cols-2">
             <label className="flex flex-col gap-1 text-sm">
-              <span className="text-ink-muted">Probabilidade / frequência (1-4)</span>
-              <select className="input" value={clampScale(probability)} onChange={(e) => setProbability(Number(e.target.value))}>
+              <span className="text-ink-muted">Probabilidade (1-5)</span>
+              <select className="input" aria-label="Probabilidade" value={probability ?? ""} onChange={(e) => setProbability(e.target.value ? Number(e.target.value) : null)}>
+                <option value="">Pendente de avaliação</option>
                 {PROBABILITY_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
               </select>
             </label>
             <label className="flex flex-col gap-1 text-sm">
-              <span className="text-ink-muted">Severidade / potencial de dano (1-4)</span>
-              <select className="input" value={clampScale(severity)} onChange={(e) => setSeverity(Number(e.target.value))}>
+              <span className="text-ink-muted">Severidade (1-5)</span>
+              <select className="input" aria-label="Severidade" value={severity ?? ""} onChange={(e) => setSeverity(e.target.value ? Number(e.target.value) : null)}>
+                <option value="">Pendente de avaliação</option>
                 {SEVERITY_OPTIONS.map((o) => (
                   <option key={o.value} value={o.value}>{o.label}</option>
                 ))}
@@ -771,18 +783,24 @@ function RiskForm({
               <span className="text-ink-muted">Nível de risco e classificação (calculados)</span>
               <div
                 className="flex items-center justify-between rounded-md border border-line px-3 py-2.5 font-display font-semibold text-black"
-                style={{ background: MATRIX_LEVEL_COLOR[level] }}
+                style={{ background: level ? MATRIX_LEVEL_COLOR[level] : "var(--paper)" }}
                 aria-live="polite"
               >
-                <span>
-                  Risco {MATRIX_LEVEL_LABEL[level]} · {MATRIX_CLASSIFICATION[level]}
-                </span>
-                <span className="text-sm font-medium">{clampScale(probability)} × {clampScale(severity)} = {clampScale(probability) * clampScale(severity)}</span>
+                {level ? (
+                  <>
+                    <span>
+                      Risco {MATRIX_LEVEL_LABEL[level]} · {MATRIX_CLASSIFICATION[level]}
+                    </span>
+                    <span className="text-sm font-medium">{probability} × {severity} = {probability! * severity!}</span>
+                  </>
+                ) : (
+                  <span className="text-ink-muted">Pendente de avaliação — escolha a probabilidade e a severidade</span>
+                )}
               </div>
-              <p className="text-xs text-ink-muted">O nível de risco e a classificação são calculados pela matriz ao lado a partir da probabilidade e da severidade.</p>
+              <p className="text-xs text-ink-muted">O nível de risco e a classificação são calculados pela matriz ao lado a partir da probabilidade e da severidade. Sem os dois, o risco fica pendente de avaliação (pela avaliação das condições reais de trabalho).</p>
             </div>
           </div>
-          <RiskMatrix probability={clampScale(probability)} severity={clampScale(severity)} />
+          <RiskMatrix probability={probability} severity={severity} />
         </div>
         <label className="mt-3 flex flex-col gap-1 text-sm">
           <span className="text-ink-muted">Conclusão</span>

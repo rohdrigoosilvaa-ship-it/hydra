@@ -889,6 +889,8 @@ model PgrRisk {
   exposureProfile    String?
   probability        Int // 1-5
   severity           Int // 1-5
+  /// false = ainda não avaliado (probabilidade/severidade 1 são só marcador): o documento mostra "Pendente de avaliação".
+  evaluated          Boolean             @default(true)
   riskLevel          RiskLevel
   /// Classificação conforme a metodologia do PGR de referência (ex.: "Aceitável",
   /// "Tolerável") — texto livre porque a escala completa não está confirmada

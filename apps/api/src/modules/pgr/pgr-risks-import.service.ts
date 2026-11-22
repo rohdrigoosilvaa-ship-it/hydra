@@ -47,7 +47,7 @@ function normalizeKey(s: string): string {
 function validateScale(v: number | "__invalid__" | undefined, label: string): { value?: number; error?: string } {
   if (v === undefined) return { error: `${label} é obrigatória.` };
   if (v === "__invalid__") return { error: `${label} inválida — use um número.` };
-  if (!Number.isInteger(v) || v < 1 || v > 4) return { error: `${label} deve ser um número inteiro entre 1 e 4.` };
+  if (!Number.isInteger(v) || v < 1 || v > 5) return { error: `${label} deve ser um número inteiro entre 1 e 5.` };
   return { value: v };
 }
 

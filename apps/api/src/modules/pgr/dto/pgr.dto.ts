@@ -443,15 +443,18 @@ export class CreatePgrRiskDto extends PgrRiskFields {
   @IsString()
   hazardId!: string;
 
+  /** Vazio = ainda não avaliado ("Pendente de avaliação"). */
+  @IsOptional()
   @IsInt()
   @Min(1)
-  @Max(4)
-  probability!: number;
+  @Max(5)
+  probability?: number | null;
 
+  @IsOptional()
   @IsInt()
   @Min(1)
-  @Max(4)
-  severity!: number;
+  @Max(5)
+  severity?: number | null;
 }
 
 export class UpdatePgrRiskDto extends PgrRiskFields {
@@ -467,13 +470,13 @@ export class UpdatePgrRiskDto extends PgrRiskFields {
   @IsInt()
   @Min(1)
   @Max(5)
-  probability?: number;
+  probability?: number | null;
 
   @IsOptional()
   @IsInt()
   @Min(1)
   @Max(5)
-  severity?: number;
+  severity?: number | null;
 }
 
 const ACTION_STATUSES: ActionStatus[] = [

@@ -576,6 +576,8 @@ export interface PgrRisk {
   exposureProfile: string | null;
   probability: number;
   severity: number;
+  /** false = ainda não avaliado ("Pendente de avaliação"). */
+  evaluated?: boolean;
   riskLevel: RiskLevel;
   classification: string | null;
   conclusion: string | null;

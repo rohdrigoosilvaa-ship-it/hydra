@@ -40,9 +40,10 @@ const RISK_CLASSIFICATION: Record<string, string> = {
   HIGH: "Substancial",
   CRITICAL: "Intolerável",
 };
-// Escalas do modelo (4 níveis) — o cadastro aceita 1-4 (valores antigos de 5 são exibidos como o nível máximo).
-const PROBABILITY_LABEL: Record<number, string> = { 1: "Ocasional", 2: "Intermitente", 3: "Habitual", 4: "Permanente", 5: "Permanente" };
-const SEVERITY_LABEL: Record<number, string> = { 1: "Leve", 2: "Moderado", 3: "Sério", 4: "Severo", 5: "Severo" };
+// Escalas (1 a 5) — as mesmas da avaliação do risco no cargo.
+const PROBABILITY_LABEL: Record<number, string> = { 1: "Raro", 2: "Pouco provável", 3: "Possível", 4: "Provável", 5: "Muito provável" };
+const SEVERITY_LABEL: Record<number, string> = { 1: "Leve", 2: "Baixa", 3: "Moderada", 4: "Alta", 5: "Extrema" };
+const NOT_EVALUATED_TEXT = "Pendente de avaliação";
 
 const MARGIN = 50;
 const PAGE_WIDTH = 595.28; // A4 pt
@@ -90,15 +91,10 @@ const RISK_LEVEL_TEXT_COLOR: Record<string, string> = {
   CRITICAL: C_RED,
   IRRELEVANT: C_GREEN_DARK,
 };
-const LEVEL_COLOR: Record<number, string> = { 1: C_GREEN, 2: C_YELLOW, 3: C_ORANGE, 4: C_RED };
-const LEVEL_TINT: Record<number, string> = { 1: "#f0f7f3", 2: "#fdf8e4", 3: "#faf1ec", 4: "#f9ecec" };
-const MEDIDA_COLOR: Record<string, string> = {
-  green1: C_GREEN_BRIGHT,
-  green: C_GREEN,
-  yellow: C_YELLOW,
-  orange: C_ORANGE,
-  red: C_RED,
-};
+// cores dos 5 níveis: azul, verde, amarelo, laranja e vermelho (a mesma matriz do cargo)
+const LEVEL_COLOR: Record<number, string> = { 1: "#38c8f5", 2: "#8fd14f", 3: "#fde38c", 4: "#ffc107", 5: "#e2504f" };
+const LEVEL_TINT: Record<number, string> = { 1: "#eaf8fe", 2: "#f1f9e9", 3: "#fefaea", 4: "#fff7e0", 5: "#fceceb" };
+const MEDIDA_COLOR: Record<string, string> = { n1: "#38c8f5", n2: "#8fd14f", n3: "#fde38c", n4: "#ffc107", n5: "#e2504f" };
 
 const MONTH_ABBR = ["JAN", "FEV", "MAR", "ABR", "MAI", "JUN", "JUL", "AGO", "SET", "OUT", "NOV", "DEZ"];
 
@@ -656,7 +652,7 @@ export class PgrPdfService {
       // ---- Matriz 4x4 ----
       doc.addPage();
       doc.y = 52;
-      doc.font("Poppins-SemiBold").fontSize(11.5).fillColor(C_INK).text("SEVERIDADE / POTENCIAL DE DANO", MARGIN, doc.y, { width: CONTENT_WIDTH, align: "center" });
+      doc.font("Poppins-SemiBold").fontSize(11.5).fillColor(C_INK).text("MATRIZ DE RISCO — PROBABILIDADE x SEVERIDADE", MARGIN, doc.y, { width: CONTENT_WIDTH, align: "center" });
       gap(14);
       drawMatrix();
       gap(14);
@@ -682,7 +678,7 @@ export class PgrPdfService {
       for (const m of T.MEDIDAS_SUGERIDAS) {
         drawRow(
           [
-            { text: String(m.value), w: frac(0.12), font: "Helvetica-Bold", size: 9.5, fill: MEDIDA_COLOR[m.color], color: "#ffffff", align: "center" },
+            { text: String(m.value), w: frac(0.12), font: "Helvetica-Bold", size: 9.5, fill: MEDIDA_COLOR[m.color], color: C_INK, align: "center" },
             { text: m.text, w: frac(0.88), size: 9, color: C_BODY },
           ],
           { minH: 40, pad: 7 },
@@ -824,77 +820,72 @@ export class PgrPdfService {
         const rightX = MARGIN + tableW + 14;
         const top = doc.y;
         const barH = 22;
-        const rowH = 44;
+        const rowH = 52;
 
         const drawBar = (x: number, title: string) => {
           doc.rect(x, top, tableW, barH).fill(C_GRAY_BAR);
           doc.font("Helvetica").fontSize(9).fillColor(C_INK).text(title, x + 8, top + 6.5, { width: tableW - 16, lineBreak: false });
         };
         drawBar(leftX, "PROBABILIDADE");
-        drawBar(rightX, "POTENCIAL DE DANO");
+        drawBar(rightX, "SEVERIDADE (AIHA, 2015)");
 
         T.TABELA_PROBABILIDADE.forEach((r, i) => {
           const y = top + barH + i * rowH;
-          const nameW = 82;
+          const nameW = 96;
           const lvlW = 20;
           doc.rect(leftX, y, lvlW, rowH).fill(LEVEL_COLOR[r.level]!);
-          doc.font("Helvetica-Bold").fontSize(9).fillColor("#ffffff").text(String(r.level), leftX, y + rowH / 2 - 5, { width: lvlW, align: "center", lineBreak: false });
+          doc.font("Helvetica-Bold").fontSize(9).fillColor(C_INK).text(String(r.level), leftX, y + rowH / 2 - 5, { width: lvlW, align: "center", lineBreak: false });
           doc.rect(leftX + lvlW, y, nameW, rowH).fill(LEVEL_TINT[r.level]!);
-          doc.font("Helvetica").fontSize(8.5).fillColor(C_INK).text(r.title, leftX + lvlW + 5, y + 10, { width: nameW - 8, lineBreak: false });
-          doc.font("Helvetica-Bold").fontSize(7.5).fillColor(C_BODY).text(r.subtitle, leftX + lvlW + 5, y + 22, { width: nameW - 8, lineBreak: false });
-          doc.font("Helvetica").fontSize(7.5).fillColor(C_BODY).text(`${r.line1}\n${r.line2}`, leftX + lvlW + nameW + 5, y + 6, { width: tableW - lvlW - nameW - 10, lineGap: 1 });
+          doc.font("Helvetica-Bold").fontSize(8).fillColor(C_INK).text(r.title, leftX + lvlW + 5, y + 8, { width: nameW - 8, lineBreak: false });
+          doc.font("Helvetica").fontSize(7).fillColor(C_BODY).text(r.subtitle, leftX + lvlW + 5, y + 22, { width: nameW - 8, lineGap: 1 });
+          doc.font("Helvetica").fontSize(7).fillColor(C_BODY).text(`${r.line1}\n${r.line2}`, leftX + lvlW + nameW + 5, y + 6, { width: tableW - lvlW - nameW - 10, lineGap: 1 });
           doc.rect(leftX, y, tableW, rowH).lineWidth(0.6).strokeColor(C_LINE).stroke();
         });
 
         T.TABELA_POTENCIAL_DANO.forEach((r, i) => {
           const y = top + barH + i * rowH;
           const lvlW = 20;
-          const nameW = 124;
+          const nameW = 70;
           doc.rect(rightX, y, lvlW, rowH).fill(LEVEL_COLOR[r.level]!);
-          doc.font("Helvetica-Bold").fontSize(9).fillColor("#ffffff").text(String(r.level), rightX, y + rowH / 2 - 5, { width: lvlW, align: "center", lineBreak: false });
+          doc.font("Helvetica-Bold").fontSize(9).fillColor(C_INK).text(String(r.level), rightX, y + rowH / 2 - 5, { width: lvlW, align: "center", lineBreak: false });
           doc.rect(rightX + lvlW, y, nameW, rowH).fill(LEVEL_TINT[r.level]!);
-          doc.font("Helvetica").fontSize(8.5).fillColor(C_INK).text(r.title, rightX + lvlW + 8, y + 10, { width: nameW - 12, lineBreak: false });
-          doc.font("Helvetica-Bold").fontSize(7.5).fillColor(C_BODY).text(r.subtitle, rightX + lvlW + 8, y + 22, { width: nameW - 12, lineBreak: false });
-          doc.font("Helvetica").fontSize(8).fillColor(C_BODY).text(r.risk, rightX + lvlW + nameW + 8, y + rowH / 2 - 5, { width: tableW - lvlW - nameW - 12, lineBreak: false });
+          doc.font("Helvetica-Bold").fontSize(8).fillColor(C_INK).text(r.title, rightX + lvlW + 6, y + rowH / 2 - 5, { width: nameW - 10, lineBreak: false });
+          doc.font("Helvetica").fontSize(7.5).fillColor(C_BODY).text(r.definition, rightX + lvlW + nameW + 6, y + 8, { width: tableW - lvlW - nameW - 12, lineGap: 1 });
           doc.rect(rightX, y, tableW, rowH).lineWidth(0.6).strokeColor(C_LINE).stroke();
         });
 
-        doc.y = top + barH + 4 * rowH + 4;
+        doc.y = top + barH + T.TABELA_PROBABILIDADE.length * rowH + 4;
         doc.x = MARGIN;
       }
 
+      /** Matriz 5x5: probabilidade 5 (em cima) a 1; severidade 1 a 5. */
       function drawMatrix() {
-        const labelW = 80;
-        const cw = (CONTENT_WIDTH - labelW) / 4;
-        const headH = 30;
-        const rowH = 42;
+        const labelW = 60;
+        const cw = (CONTENT_WIDTH - labelW) / 5;
+        const headH = 26;
+        const rowH = 40;
         const x0 = MARGIN;
         const y0 = doc.y;
-        const levelFill = (label: string, value: number) => {
-          if (label === "Irrelevante") return C_GREEN_BRIGHT;
-          if (label === "Baixo") return C_GREEN;
-          if (label === "Médio") return C_YELLOW;
-          if (label === "Alto") return C_ORANGE;
-          return value >= 16 ? C_RED : C_GREEN;
-        };
-        for (let c = 0; c < 4; c++) {
+        for (let c = 0; c < 5; c++) {
           const x = x0 + labelW + c * cw;
-          doc.rect(x, y0, cw, headH).fill(LEVEL_COLOR[c + 1]!);
-          doc.font("Helvetica-Bold").fontSize(10).fillColor("#ffffff").text(String(c + 1), x, y0 + headH / 2 - 5, { width: cw, align: "center", lineBreak: false });
+          doc.rect(x, y0, cw, headH).fill(C_GRAY_BAR);
+          doc.font("Helvetica-Bold").fontSize(9).fillColor(C_INK).text(`${c + 1} · ${SEVERITY_LABEL[c + 1]}`, x, y0 + headH / 2 - 5, { width: cw, align: "center", lineBreak: false });
         }
-        for (let r = 0; r < 4; r++) {
+        T.MATRIZ_RISCO.forEach((row, r) => {
+          const p = 5 - r;
           const y = y0 + headH + r * rowH;
-          doc.rect(x0, y, labelW, rowH).fill(LEVEL_COLOR[r + 1]!);
-          doc.font("Helvetica-Bold").fontSize(10).fillColor("#ffffff").text(String(r + 1), x0, y + rowH / 2 - 5, { width: labelW, align: "center", lineBreak: false });
-          for (let c = 0; c < 4; c++) {
-            const cell = T.MATRIZ_RISCO[r]![c]!;
+          doc.rect(x0, y, labelW, rowH).fill(C_GRAY_BAR);
+          doc.font("Helvetica-Bold").fontSize(9).fillColor(C_INK).text(`${p}`, x0, y + rowH / 2 - 11, { width: labelW, align: "center", lineBreak: false });
+          doc.font("Helvetica").fontSize(7).fillColor(C_BODY).text(PROBABILITY_LABEL[p]!, x0 + 2, y + rowH / 2 + 1, { width: labelW - 4, align: "center", lineBreak: false });
+          row.forEach((cell, c) => {
             const x = x0 + labelW + c * cw;
-            doc.rect(x, y, cw, rowH).fill(levelFill(cell.label, cell.value));
+            doc.rect(x, y, cw, rowH).fill(LEVEL_COLOR[cell.level]!);
             doc.rect(x, y, cw, rowH).lineWidth(0.8).strokeColor("#ffffff").stroke();
-            doc.font("Helvetica").fontSize(9).fillColor("#ffffff").text(`${cell.value}\n${cell.label}`, x, y + 9, { width: cw, align: "center", lineGap: 3 });
-          }
-        }
-        doc.y = y0 + headH + 4 * rowH;
+            doc.font("Helvetica-Bold").fontSize(10).fillColor(C_INK).text(`${cell.value}`, x, y + 8, { width: cw, align: "center", lineBreak: false });
+            doc.font("Helvetica").fontSize(7.5).fillColor(C_INK).text(cell.label, x, y + 23, { width: cw, align: "center", lineBreak: false });
+          });
+        });
+        doc.y = y0 + headH + 5 * rowH;
         doc.x = MARGIN;
       }
 
@@ -1067,15 +1058,15 @@ export class PgrPdfService {
               { text: r.sourceCircumstances ?? "", w: cw[1]!, size: 8.5, align: "center" },
               { text: r.exposureType ? EXPOSURE_TYPE_ABBR[r.exposureType]! : "—", w: cw[2]!, size: 8.5, align: "center" },
               { text: r.evaluationCriteria ? EVALUATION_CRITERIA_ABBR[r.evaluationCriteria]! : "—", w: cw[3]!, size: 8.5, align: "center" },
-              { text: `${SEVERITY_LABEL[r.severity] ?? r.severity}`, w: cw[4]!, size: 8.5, align: "center" },
+              { text: r.evaluated === false ? NOT_EVALUATED_TEXT : `${SEVERITY_LABEL[r.severity] ?? r.severity}`, w: cw[4]!, size: 8.5, align: "center" },
               {
-                text: `${PROBABILITY_LABEL[r.probability] ?? r.probability}\n${RISK_LEVEL_LABEL[r.riskLevel] ?? ""}`,
+                text: r.evaluated === false ? NOT_EVALUATED_TEXT : `${PROBABILITY_LABEL[r.probability] ?? r.probability}\n${RISK_LEVEL_LABEL[r.riskLevel] ?? ""}`,
                 w: cw[5]!,
                 size: 8.5,
                 align: "center",
-                color: RISK_LEVEL_TEXT_COLOR[r.riskLevel] ?? C_BODY,
+                color: r.evaluated === false ? C_BODY : (RISK_LEVEL_TEXT_COLOR[r.riskLevel] ?? C_BODY),
               },
-              { text: r.classification ?? "A definir", w: cw[6]!, size: 8.5, align: "center" },
+              { text: r.evaluated === false ? NOT_EVALUATED_TEXT : (r.classification ?? "A definir"), w: cw[6]!, size: 8.5, align: "center" },
             ],
             { minH: 36, pad: 5 },
           );
@@ -1135,16 +1126,26 @@ export class PgrPdfService {
         );
         if (risk.exposureProfile) labelRow("Perfil de exposição", risk.exposureProfile);
         const q = [frac(0.25), frac(0.25), frac(0.25), frac(0.25)];
-        drawRow([th("Classificação do Efeito", q[0]!), th("Frequência", q[1]!), th("Nível de Risco", q[2]!), th("Classificação", q[3]!)], { minH: 24 });
-        drawRow(
-          [
-            { text: SEVERITY_LABEL[risk.severity] ?? String(risk.severity), w: q[0]!, align: "center" },
-            { text: PROBABILITY_LABEL[risk.probability] ?? String(risk.probability), w: q[1]!, align: "center" },
-            { text: RISK_LEVEL_LABEL[risk.riskLevel] ?? "", w: q[2]!, align: "center", font: "Helvetica-Bold", color: RISK_LEVEL_TEXT_COLOR[risk.riskLevel] ?? C_BODY },
-            { text: RISK_CLASSIFICATION[risk.riskLevel] ?? risk.classification ?? "A definir", w: q[3]!, align: "center" },
-          ],
-          { minH: 24 },
-        );
+        drawRow([th("Severidade", q[0]!), th("Probabilidade", q[1]!), th("Nível de Risco", q[2]!), th("Classificação", q[3]!)], { minH: 24 });
+        if (risk.evaluated === false) {
+          // nunca avaliado: não recebe nível nem classificação (nada de "aceitável" por omissão)
+          drawRow(
+            [
+              { text: NOT_EVALUATED_TEXT, w: q[0]! + q[1]! + q[2]! + q[3]!, align: "center", font: "Helvetica-Bold", color: C_BODY },
+            ],
+            { minH: 24 },
+          );
+        } else {
+          drawRow(
+            [
+              { text: SEVERITY_LABEL[risk.severity] ?? String(risk.severity), w: q[0]!, align: "center" },
+              { text: PROBABILITY_LABEL[risk.probability] ?? String(risk.probability), w: q[1]!, align: "center" },
+              { text: `${RISK_LEVEL_LABEL[risk.riskLevel] ?? ""} (${risk.probability} x ${risk.severity} = ${risk.probability * risk.severity})`, w: q[2]!, align: "center", font: "Helvetica-Bold", color: RISK_LEVEL_TEXT_COLOR[risk.riskLevel] ?? C_BODY },
+              { text: RISK_CLASSIFICATION[risk.riskLevel] ?? risk.classification ?? "A definir", w: q[3]!, align: "center" },
+            ],
+            { minH: 24 },
+          );
+        }
 
         bar("Prevenção e controle");
         const yn = (v: string | null | undefined) => YES_NO_LABEL[v ?? ""] ?? "Não se aplica";

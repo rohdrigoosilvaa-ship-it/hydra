@@ -3,8 +3,15 @@ import { PrismaService } from "../../core/prisma/prisma.service";
 import { PERMISSIONS } from "../../core/permissions/permissions";
 import type { RoleAssignmentClaim } from "../../core/auth/jwt.types";
 import type { CreatePgrRiskDto, UpdatePgrRiskDto } from "./dto/pgr.dto";
-import { computeRiskLevel, riskClassification } from "./risk-level.util";
+import { NOT_EVALUATED, computeRiskLevel, riskClassification } from "./risk-level.util";
 import { assertCompanyInScope, relatedCompanyScopeWhere } from "../org/scope.util";
+
+/** Probabilidade e severidade → nível e classificação; sem os dois, o risco fica "não avaliado" (nunca "aceitável"). */
+function evaluate(probability: number | null | undefined, severity: number | null | undefined) {
+  if (probability == null || severity == null) return { ...NOT_EVALUATED };
+  const level = computeRiskLevel(probability, severity);
+  return { probability, severity, riskLevel: level, classification: riskClassification(level), evaluated: true };
+}
 
 @Injectable()
 export class PgrRisksService {
@@ -29,8 +36,7 @@ export class PgrRisksService {
     return this.prisma.pgrRisk.create({
       data: {
         ...dto,
-        riskLevel: computeRiskLevel(dto.probability, dto.severity),
-        classification: riskClassification(computeRiskLevel(dto.probability, dto.severity)),
+        ...evaluate(dto.probability, dto.severity),
         tenantId,
         createdById: userId,
         updatedById: userId,
@@ -44,15 +50,15 @@ export class PgrRisksService {
     if (!risk) throw new NotFoundException("Risco não encontrado.");
     assertCompanyInScope(assignments, PERMISSIONS.PGR_WRITE, risk.pgr.companyId);
 
-    const probability = dto.probability ?? risk.probability;
-    const severity = dto.severity ?? risk.severity;
+    // valor não enviado mantém o atual (se o risco já estava avaliado); null ou vazio volta para "não avaliado"
+    const probability = dto.probability === undefined ? (risk.evaluated ? risk.probability : null) : dto.probability;
+    const severity = dto.severity === undefined ? (risk.evaluated ? risk.severity : null) : dto.severity;
 
     return this.prisma.pgrRisk.update({
       where: { id },
       data: {
         ...dto,
-        riskLevel: computeRiskLevel(probability, severity),
-        classification: riskClassification(computeRiskLevel(probability, severity)),
+        ...evaluate(probability, severity),
         updatedById: userId,
       },
       include: { hazard: true, ghe: true },

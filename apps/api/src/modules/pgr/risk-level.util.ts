@@ -1,21 +1,22 @@
 import type { RiskLevel } from "@hydra/db";
 
 /**
- * Matriz 4x4 de classificação do risco: linhas = frequência/probabilidade (1-4),
- * colunas = severidade/potencial de dano (1-4). Não é só o produto — ex.: 4 pode ser Baixo ou Médio.
+ * Matriz 5x5 de classificação do risco: linha = probabilidade (1-5), coluna = severidade (1-5). Nível 1 a 5
+ * (Irrelevante, Baixo, Médio, Alto, Crítico). É a mesma matriz da avaliação do risco no cargo.
  */
-const MATRIX: RiskLevel[][] = [
-  ["IRRELEVANT", "LOW", "LOW", "MEDIUM"],
-  ["LOW", "LOW", "MEDIUM", "HIGH"],
-  ["LOW", "MEDIUM", "HIGH", "HIGH"],
-  ["MEDIUM", "HIGH", "HIGH", "CRITICAL"],
+const GRID: number[][] = [
+  [1, 1, 2, 3, 3],
+  [1, 2, 3, 3, 4],
+  [1, 2, 3, 4, 5],
+  [2, 2, 3, 4, 5],
+  [2, 3, 4, 5, 5],
 ];
+const LEVELS: RiskLevel[] = ["IRRELEVANT", "LOW", "MEDIUM", "HIGH", "CRITICAL"];
 
-const clamp = (n: number) => Math.min(4, Math.max(1, Math.round(n) || 1));
+const clamp = (n: number) => Math.min(5, Math.max(1, Math.round(n) || 1));
 
-/** Valores antigos de 5 (escala anterior) contam como o máximo da matriz. */
 export function computeRiskLevel(probability: number, severity: number): RiskLevel {
-  return MATRIX[clamp(probability) - 1]![clamp(severity) - 1]!;
+  return LEVELS[GRID[clamp(probability) - 1]![clamp(severity) - 1]! - 1]!;
 }
 
 const LABEL: Record<RiskLevel, string> = { IRRELEVANT: "Irrelevante", LOW: "Baixo", MEDIUM: "Médio", HIGH: "Alto", CRITICAL: "Crítico" };
@@ -33,3 +34,6 @@ const CLASSIFICATION: Record<RiskLevel, string> = {
 
 /** Classificação do risco (Aceitável … Intolerável), calculada junto com o nível. */
 export const riskClassification = (level: RiskLevel) => CLASSIFICATION[level];
+
+/** Risco ainda não avaliado: marcador sem valor (nunca é "aceitável"). */
+export const NOT_EVALUATED = { probability: 1, severity: 1, riskLevel: "IRRELEVANT" as RiskLevel, classification: "Não avaliado", evaluated: false };
