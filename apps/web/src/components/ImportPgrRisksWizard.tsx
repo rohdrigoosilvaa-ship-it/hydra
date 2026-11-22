@@ -43,6 +43,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   BIOLOGICO: "Biológico",
   ERGONOMICO: "Ergonômico",
   ACIDENTE: "Acidente",
+  PSICOSSOCIAL: "Psicossocial",
 };
 
 const STATUS_LABEL: Record<RiskImportRowResult["status"], string> = {

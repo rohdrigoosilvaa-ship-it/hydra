@@ -16,6 +16,13 @@ export class HazardsController {
     return this.hazards.list(user.tenantId);
   }
 
+  /** Carrega a base mestra de riscos ocupacionais (idempotente). */
+  @Post("load-master")
+  @RequirePermission(PERMISSIONS.PGR_WRITE)
+  loadMaster(@CurrentUser() user: HydraRequestUser) {
+    return this.hazards.loadMaster(user.tenantId, user.id);
+  }
+
   @Get(":id")
   @RequirePermission(PERMISSIONS.PGR_READ)
   get(@CurrentUser() user: HydraRequestUser, @Param("id") id: string) {

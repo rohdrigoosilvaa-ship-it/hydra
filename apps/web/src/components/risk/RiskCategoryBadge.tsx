@@ -7,6 +7,7 @@ export const CATEGORY_COLOR: Record<RiskCategory, { bg: string; fg: string; labe
   BIOLOGICO: { bg: "#8a6a4b", fg: "#ffffff", label: "Biológicos" },
   ERGONOMICO: { bg: "#f2c037", fg: "#3a2f00", label: "Ergonômicos" },
   ACIDENTE: { bg: "#1f8fd1", fg: "#ffffff", label: "Acidentes" },
+  PSICOSSOCIAL: { bg: "#7c5cbf", fg: "#ffffff", label: "Psicossociais" },
 };
 
 export function RiskCategoryBadge({ category }: { category: RiskCategory }) {

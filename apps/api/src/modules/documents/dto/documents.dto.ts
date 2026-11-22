@@ -9,7 +9,7 @@ const REPORT_TYPES: TechnicalReportType[] = [
   "ERGONOMICO",
 ];
 
-const RISK_CATEGORIES: RiskCategory[] = ["FISICO", "QUIMICO", "BIOLOGICO", "ERGONOMICO", "ACIDENTE"];
+const RISK_CATEGORIES: RiskCategory[] = ["FISICO", "QUIMICO", "BIOLOGICO", "ERGONOMICO", "ACIDENTE", "PSICOSSOCIAL"];
 
 /** Campos de metadados do documento — mesma paridade do PGR (PgrDocumentFields),
  * compartilhados entre criação e edição, todos opcionais na edição. */

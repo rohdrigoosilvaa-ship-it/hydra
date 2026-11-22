@@ -2,6 +2,7 @@ import { BadRequestException, Injectable, NotFoundException } from "@nestjs/comm
 import { PrismaService } from "../../core/prisma/prisma.service";
 import type { CreateHazardDto, UpdateHazardDto } from "./dto/pgr.dto";
 import { syncPositionExams } from "../org/position-exams.util";
+import { MASTER_HAZARDS, MASTER_HAZARDS_REF } from "./master-hazards.data";
 
 const HAZARD_INCLUDE = {
   protections: { select: { equipment: { select: { id: true, kind: true, name: true } } } },
@@ -67,6 +68,48 @@ export class HazardsService {
       }
       return tx.hazard.update({ where: { id }, data: rest, include: HAZARD_INCLUDE });
     });
+  }
+
+  /**
+   * Carrega a base mestra de riscos ocupacionais no catálogo do cliente. O que ainda não existe (mesmo nome, sem
+   * diferenciar maiúsculas) é criado; o que já existe recebe o texto padrão e o valor anterior fica no histórico
+   * (auditoria). Exposição, eSocial, insalubridade, periculosidade, aposentadoria especial, ASO, EPC/EPI,
+   * exames e equipamentos do cliente não são alterados. Pode ser repetido sem duplicar.
+   */
+  async loadMaster(tenantId: string, userId: string) {
+    const existing = await this.prisma.hazard.findMany({ where: { tenantId, deletedAt: null } });
+    const byName = new Map(existing.map((h) => [h.name.trim().toLowerCase(), h]));
+    let created = 0;
+    let updated = 0;
+    for (const m of MASTER_HAZARDS) {
+      const content = {
+        category: m.category,
+        esocialCode: m.esocialCode,
+        description: m.description,
+        damagePotential: m.damagePotential,
+        observations: m.observations,
+        sourceCircumstances: m.sourceCircumstances,
+        adminMeasures: m.adminMeasures,
+        measurementType: m.measurementType,
+      };
+      const cur = byName.get(m.name.trim().toLowerCase());
+      if (!cur) {
+        await this.prisma.hazard.create({ data: { tenantId, name: m.name, ...content, insertInAso: false } });
+        created++;
+        continue;
+      }
+      const changed = (Object.keys(content) as (keyof typeof content)[]).some((k) => (cur[k] ?? null) !== content[k]);
+      if (!changed) continue;
+      const before = Object.fromEntries((Object.keys(content) as (keyof typeof content)[]).map((k) => [k, cur[k] ?? null]));
+      await this.prisma.$transaction([
+        this.prisma.auditLog.create({
+          data: { tenantId, userId, action: "hazard.master_update", entityType: "hazard", entityId: cur.id, metadata: { source: MASTER_HAZARDS_REF, before } },
+        }),
+        this.prisma.hazard.update({ where: { id: cur.id }, data: content }),
+      ]);
+      updated++;
+    }
+    return { total: MASTER_HAZARDS.length, created, updated, unchanged: MASTER_HAZARDS.length - created - updated };
   }
 
   /** Exclusão lógica. Perigo em uso no inventário de algum PGR não pode ser excluído. */

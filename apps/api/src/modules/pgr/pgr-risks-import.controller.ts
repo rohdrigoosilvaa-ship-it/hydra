@@ -9,7 +9,7 @@ import { PgrRisksImportService } from "./pgr-risks-import.service";
 import { ConfirmRiskImportDto, ImportRiskRowDto } from "./dto/pgr-risks-import.dto";
 import type { ParsedRiskImportRow } from "./pgr-risks-import.util";
 
-const RISK_CATEGORIES: RiskCategory[] = ["FISICO", "QUIMICO", "BIOLOGICO", "ERGONOMICO", "ACIDENTE"];
+const RISK_CATEGORIES: RiskCategory[] = ["FISICO", "QUIMICO", "BIOLOGICO", "ERGONOMICO", "ACIDENTE", "PSICOSSOCIAL"];
 const EXPOSURE_TYPES: ExposureType[] = ["HABITUAL", "EVENTUAL", "INTERMITENTE", "PERMANENTE"];
 const EVALUATION_CRITERIA: EvaluationCriteria[] = ["QUALITATIVO", "QUANTITATIVO"];
 

@@ -628,6 +628,8 @@ enum RiskCategory {
   BIOLOGICO
   ERGONOMICO
   ACIDENTE
+  /// Fatores psicossociais relacionados ao trabalho (NR-1).
+  PSICOSSOCIAL
 }
 
 /// Catálogo de perigos/agentes reutilizável entre PGRs do mesmo tenant.
