@@ -1,4 +1,5 @@
-import { IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, Max, Min, MinLength } from "class-validator";
+import { Type } from "class-transformer";
+import { ValidateNested, IsArray, IsBoolean, IsNumber, IsDateString, IsIn, IsInt, IsOptional, IsString, Max, Min, MinLength } from "class-validator";
 import type { ActionStatus, EvaluationCriteria, ExposureType, RiskCategory } from "@hydra/db";
 
 const RISK_CATEGORIES: RiskCategory[] = ["FISICO", "QUIMICO", "BIOLOGICO", "ERGONOMICO", "ACIDENTE"];
@@ -6,6 +7,11 @@ const EXPOSURE_TYPES: ExposureType[] = ["HABITUAL", "EVENTUAL", "INTERMITENTE", 
 const EVALUATION_CRITERIA: EvaluationCriteria[] = ["QUALITATIVO", "QUANTITATIVO"];
 
 const TRI_STATE = ["SIM", "NAO", "NAO_SE_APLICA"];
+
+export class HazardExamDto {
+  @IsString() @MinLength(2) name!: string;
+  @IsOptional() @IsInt() @Min(1) @Max(120) periodicityMonths?: number;
+}
 
 /** Campos do cadastro de risco (catálogo) além de categoria/nome/código. */
 class HazardExtraFields {
@@ -21,6 +27,8 @@ class HazardExtraFields {
   @IsOptional() @IsBoolean() insertInAso?: boolean;
   @IsOptional() @IsIn(TRI_STATE) epcStatus?: string;
   @IsOptional() @IsIn(TRI_STATE) epiStatus?: string;
+  /** Exames que este risco exige (substitui a lista). */
+  @IsOptional() @IsArray() @ValidateNested({ each: true }) @Type(() => HazardExamDto) exams?: HazardExamDto[];
   /** EPCs/EPIs do banco indicados para este risco (substitui a lista). */
   @IsOptional() @IsArray() @IsString({ each: true }) equipmentIds?: string[];
 }
@@ -344,6 +352,15 @@ class PgrRiskFields {
   @IsString()
   description?: string;
 
+  // Medição de ruído (dB(A))
+  @IsOptional() @IsString() measurementCompany?: string | null;
+  @IsOptional() @IsString() measurementTechnique?: string | null;
+  @IsOptional() @IsString() measurementEquipment?: string | null;
+  @IsOptional() @IsDateString() measurementDate?: string | null;
+  @IsOptional() @IsNumber() measurementValue?: number | null;
+  @IsOptional() @IsNumber() measurementActionLevel?: number | null;
+  @IsOptional() @IsNumber() measurementLimit?: number | null;
+
   @IsOptional()
   @IsString()
   legalBasis?: string;
@@ -435,15 +452,18 @@ export class CreatePgrRiskDto extends PgrRiskFields {
   @IsString()
   hazardId!: string;
 
+  /** Vazio = ainda não avaliado ("Pendente de avaliação"). */
+  @IsOptional()
   @IsInt()
   @Min(1)
-  @Max(4)
-  probability!: number;
+  @Max(5)
+  probability?: number | null;
 
+  @IsOptional()
   @IsInt()
   @Min(1)
-  @Max(4)
-  severity!: number;
+  @Max(5)
+  severity?: number | null;
 }
 
 export class UpdatePgrRiskDto extends PgrRiskFields {
@@ -459,13 +479,13 @@ export class UpdatePgrRiskDto extends PgrRiskFields {
   @IsInt()
   @Min(1)
   @Max(5)
-  probability?: number;
+  probability?: number | null;
 
   @IsOptional()
   @IsInt()
   @Min(1)
   @Max(5)
-  severity?: number;
+  severity?: number | null;
 }
 
 const ACTION_STATUSES: ActionStatus[] = [

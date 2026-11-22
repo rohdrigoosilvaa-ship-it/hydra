@@ -88,58 +88,65 @@ export const ESTRATEGIA = {
   ],
   avaliacaoEtapa1: "Esta primeira etapa representa o processo de conhecer os ambientes de trabalho, os trabalhadores expostos e os agentes ocupacionais.",
   classificacaoLabel: "Matriz de risco",
-  matrizIntro: "A Matriz de Risco utilizada neste Programa de Gerenciamento de Riscos é uma matriz no formato 4x4. Esta matriz funciona para avaliações qualitativas e quantitativas, pois as tabelas de gradações sugeridas possuem as estimativas adequadas para ambas as avaliações.",
+  matrizIntro: "A Matriz de Risco utilizada neste Programa de Gerenciamento de Riscos é uma matriz no formato 5x5. Esta matriz funciona para avaliações qualitativas e quantitativas, pois as tabelas de gradações sugeridas possuem as estimativas adequadas para ambas as avaliações.",
 };
 
 export const TABELA_PROBABILIDADE: { level: number; title: string; subtitle: string; line1: string; line2: string }[] = [
-  { level: 1, title: "OCASIONAL", subtitle: "Improvável", line1: "Até 25% da jornada", line2: "Improvável de ocorrer o evento (<2%)" },
-  { level: 2, title: "INTERMITENTE", subtitle: "Pouco provável", line1: "De 26% até 50% da Jornada de trabalho", line2: "Pouco provável de ocorrer o evento (2% - <10%)" },
-  { level: 3, title: "HABITUAL", subtitle: "Provável", line1: "De 51% até 75% da Jornada de trabalho", line2: "Provável de ocorrer o evento (>10% -50%)" },
-  { level: 4, title: "PERMANENTE", subtitle: "Muito provável", line1: "Acima de 75% da jornada de trabalho", line2: "Muito provável de ocorrer o evento (>50%)" },
+  { level: 1, title: "RARO", subtitle: "Controle excelente", line1: "Físico: exposição < 10% do LEO", line2: "Químico: sistema totalmente fechado" },
+  { level: 2, title: "POUCO PROVÁVEL", subtitle: "Controle em conformidade legal", line1: "Físico: exposição > 10% e < 50% do LEO", line2: "Químico: sistema fechado, pouca possibilidade de exposição" },
+  { level: 3, title: "POSSÍVEL", subtitle: "Controle com pequenas deficiências", line1: "Físico: exposição > 50% e < 100% do LEO", line2: "Químico: sistema semiaberto ou aberto com ventilação automática" },
+  { level: 4, title: "PROVÁVEL", subtitle: "Controle deficiente", line1: "Físico: exposição > 100% a 500% do LEO", line2: "Químico: sistema aberto, ventilação passiva e barreiras" },
+  { level: 5, title: "MUITO PROVÁVEL", subtitle: "Controle inexistente", line1: "Físico: exposição superior a 5 x LEO", line2: "Químico: sistema aberto, sem ventilação" },
 ];
 
-export const TABELA_POTENCIAL_DANO: { level: number; title: string; subtitle: string; risk: string }[] = [
-  { level: 1, title: "LEVE", subtitle: "Dano insignificante", risk: "Risco Leve" },
-  { level: 2, title: "MODERADO", subtitle: "Sem afastamento", risk: "Risco Moderado" },
-  { level: 3, title: "SÉRIO", subtitle: "Com afastamento", risk: "Risco Sério" },
-  { level: 4, title: "SEVERO", subtitle: "Morte / Irreversível", risk: "Risco Severo" },
+/** Estimativa de severidade (AIHA, 2015). */
+export const TABELA_POTENCIAL_DANO: { level: number; title: string; definition: string }[] = [
+  { level: 1, title: "LEVE", definition: "Lesão leve sem necessidade de atenção médica, incômodos ou mal-estar." },
+  { level: 2, title: "BAIXA", definition: "Lesão ou doenças sérias reversíveis." },
+  { level: 3, title: "MODERADA", definition: "Lesão ou doenças críticas irreversíveis que podem limitar a capacidade funcional." },
+  { level: 4, title: "ALTA", definition: "Lesão ou doença incapacitante ou mortal." },
+  { level: 5, title: "EXTREMA", definition: "Mortes ou incapacidades múltiplas (>10)." },
 ];
 
 export const TEXTO_NIVEIS =
-  "Os níveis de risco presentes na matriz são 5 (cinco): Insignificante (1); Baixo (2-4); Médio (4-6); Alto (8-12) e Crítico (16). Cada nível de risco possui o seu método de controle sugerido, baseado na estimativa (grau de certeza) da avaliação, onde os riscos de níveis mais altos têm prioridade de ação.";
+  "A matriz relaciona a probabilidade (1 a 5) com a severidade (1 a 5). O nível do risco resulta dessa combinação e é classificado em cinco categorias: Irrelevante, Baixo, Médio, Alto e Crítico, com o produto probabilidade x severidade indicado em cada quadro. Cada nível possui o seu método de controle sugerido, e a certeza da estimativa da avaliação define se é preciso levantar informação adicional. Riscos ainda não avaliados aparecem como “Pendente de avaliação” e não recebem nível.";
 
-/** Matriz 4x4: linhas = probabilidade 1..4, colunas = severidade 1..4. */
-export const MATRIZ_RISCO: { value: number; label: string }[][] = [
-  [{ value: 1, label: "Irrelevante" }, { value: 2, label: "Baixo" }, { value: 3, label: "Baixo" }, { value: 4, label: "Médio" }],
-  [{ value: 2, label: "Baixo" }, { value: 4, label: "Baixo" }, { value: 6, label: "Médio" }, { value: 8, label: "Alto" }],
-  [{ value: 3, label: "Baixo" }, { value: 6, label: "Médio" }, { value: 9, label: "Alto" }, { value: 12, label: "Alto" }],
-  [{ value: 4, label: "Médio" }, { value: 8, label: "Alto" }, { value: 12, label: "Alto" }, { value: 16, label: "Crítico" }],
+/** Níveis (1 a 5) por probabilidade (linha) e severidade (coluna) — a mesma matriz da avaliação do risco no cargo. */
+const NIVEIS_5X5 = [
+  [1, 1, 2, 3, 3],
+  [1, 2, 3, 3, 4],
+  [1, 2, 3, 4, 5],
+  [2, 2, 3, 4, 5],
+  [2, 3, 4, 5, 5],
 ];
+export const NIVEL_NOME: Record<number, string> = { 1: "Irrelevante", 2: "Baixo", 3: "Médio", 4: "Alto", 5: "Crítico" };
 
-export const MATRIZ_LEGENDA = "Eixo vertical: FREQUÊNCIA / PROBABILIDADE. Eixo horizontal: SEVERIDADE / POTENCIAL DE DANO.";
+/** Matriz 5x5 para desenhar: linhas da probabilidade 5 (em cima) até 1; colunas da severidade 1 a 5. */
+export const MATRIZ_RISCO: { value: number; level: number; label: string }[][] = [5, 4, 3, 2, 1].map((p) =>
+  [1, 2, 3, 4, 5].map((s) => {
+    const level = NIVEIS_5X5[p - 1]![s - 1]!;
+    return { value: p * s, level, label: NIVEL_NOME[level]! };
+  }),
+);
+
+export const MATRIZ_LEGENDA = "Eixo vertical: PROBABILIDADE (5 em cima, 1 embaixo). Eixo horizontal: SEVERIDADE (1 a 5). Em cada quadro: produto probabilidade x severidade e nível do risco.";
 
 export const EXEMPLO_APLICACAO = [
   { term: "Probabilidade", text: ": ruído ocupacional de 40 dB, permitido para 8 horas de atividade, classificando-o como probabilidade de nível 2 (pouco provável), de acordo com a tabela de gradação." },
-  { term: "Severidade", text: ": a severidade de uma doença que possa surgir de um ruído ocupacional classifica-se como “Lesão ou doenças críticas irreversíveis que podem limitar a capacidade funcional”, de acordo com a tabela sugerida, classificando-a como severidade de nível 2 (Moderado)." },
-  { term: "Nível do Risco", text: ": o nível do risco é a probabilidade x (vezes) a severidade. No caso, 2 x 2, resultando em 4 (Risco baixo) de acordo com a matriz." },
+  { term: "Severidade", text: ": a severidade de uma doença que possa surgir desse ruído classifica-se como “Lesão ou doenças sérias reversíveis”, de acordo com a tabela sugerida, ou seja, severidade de nível 2 (baixa)." },
+  { term: "Nível do Risco", text: ": o nível do risco combina a probabilidade com a severidade. No caso, 2 x 2, resultando em 4 (Risco Baixo) de acordo com a matriz." },
 ];
 
 export const METODOS_CONTROLE =
   "Os métodos de controle são classificados de acordo com o nível do risco e grau de certeza da estimativa da avaliação. Os níveis de risco mais altos devem ter prioridade na ação de controle. A ação de controle é classificada de acordo com o cálculo exposto na Matriz de risco seguindo a tabela abaixo.";
 
-/** Cada linha: valor G.R. + cor + texto. cor: green1 (verde-claro), green, yellow, orange, red. */
-export const MEDIDAS_SUGERIDAS: { value: number; color: "green1" | "green" | "yellow" | "orange" | "red"; text: string }[] = [
-  { value: 1, color: "green1", text: "Não prioritário. Manter as medidas melhoria contínua. Pode ser necessária avaliação quantitativa para confirmação da categoria, a critério do profissional responsável pelo levantamento de informações." },
-  { value: 2, color: "green", text: "Não prioritário. Manter as medidas melhoria contínua. Pode ser necessária avaliação quantitativa para confirmação da categoria, a critério do profissional responsável pelo levantamento de informações." },
-  { value: 2, color: "yellow", text: "Prioridade básica. Iniciar processo de avaliação quantitativa para confirmação, quando possível, da categoria e monitoramento periódico (Controle Estatístico). Planejamento de medidas de controle." },
-  { value: 3, color: "green", text: "Não prioritário. Manter as medidas melhoria contínua. Pode ser necessária avaliação quantitativa para confirmação da categoria, a critério do profissional responsável pelo levantamento de informações." },
-  { value: 4, color: "green", text: "Não prioritário. Manter as medidas melhoria contínua. Pode ser necessária avaliação quantitativa para confirmação da categoria, a critério do profissional responsável pelo levantamento de informações." },
-  { value: 4, color: "yellow", text: "Prioridade média. Adotar medidas de controle para redução da exposição ou probabilidade de dano e iniciar processo de avaliação quantitativa quando possível. Implementar medidas de controle." },
-  { value: 6, color: "yellow", text: "Prioridade média. Adotar medidas de controle para redução da exposição ou probabilidade de dano e iniciar processo de avaliação quantitativa quando possível. Implementar medidas de controle." },
-  { value: 8, color: "orange", text: "Prioridade média. Adotar medidas de controle para redução da exposição ou probabilidade de dano e iniciar processo de avaliação quantitativa quando possível. Implementar medidas de controle." },
-  { value: 9, color: "orange", text: "Prioridade preferencial. Adotar medidas imediatas de controle. Iniciar processo de avaliação quantitativa, quando possível, para verificação do rebaixamento da categoria de risco." },
-  { value: 12, color: "orange", text: "Prioridade preferencial. Adotar medidas imediatas de controle. Iniciar processo de avaliação quantitativa, quando possível, para verificação do rebaixamento da categoria de risco." },
-  { value: 16, color: "red", text: "Prioridade máxima. Retirada do exposto do local e paralisação da atividade /processo. Realização de reunião extraordinária para propor medidas de melhorias." },
+/** Uma linha por nível de risco (1 a 5), com a ação sugerida quando a estimativa é certa. */
+export const MEDIDAS_SUGERIDAS: { value: number; color: "n1" | "n2" | "n3" | "n4" | "n5"; text: string }[] = [
+  { value: 1, color: "n1", text: "Irrelevante. Nenhuma ação é necessária. Nenhuma informação adicional é necessária." },
+  { value: 2, color: "n2", text: "Baixo. Nenhum controle adicional é necessário. Se a estimativa tiver certeza média ou baixa, levantar informação adicional." },
+  { value: 3, color: "n3", text: "Médio. Controle adicional se for possível e viável. Se a estimativa tiver certeza média ou baixa, levantar informação adicional." },
+  { value: 4, color: "n4", text: "Alto. Controle necessário. Se a estimativa tiver certeza média ou baixa, o controle deve vir junto com informação adicional." },
+  { value: 5, color: "n5", text: "Crítico. Ação imediata ou interrupção da atividade. Se a estimativa tiver certeza média ou baixa, o controle deve vir junto com informação adicional." },
 ];
 
 export const MEDIDAS_NOTA =

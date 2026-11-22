@@ -7,6 +7,7 @@ import type { ExposureType, Prisma, RiskLevel } from "@hydra/db";
 import { assertCompanyInScope, companyScopeWhere } from "../org/scope.util";
 import { copyGheStructure } from "./ghe-copy.util";
 import { computePgrProgress } from "./pgr-progress.util";
+import { NOT_EVALUATED } from "./risk-level.util";
 
 @Injectable()
 export class PgrService {
@@ -376,15 +377,21 @@ async function addRisksToGhe(
         sourceCircumstances: r.sourceCircumstances,
         exposureType: r.exposureType as ExposureType | null,
         evaluationCriteria: r.measurementType,
-        probability: r.probability ?? 1,
-        severity: r.severity ?? 1,
-        riskLevel: LEVEL_TO_ENUM[level] ?? "IRRELEVANT",
-        classification: level ? LEVEL_CLASSIFICATION[level] : "Não avaliado",
+        ...(level
+          ? { probability: r.probability!, severity: r.severity!, riskLevel: LEVEL_TO_ENUM[level]!, classification: LEVEL_CLASSIFICATION[level]!, evaluated: true }
+          : { ...NOT_EVALUATED }),
         adminControls: r.adminMeasures,
         epcMeasures: names("EPC"),
         epiMeasures: names("EPI"),
         usesEpc: r.epcStatus,
         usesEpi: r.epiStatus,
+        measurementCompany: r.measurementCompany,
+        measurementTechnique: r.measurementTechnique,
+        measurementEquipment: r.measurementEquipment,
+        measurementDate: r.measurementDate,
+        measurementValue: r.measurementValue,
+        measurementActionLevel: r.measurementActionLevel,
+        measurementLimit: r.measurementLimit,
         createdById: userId,
         updatedById: userId,
       },

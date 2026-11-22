@@ -22,6 +22,12 @@ export class MedicalExamsController {
     return this.exams.create(user.tenantId, dto, user.id, user.assignments);
   }
 
+  @Get("control")
+  @RequirePermission(PERMISSIONS.HEALTH_READ)
+  control(@CurrentUser() user: HydraRequestUser, @Query("companyId") companyId: string) {
+    return this.exams.control(user.tenantId, user.assignments, companyId);
+  }
+
   @Post("sync-admissions")
   @RequirePermission(PERMISSIONS.HEALTH_WRITE)
   syncAdmissions(@CurrentUser() user: HydraRequestUser, @Body() dto: SyncAdmissionsDto) {

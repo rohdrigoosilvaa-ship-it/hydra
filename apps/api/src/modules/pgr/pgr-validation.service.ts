@@ -109,6 +109,15 @@ export class PgrValidationService {
             entityId: risk.id,
           });
         }
+        if (risk.evaluated === false) {
+          alerts.push({
+            code: "RISCO_NAO_AVALIADO",
+            severity: "warning",
+            message: `Risco "${risk.hazard.name}" (GHE "${ghe.name}") ainda não foi avaliado: pendente de probabilidade e severidade, pela avaliação das condições reais de trabalho.`,
+            entityType: "pgrRisk",
+            entityId: risk.id,
+          });
+        }
         if (!risk.classification) {
           alerts.push({
             code: "RISCO_SEM_CLASSIFICACAO",

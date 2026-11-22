@@ -662,6 +662,7 @@ model Hazard {
   pgrRisks      PgrRisk[]
   positionRisks PositionRisk[]
   protections   HazardProtection[]
+  exams         HazardExam[]
 
   @@index([tenantId])
   @@map("hazards")
@@ -888,6 +889,8 @@ model PgrRisk {
   exposureProfile    String?
   probability        Int // 1-5
   severity           Int // 1-5
+  /// false = ainda não avaliado (probabilidade/severidade 1 são só marcador): o documento mostra "Pendente de avaliação".
+  evaluated          Boolean             @default(true)
   riskLevel          RiskLevel
   /// Classificação conforme a metodologia do PGR de referência (ex.: "Aceitável",
   /// "Tolerável") — texto livre porque a escala completa não está confirmada
@@ -910,6 +913,15 @@ model PgrRisk {
   requiredActions     String? @db.Text
   /// Orientação aos trabalhadores.
   guidance            String? @db.Text
+
+  /// Medição de ruído (dB(A)) — só preenchida em riscos de ruído.
+  measurementCompany     String?
+  measurementTechnique   String?
+  measurementEquipment   String?
+  measurementDate        DateTime? @db.Date
+  measurementValue       Decimal?  @db.Decimal(8, 2)
+  measurementActionLevel Decimal?  @db.Decimal(8, 2)
+  measurementLimit       Decimal?  @db.Decimal(8, 2)
 
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
@@ -1027,9 +1039,10 @@ model MedicalExam {
   updatedAt   DateTime   @updatedAt
   createdById String?
 
-  pcmso    Pcmso?   @relation(fields: [pcmsoId], references: [id])
+  pcmso    Pcmso?            @relation(fields: [pcmsoId], references: [id])
+  items    MedicalExamItem[]
   aso      Aso?
-  employee Employee @relation(fields: [employeeId], references: [id])
+  employee Employee          @relation(fields: [employeeId], references: [id])
 
   @@index([tenantId])
   @@index([employeeId])
@@ -2621,6 +2634,15 @@ model PositionRisk {
   severity               Int?
   certainty              Int?
 
+  /// Medição de ruído (dB(A)) — só preenchida em riscos de ruído.
+  measurementCompany     String?
+  measurementTechnique   String?
+  measurementEquipment   String?
+  measurementDate        DateTime? @db.Date
+  measurementValue       Decimal?  @db.Decimal(8, 2)
+  measurementActionLevel Decimal?  @db.Decimal(8, 2)
+  measurementLimit       Decimal?  @db.Decimal(8, 2)
+
   position   Position                 @relation(fields: [positionId], references: [id], onDelete: Cascade)
   hazard     Hazard                   @relation(fields: [hazardId], references: [id])
   protection PositionRiskProtection[]
@@ -2646,11 +2668,15 @@ model PositionRiskProtection {
 
 /// Exame ocupacional exigido para o cargo.
 model PositionExam {
-  id         String   @id @default(cuid())
-  tenantId   String
-  positionId String
-  name       String
-  createdAt  DateTime @default(now())
+  id                String   @id @default(cuid())
+  tenantId          String
+  positionId        String
+  name              String
+  /// Periodicidade do exame em meses (padrão: 12 = anual).
+  periodicityMonths Int      @default(12)
+  /// Risco que originou o exame (vem do cadastro do risco); vazio = lançado à mão no cargo.
+  hazardId          String?
+  createdAt         DateTime @default(now())
 
   position Position @relation(fields: [positionId], references: [id], onDelete: Cascade)
 
@@ -2765,4 +2791,34 @@ model ActionScheduleItem {
 
   @@index([scheduleId])
   @@map("action_schedule_items")
+}
+
+/// Exame que o risco exige (ex.: audiometria para ruído), com a periodicidade em meses.
+model HazardExam {
+  id                String @id @default(cuid())
+  tenantId          String
+  hazardId          String
+  name              String
+  periodicityMonths Int    @default(12)
+
+  hazard Hazard @relation(fields: [hazardId], references: [id], onDelete: Cascade)
+
+  @@index([hazardId])
+  @@map("hazard_exams")
+}
+
+/// Exame complementar feito dentro de um exame/ASO do colaborador (ex.: audiometria), com a data e o próximo vencimento.
+model MedicalExamItem {
+  id          String    @id @default(cuid())
+  tenantId    String
+  examId      String
+  name        String
+  performedAt DateTime? @db.Date
+  nextDueAt   DateTime? @db.Date
+
+  exam MedicalExam @relation(fields: [examId], references: [id], onDelete: Cascade)
+
+  @@index([examId])
+  @@index([tenantId])
+  @@map("medical_exam_items")
 }

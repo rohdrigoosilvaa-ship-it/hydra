@@ -1,4 +1,5 @@
-import { IsDateString, IsIn, IsOptional, IsString, MinLength } from "class-validator";
+import { Type } from "class-transformer";
+import { IsArray, IsDateString, IsIn, IsOptional, IsString, MinLength, ValidateNested } from "class-validator";
 import type { ExamResult, ExamType } from "@hydra/db";
 
 const EXAM_TYPES: ExamType[] = [
@@ -35,6 +36,19 @@ export class CreatePcmsoDto {
   validUntil?: string;
 }
 
+export class MedicalExamItemDto {
+  @IsString()
+  name!: string;
+
+  @IsOptional()
+  @IsDateString()
+  performedAt?: string | null;
+
+  @IsOptional()
+  @IsDateString()
+  nextDueAt?: string | null;
+}
+
 export class CreateMedicalExamDto {
   @IsString()
   employeeId!: string;
@@ -61,6 +75,13 @@ export class CreateMedicalExamDto {
   @IsOptional()
   @IsIn(EXAM_RESULTS)
   result?: ExamResult;
+
+  /** Exames complementares feitos junto (ex.: audiometria). */
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => MedicalExamItemDto)
+  items?: MedicalExamItemDto[];
 }
 
 /** Edição do exame lançado: tudo opcional; data vazia (null) limpa o campo. */
@@ -84,6 +105,12 @@ export class UpdateMedicalExamDto {
   @IsOptional()
   @IsIn(EXAM_RESULTS)
   result?: ExamResult;
+
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => MedicalExamItemDto)
+  items?: MedicalExamItemDto[];
 }
 
 export class CreateAsoDto {

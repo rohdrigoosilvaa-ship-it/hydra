@@ -184,6 +184,7 @@ export interface MedicalExam {
   performedAt: string | null;
   scheduledAt?: string | null;
   nextDueAt?: string | null;
+  items?: { id: string; name: string; performedAt: string | null; nextDueAt: string | null }[];
   result: ExamResult;
   aso: { id: string; result: ExamResult } | null;
 }
@@ -455,6 +456,7 @@ export interface Hazard {
   epcStatus?: string;
   epiStatus?: string;
   protections?: { equipment: ProtectionEquipment }[];
+  exams?: { id?: string; name: string; periodicityMonths: number }[];
 }
 
 export interface ProtectionEquipment {
@@ -574,6 +576,8 @@ export interface PgrRisk {
   exposureProfile: string | null;
   probability: number;
   severity: number;
+  /** false = ainda não avaliado ("Pendente de avaliação"). */
+  evaluated?: boolean;
   riskLevel: RiskLevel;
   classification: string | null;
   conclusion: string | null;
@@ -624,6 +628,13 @@ export interface PositionRisk {
   probability: number | null;
   severity: number | null;
   certainty: number | null;
+  measurementCompany?: string | null;
+  measurementTechnique?: string | null;
+  measurementEquipment?: string | null;
+  measurementDate?: string | null;
+  measurementValue?: string | number | null;
+  measurementActionLevel?: string | number | null;
+  measurementLimit?: string | number | null;
   hazard: { name: string; category: RiskCategory };
   protection: { equipmentId: string; equipment: { id: string; kind: "EPC" | "EPI"; name: string } }[];
 }
@@ -659,7 +670,7 @@ export interface Position {
   /** Ambientes pelos quais o cargo transita. */
   environments?: { environmentId: string }[];
   risks?: PositionRisk[];
-  exams?: { id: string; name: string }[];
+  exams?: { id: string; name: string; periodicityMonths: number; hazardId: string | null }[];
 }
 
 export type EnvironmentUnitType = "MATRIZ" | "FILIAL";

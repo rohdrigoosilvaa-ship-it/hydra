@@ -72,7 +72,7 @@ export class PositionsController {
   @Post(":id/exams")
   @RequirePermission(PERMISSIONS.ORG_POSITION_WRITE)
   addExams(@CurrentUser() user: HydraRequestUser, @Param("id") id: string, @Body() dto: AddPositionExamsDto) {
-    return this.positions.addExams(user.tenantId, id, dto.names, user.assignments);
+    return this.positions.addExams(user.tenantId, id, dto.names, user.assignments, dto.periodicityMonths);
   }
 
   @Delete(":id/exams")

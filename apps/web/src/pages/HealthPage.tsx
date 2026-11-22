@@ -5,7 +5,26 @@ import { Pencil, Plus, Trash2 } from "lucide-react";
 import { FormModal, ModalField } from "../components/ui/modal";
 import type { CompanyWorkspaceContext } from "./company/CompanyWorkspacePage";
 import { api } from "../lib/api";
-import type { Company, Employee, ExamType, MedicalExam, Pcmso } from "../lib/types";
+import type { Company, Employee, ExamType, MedicalExam, Pcmso, Position } from "../lib/types";
+
+interface ControlRow {
+  employeeId: string;
+  employeeName: string;
+  positionName: string | null;
+  exam: string;
+  periodicityMonths: number;
+  origin: string | null;
+  lastPerformedAt: string | null;
+  nextDueAt: string | null;
+  status: "EM_DIA" | "VENCENDO" | "VENCIDO" | "SEM_REGISTRO";
+}
+const CONTROL_LABEL: Record<ControlRow["status"], string> = { EM_DIA: "Em dia", VENCENDO: "Vence em breve", VENCIDO: "Vencido", SEM_REGISTRO: "Sem registro" };
+const CONTROL_STYLE: Record<ControlRow["status"], string> = {
+  EM_DIA: "bg-teal-tint text-teal-deep",
+  VENCENDO: "bg-amber-tint text-amber",
+  VENCIDO: "bg-amber text-white",
+  SEM_REGISTRO: "bg-line text-ink-muted",
+};
 
 const EXAM_TYPE_LABEL: Record<ExamType, string> = {
   ADMISSIONAL: "Admissional",
@@ -35,6 +54,8 @@ export function HealthPage() {
   const [pcmsos, setPcmsos] = useState<Pcmso[] | null>(null);
   const [exams, setExams] = useState<MedicalExam[] | null>(null);
   const [employees, setEmployees] = useState<Employee[]>([]);
+  const [positions, setPositions] = useState<Position[]>([]);
+  const [control, setControl] = useState<ControlRow[]>([]);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [showPcmsoForm, setShowPcmsoForm] = useState(false);
   const [examForm, setExamForm] = useState<MedicalExam | "new" | null>(null);
@@ -42,12 +63,16 @@ export function HealthPage() {
 
   async function load() {
     const q = companyId ? `?companyId=${companyId}` : "";
-    const [pcmsoList, examList, employeeList, companyList] = await Promise.all([
+    const [pcmsoList, examList, employeeList, companyList, positionList, controlList] = await Promise.all([
       api.get<Pcmso[]>("/health/pcmso"),
       api.get<MedicalExam[]>(`/health/exams${q}`),
       api.get<Employee[]>(`/employees${q}`),
       api.get<Company[]>("/companies"),
+      api.get<Position[]>(`/positions${q}`),
+      companyId ? api.get<ControlRow[]>(`/health/exams/control?companyId=${companyId}`) : Promise.resolve([] as ControlRow[]),
     ]);
+    setPositions(positionList);
+    setControl(controlList);
     setPcmsos(companyId ? pcmsoList.filter((p) => p.companyId === companyId) : pcmsoList);
     setExams(examList);
     setEmployees(employeeList);
@@ -180,9 +205,48 @@ export function HealthPage() {
         </div>
       </section>
 
+      {companyId && (
+        <section className="mt-8">
+          <h2 className="font-display text-lg font-semibold text-ink">Controle de exames por colaborador</h2>
+          <p className="mt-1 text-sm text-ink-muted">Os exames vêm do cargo: os que os riscos do PGR exigem e os que foram lançados no cargo. O vencimento segue a periodicidade de cada exame.</p>
+          <div className="mt-3 panel overflow-x-auto">
+            <table className="w-full text-left text-sm">
+              <thead>
+                <tr className="border-b border-line text-xs uppercase tracking-wide text-ink-muted">
+                  <th className="px-4 py-3 font-medium">Colaborador</th>
+                  <th className="px-4 py-3 font-medium">Cargo</th>
+                  <th className="px-4 py-3 font-medium">Exame</th>
+                  <th className="px-4 py-3 font-medium">Origem</th>
+                  <th className="px-4 py-3 font-medium">Último</th>
+                  <th className="px-4 py-3 font-medium">Vence</th>
+                  <th className="px-4 py-3 font-medium">Situação</th>
+                </tr>
+              </thead>
+              <tbody>
+                {control.length === 0 && (
+                  <tr><td className="px-4 py-6 text-ink-muted" colSpan={7}>Nenhum exame exigido pelos cargos dos colaboradores. Defina os exames no risco (Segurança › Riscos) ou no cargo.</td></tr>
+                )}
+                {control.map((r) => (
+                  <tr key={`${r.employeeId}-${r.exam}`} className="border-b border-line last:border-none">
+                    <td className="px-4 py-3 text-ink">{r.employeeName}</td>
+                    <td className="px-4 py-3 text-ink-muted">{r.positionName ?? "—"}</td>
+                    <td className="px-4 py-3 text-ink">{r.exam} <span className="text-xs text-ink-muted">(a cada {r.periodicityMonths}m)</span></td>
+                    <td className="px-4 py-3 text-ink-muted">{r.origin ?? "Cargo"}</td>
+                    <td className="px-4 py-3 text-ink-muted">{fmt(r.lastPerformedAt)}</td>
+                    <td className="px-4 py-3 text-ink-muted">{fmt(r.nextDueAt)}</td>
+                    <td className="px-4 py-3"><span className={`rounded px-2 py-0.5 text-xs font-medium ${CONTROL_STYLE[r.status]}`}>{CONTROL_LABEL[r.status]}</span></td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+
       {examForm && (
         <ExamModal
           employees={employees}
+          positions={positions}
           exam={examForm === "new" ? undefined : examForm}
           onClose={() => setExamForm(null)}
           onSaved={() => {
@@ -239,13 +303,18 @@ function NewPcmsoForm({ companies, onClose, onCreated }: { companies: Company[];
 }
 
 /** Lançar / editar exame: colaborador, tipo, data do exame, resultado e próximo vencimento. */
-function ExamModal({ employees, exam, onClose, onSaved }: { employees: Employee[]; exam?: MedicalExam; onClose: () => void; onSaved: () => void }) {
+function ExamModal({ employees, positions, exam, onClose, onSaved }: { employees: Employee[]; positions: Position[]; exam?: MedicalExam; onClose: () => void; onSaved: () => void }) {
   const [employeeId, setEmployeeId] = useState(exam?.employeeId ?? employees[0]?.id ?? "");
   const [type, setType] = useState<ExamType>(exam?.type ?? "PERIODICO");
   const [performedAt, setPerformedAt] = useState(exam?.performedAt?.slice(0, 10) ?? new Date().toISOString().slice(0, 10));
   const [result, setResult] = useState<"APTO" | "INAPTO" | "PENDENTE">(exam?.result ?? "APTO");
   const [nextDueAt, setNextDueAt] = useState(exam?.nextDueAt?.slice(0, 10) ?? plusOneYear(exam?.performedAt?.slice(0, 10) ?? new Date().toISOString().slice(0, 10)));
   const [dueTouched, setDueTouched] = useState(!!exam?.nextDueAt);
+  const required = positions.find((p) => p.id === employees.find((x) => x.id === employeeId)?.positionId)?.exams ?? [];
+  // exames do cargo marcados por padrão; ao editar, os que já estavam no exame
+  const [picked, setPicked] = useState<string[] | null>(exam ? (exam.items ?? []).map((i) => i.name) : null);
+  const selected = picked ?? required.map((r) => r.name);
+  const togglePick = (name: string) => setPicked(selected.includes(name) ? selected.filter((n) => n !== name) : [...selected, name]);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -253,11 +322,12 @@ function ExamModal({ employees, exam, onClose, onSaved }: { employees: Employee[
     e.preventDefault();
     setSaving(true);
     setError(null);
+    const items = selected.map((name) => ({ name }));
     try {
       if (exam) {
-        await api.patch(`/health/exams/${exam.id}`, { type, performedAt: performedAt || null, result, nextDueAt: nextDueAt || null });
+        await api.patch(`/health/exams/${exam.id}`, { type, performedAt: performedAt || null, result, nextDueAt: nextDueAt || null, items });
       } else {
-        await api.post("/health/exams", { employeeId, type, performedAt: performedAt || undefined, result, nextDueAt: nextDueAt || undefined });
+        await api.post("/health/exams", { employeeId, type, performedAt: performedAt || undefined, result, nextDueAt: nextDueAt || undefined, items });
       }
       onSaved();
     } catch (err) {
@@ -304,6 +374,20 @@ function ExamModal({ employees, exam, onClose, onSaved }: { employees: Employee[
           <input className="input" type="date" aria-label="Próximo vencimento" value={nextDueAt} onChange={(e) => { setNextDueAt(e.target.value); setDueTouched(true); }} />
         </ModalField>
       </div>
+      {required.length > 0 && (
+        <fieldset className="rounded-md border border-line p-3">
+          <legend className="px-1 text-xs font-semibold uppercase text-teal-deep">Exames do cargo feitos neste atendimento</legend>
+          <div className="flex flex-wrap gap-x-5 gap-y-2">
+            {required.map((r) => (
+              <label key={r.id} className="flex items-center gap-2 text-sm text-ink">
+                <input type="checkbox" checked={selected.includes(r.name)} onChange={() => togglePick(r.name)} />
+                {r.name} <span className="text-xs text-ink-muted">(a cada {r.periodicityMonths}m)</span>
+              </label>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-ink-muted">Cada exame marcado vence conforme a periodicidade dele, contada a partir da data do exame.</p>
+        </fieldset>
+      )}
       <p className="text-xs text-ink-muted">O vencimento sugerido é 1 ano depois do exame. Com resultado Apto ou Inapto, o exame conta como ASO emitido no painel da empresa.</p>
     </FormModal>
   );
