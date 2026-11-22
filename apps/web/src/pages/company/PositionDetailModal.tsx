@@ -4,6 +4,7 @@ import { api } from "../../lib/api";
 import { FormModal, ModalField, ModalFrame } from "../../components/ui/modal";
 import { EXPOSURE_LABEL, NewProtectionModal, ProtectionBox, RISK_CATEGORY_LABEL, TRI, YesNo } from "../RisksCatalogPage";
 import { RiskCategoryBadge } from "../../components/risk/RiskCategoryBadge";
+import { EMPTY_MEASUREMENT, NoiseMeasurementFields, isNoiseHazard, measurementFrom, measurementPayload, type Measurement } from "../../components/risk/NoiseMeasurement";
 import { RiskAssessment, type Assessment } from "../../components/risk/RiskAssessment";
 import { riskResult } from "../../lib/risk-assessment";
 import type { ExposureType, Hazard, Position, PositionRisk, ProtectionEquipment, WorkEnvironment } from "../../lib/types";
@@ -178,6 +179,7 @@ function LinkRiskModal({ position, positions, editing, onClose, onSaved }: { pos
   const [f, setF] = useState<Fields>(() => (editing ? { ...BLANK, ...Object.fromEntries(Object.keys(BLANK).map((k) => [k, (editing as unknown as Record<string, unknown>)[k] ?? (BLANK as Record<string, unknown>)[k]])) } as Fields : BLANK));
   const [chosen, setChosen] = useState<string[]>(() => (editing?.protection ?? []).map((p) => p.equipmentId));
   const [assessment, setAssessment] = useState<Assessment>({ probability: editing?.probability ?? null, severity: editing?.severity ?? null, certainty: editing?.certainty ?? null });
+  const [measurement, setMeasurement] = useState<Measurement>(() => (editing ? measurementFrom(editing) : EMPTY_MEASUREMENT));
   const [newKind, setNewKind] = useState<"EPC" | "EPI" | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -216,6 +218,7 @@ function LinkRiskModal({ position, positions, editing, onClose, onSaved }: { pos
       sendEsocial: esocial,
       ...f,
       ...assessment,
+      ...(isNoiseHazard(hazard?.name ?? editing?.hazard.name) ? measurementPayload(measurement) : {}),
       equipmentIds: chosen.filter((id) => {
         const kind = bank.find((b) => b.id === id)?.kind;
         return kind === "EPC" ? f.epcStatus === "SIM" : kind === "EPI" ? f.epiStatus === "SIM" : false;
@@ -336,6 +339,8 @@ function LinkRiskModal({ position, positions, editing, onClose, onSaved }: { pos
               </select>
             </ModalField>
             {f.epiStatus === "SIM" && <ProtectionBox kind="EPI" bank={bank} chosen={chosen} setChosen={setChosen} onNew={() => setNewKind("EPI")} />}
+
+            {isNoiseHazard(hazard?.name ?? editing?.hazard.name) && <NoiseMeasurementFields value={measurement} onChange={setMeasurement} />}
 
             <div className="border-t border-line pt-4">
               <p className="mb-3 font-display text-sm font-bold uppercase text-ink">Avaliação do risco</p>

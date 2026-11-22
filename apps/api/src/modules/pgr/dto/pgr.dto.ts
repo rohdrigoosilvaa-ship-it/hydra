@@ -1,5 +1,5 @@
 import { Type } from "class-transformer";
-import { ValidateNested, IsArray, IsBoolean, IsDateString, IsIn, IsInt, IsOptional, IsString, Max, Min, MinLength } from "class-validator";
+import { ValidateNested, IsArray, IsBoolean, IsNumber, IsDateString, IsIn, IsInt, IsOptional, IsString, Max, Min, MinLength } from "class-validator";
 import type { ActionStatus, EvaluationCriteria, ExposureType, RiskCategory } from "@hydra/db";
 
 const RISK_CATEGORIES: RiskCategory[] = ["FISICO", "QUIMICO", "BIOLOGICO", "ERGONOMICO", "ACIDENTE"];
@@ -351,6 +351,15 @@ class PgrRiskFields {
   @IsOptional()
   @IsString()
   description?: string;
+
+  // Medição de ruído (dB(A))
+  @IsOptional() @IsString() measurementCompany?: string | null;
+  @IsOptional() @IsString() measurementTechnique?: string | null;
+  @IsOptional() @IsString() measurementEquipment?: string | null;
+  @IsOptional() @IsDateString() measurementDate?: string | null;
+  @IsOptional() @IsNumber() measurementValue?: number | null;
+  @IsOptional() @IsNumber() measurementActionLevel?: number | null;
+  @IsOptional() @IsNumber() measurementLimit?: number | null;
 
   @IsOptional()
   @IsString()

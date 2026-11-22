@@ -610,6 +610,14 @@ export class PositionRiskFieldsDto {
   @IsOptional() @IsInt() @Min(1) @Max(5) severity?: number | null;
   @IsOptional() @IsInt() @Min(1) @Max(3) certainty?: number | null;
   @IsOptional() @IsArray() @IsString({ each: true }) equipmentIds?: string[];
+  // Medição de ruído (dB(A))
+  @IsOptional() @IsString() measurementCompany?: string | null;
+  @IsOptional() @IsString() measurementTechnique?: string | null;
+  @IsOptional() @IsString() measurementEquipment?: string | null;
+  @IsOptional() @IsDateString() measurementDate?: string | null;
+  @IsOptional() @IsNumber() measurementValue?: number | null;
+  @IsOptional() @IsNumber() measurementActionLevel?: number | null;
+  @IsOptional() @IsNumber() measurementLimit?: number | null;
 }
 
 export class LinkPositionRisksDto extends PositionRiskFieldsDto {

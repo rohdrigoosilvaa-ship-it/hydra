@@ -30,6 +30,8 @@ const RISK_COPY_KEYS = [
   "hazardId", "exposureType", "sendEsocial", "description", "damagePotential", "observations", "sourceCircumstances",
   "adminMeasures", "measurementType", "generatesUnhealthiness", "generatesHazardPay", "specialRetirement", "insertInAso",
   "epcStatus", "epiStatus", "probability", "severity", "certainty",
+  "measurementCompany", "measurementTechnique", "measurementEquipment", "measurementDate", "measurementValue",
+  "measurementActionLevel", "measurementLimit",
 ] as const;
 
 type RiskWithProtection = { [K in (typeof RISK_COPY_KEYS)[number]]: unknown } & { protection: { equipmentId: string }[] };
@@ -255,7 +257,8 @@ export class PositionsService {
   }
 
   /** Base (cadastro do risco ou valor atual) com os campos enviados por cima. */
-  private riskData(base: { [K in keyof PositionRiskFieldsDto]?: PositionRiskFieldsDto[K] | null }, over: PositionRiskFieldsDto) {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  private riskData(base: Record<string, any>, over: PositionRiskFieldsDto) {
     const pick = <K extends keyof PositionRiskFieldsDto>(k: K) => (over[k] !== undefined ? over[k] : base[k]);
     return {
       exposureType: pick("exposureType") ?? null,
@@ -275,6 +278,13 @@ export class PositionsService {
       probability: over.probability !== undefined ? over.probability : (base.probability ?? null),
       severity: over.severity !== undefined ? over.severity : (base.severity ?? null),
       certainty: over.certainty !== undefined ? over.certainty : (base.certainty ?? null),
+      measurementCompany: over.measurementCompany !== undefined ? over.measurementCompany : (base.measurementCompany ?? null),
+      measurementTechnique: over.measurementTechnique !== undefined ? over.measurementTechnique : (base.measurementTechnique ?? null),
+      measurementEquipment: over.measurementEquipment !== undefined ? over.measurementEquipment : (base.measurementEquipment ?? null),
+      measurementDate: over.measurementDate !== undefined ? (over.measurementDate ? new Date(over.measurementDate) : null) : (base.measurementDate ? new Date(base.measurementDate) : null),
+      measurementValue: over.measurementValue !== undefined ? over.measurementValue : (base.measurementValue ?? null),
+      measurementActionLevel: over.measurementActionLevel !== undefined ? over.measurementActionLevel : (base.measurementActionLevel ?? null),
+      measurementLimit: over.measurementLimit !== undefined ? over.measurementLimit : (base.measurementLimit ?? null),
     };
   }
 

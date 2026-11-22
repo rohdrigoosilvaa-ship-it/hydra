@@ -12,6 +12,7 @@ import {
   riskLevelOf,
 } from "../../lib/risk-matrix";
 import { ImportPgrRisksWizard } from "../ImportPgrRisksWizard";
+import { NoiseMeasurementFields, isNoiseHazard, measurementFrom, measurementPayload, type Measurement } from "../risk/NoiseMeasurement";
 import type {
   EvaluationCriteria,
   ExposureType,
@@ -541,6 +542,7 @@ function RiskForm({
   const hazardName = hazardList.find((h) => h.id === hazardId)?.name ?? "";
   const isAbsence = /^aus.{1,2}ncia/i.test(hazardName.normalize("NFC").trim());
   const [conclusion, setConclusion] = useState(risk?.conclusion ?? "");
+  const [measurement, setMeasurement] = useState<Measurement>(() => measurementFrom(risk as unknown as Parameters<typeof measurementFrom>[0]));
   const [adminControls, setAdminControls] = useState(risk?.adminControls ?? "");
   const [engineeringControls, setEngineeringControls] = useState(risk?.engineeringControls ?? "");
   const [epcMeasures, setEpcMeasures] = useState(risk?.epcMeasures ?? "");
@@ -596,6 +598,7 @@ function RiskForm({
             probability: probability ?? null,
             severity: severity ?? null,
             conclusion: t(conclusion),
+            ...(isNoiseHazard(hazardName) ? measurementPayload(measurement) : {}),
             adminControls: t(adminControls),
             engineeringControls: t(engineeringControls),
             epcMeasures: t(epcMeasures),
@@ -705,6 +708,8 @@ function RiskForm({
           )}
         </div>
       </div>
+
+      {!isAbsence && isNoiseHazard(hazardName) && <NoiseMeasurementFields value={measurement} onChange={setMeasurement} />}
 
       {!isAbsence && (
       <div className="border-t border-line pt-4">

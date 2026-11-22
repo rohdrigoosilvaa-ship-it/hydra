@@ -13,6 +13,9 @@ function evaluate(probability: number | null | undefined, severity: number | nul
   return { probability, severity, riskLevel: level, classification: riskClassification(level), evaluated: true };
 }
 
+/** Data AAAA-MM-DD do formulário → Date (null limpa; undefined não mexe). */
+const toDate = (v: string | null | undefined) => (v === undefined ? undefined : v ? new Date(v) : null);
+
 @Injectable()
 export class PgrRisksService {
   constructor(private readonly prisma: PrismaService) {}
@@ -36,6 +39,7 @@ export class PgrRisksService {
     return this.prisma.pgrRisk.create({
       data: {
         ...dto,
+        measurementDate: toDate(dto.measurementDate),
         ...evaluate(dto.probability, dto.severity),
         tenantId,
         createdById: userId,
@@ -58,6 +62,7 @@ export class PgrRisksService {
       where: { id },
       data: {
         ...dto,
+        measurementDate: toDate(dto.measurementDate),
         ...evaluate(probability, severity),
         updatedById: userId,
       },

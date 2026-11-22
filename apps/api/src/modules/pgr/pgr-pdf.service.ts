@@ -1147,6 +1147,33 @@ export class PgrPdfService {
           );
         }
 
+        // Medição (ruído): empresa/técnica/equipamento e valores em dB(A)
+        if (risk.measurementValue != null || risk.measurementCompany || risk.measurementTechnique || risk.measurementEquipment) {
+          const db = (v: unknown) => (v == null ? "—" : `${Number(v).toFixed(2)} dB(A)`);
+          const m3 = [frac(0.5), frac(0.25), frac(0.25)];
+          const m4 = [frac(0.25), frac(0.25), frac(0.25), frac(0.25)];
+          bar("Medição");
+          drawRow([th("Empresa", m3[0]!), th("Técnica utilizada", m3[1]!), th("Equipamento", m3[2]!)], { minH: 24 });
+          drawRow(
+            [
+              { text: risk.measurementCompany || "—", w: m3[0]!, align: "center" },
+              { text: risk.measurementTechnique || "—", w: m3[1]!, align: "center" },
+              { text: risk.measurementEquipment || "—", w: m3[2]!, align: "center" },
+            ],
+            { minH: 28 },
+          );
+          drawRow([th("Data da medição", m4[0]!), th("Medição", m4[1]!), th("Nível de ação", m4[2]!), th("LT", m4[3]!)], { minH: 24 });
+          drawRow(
+            [
+              { text: risk.measurementDate ? new Date(risk.measurementDate).toISOString().slice(0, 10).split("-").reverse().join("/") : "—", w: m4[0]!, align: "center" },
+              { text: db(risk.measurementValue), w: m4[1]!, align: "center" },
+              { text: db(risk.measurementActionLevel), w: m4[2]!, align: "center" },
+              { text: db(risk.measurementLimit), w: m4[3]!, align: "center" },
+            ],
+            { minH: 28 },
+          );
+        }
+
         bar("Prevenção e controle");
         const yn = (v: string | null | undefined) => YES_NO_LABEL[v ?? ""] ?? "Não se aplica";
         drawRow([th("Utiliza EPC", q[0]!), th("EPC eficaz", q[1]!), th("Utiliza EPI", q[2]!), th("EPI eficaz", q[3]!)], { minH: 24 });

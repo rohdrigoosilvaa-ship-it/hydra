@@ -914,6 +914,15 @@ model PgrRisk {
   /// Orientação aos trabalhadores.
   guidance            String? @db.Text
 
+  /// Medição de ruído (dB(A)) — só preenchida em riscos de ruído.
+  measurementCompany     String?
+  measurementTechnique   String?
+  measurementEquipment   String?
+  measurementDate        DateTime? @db.Date
+  measurementValue       Decimal?  @db.Decimal(8, 2)
+  measurementActionLevel Decimal?  @db.Decimal(8, 2)
+  measurementLimit       Decimal?  @db.Decimal(8, 2)
+
   createdAt   DateTime @default(now())
   updatedAt   DateTime @updatedAt
   createdById String?
@@ -2624,6 +2633,15 @@ model PositionRisk {
   probability            Int?
   severity               Int?
   certainty              Int?
+
+  /// Medição de ruído (dB(A)) — só preenchida em riscos de ruído.
+  measurementCompany     String?
+  measurementTechnique   String?
+  measurementEquipment   String?
+  measurementDate        DateTime? @db.Date
+  measurementValue       Decimal?  @db.Decimal(8, 2)
+  measurementActionLevel Decimal?  @db.Decimal(8, 2)
+  measurementLimit       Decimal?  @db.Decimal(8, 2)
 
   position   Position                 @relation(fields: [positionId], references: [id], onDelete: Cascade)
   hazard     Hazard                   @relation(fields: [hazardId], references: [id])

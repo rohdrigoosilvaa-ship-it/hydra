@@ -628,6 +628,13 @@ export interface PositionRisk {
   probability: number | null;
   severity: number | null;
   certainty: number | null;
+  measurementCompany?: string | null;
+  measurementTechnique?: string | null;
+  measurementEquipment?: string | null;
+  measurementDate?: string | null;
+  measurementValue?: string | number | null;
+  measurementActionLevel?: string | number | null;
+  measurementLimit?: string | number | null;
   hazard: { name: string; category: RiskCategory };
   protection: { equipmentId: string; equipment: { id: string; kind: "EPC" | "EPI"; name: string } }[];
 }
